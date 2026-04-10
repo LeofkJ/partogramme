@@ -3,8 +3,15 @@ import { makePersistable } from 'mobx-persist-store';
 import { Database } from '../../../types/supabase';
 import { supabase } from '../../initSupabase';
 import { RootStore } from '../rootStore';
-import { Alert, Platform, ToastAndroid } from 'react-native';
+import { Alert, Platform, ToastAndroid as RNToastAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
+let ToastAndroid: typeof RNToastAndroid;;
+if (Platform.OS === "android") {
+  // Lazy import only on Android
+  ToastAndroid = require("react-native").ToastAndroid;
+}
 
 export type Profile = Database['public']['Tables']['Profile'];
 export type Role = Database['public']['Enums']['Role']

@@ -3,7 +3,7 @@ import { makePersistable } from "mobx-persist-store";
 import { Database } from "../../../types/supabase";
 import { supabase } from "../../initSupabase";
 import { RootStore } from "../rootStore";
-import { Alert, Platform, ToastAndroid } from "react-native";
+import { Alert, Platform} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Profile, ProfileStore } from "./profileStore";
 import { TransportLayer } from "../../transport/transportLayer";

@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  ToastAndroid,
+  ToastAndroid as RNToastAndroid,
 } from "react-native";
 import { Dialog } from "@rneui/themed";
 import { Dispatch, SetStateAction } from "react";
@@ -23,6 +23,12 @@ import { computed, makeAutoObservable, runInAction } from "mobx";
 import { userInfo } from "os";
 import { CheckBox } from "@rneui/themed";
 import ErrorDialog from "./ErrorDialog";
+
+let ToastAndroid: typeof RNToastAndroid;;
+if (Platform.OS === "android") {
+  // Lazy import only on Android
+  ToastAndroid = require("react-native").ToastAndroid;
+}
 
 interface IProps {
   isVisible: boolean;
