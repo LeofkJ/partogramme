@@ -84,73 +84,83 @@ const renderDateTextElement = (itemDate: string): string => {
  * @param textColor text color of the item
  * @returns the rendered item
  */
-const Item = observer( ({
-  item,
-  onPress,
-  onDoublePress,
-  onDeleteButtonPress,
-  backgroundColor,
-  patientNameTextColor: patientNameTextColor,
-  infoTextColor: infoTextColor,
-}: ItemProps) => (
-  <View style={styles.itemView}>
-    <TouchableOpacity onPress={onDeleteButtonPress} style={styles.deleteButton}>
-      <Icon name="trash-o" size={20} color="white" />
-    </TouchableOpacity>
-    <TouchableOpacity
-      onPress={onPress}
-      style={[styles.itemTouchable, { backgroundColor }]}
-    >
-      <TapGestureHandler numberOfTaps={2} onActivated={() => onDoublePress()}>
-        <View style={{ flexDirection: "column", margin: 10 }}>
-          <View style={{ flexDirection: "row" }}>
-            <FontAwesomeIcon
-              style={[styles.icon, { color: patientNameTextColor }]}
-              icon={faUser}
-            />
-            <Text
-              style={[styles.patientNameFont, { color: patientNameTextColor }]}
-            >
-              {renderPatientTextElement(item.partogramme)}
+const Item = observer(
+  ({
+    item,
+    onPress,
+    onDoublePress,
+    onDeleteButtonPress,
+    backgroundColor,
+    patientNameTextColor: patientNameTextColor,
+    infoTextColor: infoTextColor,
+  }: ItemProps) => (
+    <View style={styles.itemView}>
+      <TouchableOpacity
+        onPress={onDeleteButtonPress}
+        style={styles.deleteButton}
+      >
+        <Icon name="trash-o" size={20} color="white" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onPress}
+        style={[styles.itemTouchable, { backgroundColor }]}
+      >
+        <TapGestureHandler numberOfTaps={2} onActivated={() => onDoublePress()}>
+          <View style={{ flexDirection: "column", margin: 10 }}>
+            <View style={{ flexDirection: "row" }}>
+              <FontAwesomeIcon
+                style={[styles.icon, { color: patientNameTextColor }]}
+                icon={faUser}
+              />
+              <Text
+                style={[
+                  styles.patientNameFont,
+                  { color: patientNameTextColor },
+                ]}
+              >
+                {renderPatientTextElement(item.partogramme)}
+              </Text>
+            </View>
+            <Text style={[styles.infoFont, { color: infoTextColor }]}>
+              Date d'admission {"\t\t"}
+              {renderDateTextElement(item.partogramme.admissionDateTime)}
+              {"\n"}
+              Date de début du travail {"\t"}
+              {renderDateTextElement(item.partogramme.workStartDateTime)}
             </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={[
+                  styles.infoFont,
+                  { color: patientNameTextColor, opacity: 1 },
+                ]}
+              >
+                Statut Patient :
+              </Text>
+              <Text
+                style={[
+                  styles.infoFont,
+                  styles.statusTextStyle,
+                  {
+                    color: "#403572",
+                    opacity: 1,
+                    marginLeft: 10,
+                    backgroundColor: getStatusBackgroundColor(
+                      item.partogramme.state,
+                    ),
+                    textAlign: "left",
+                  },
+                ]}
+              >
+                {getStringByEnum(partogrammeStates, item.partogramme.state)}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.infoFont, { color: infoTextColor }]}>
-            Date d'admission {"\t\t"}
-            {renderDateTextElement(item.partogramme.admissionDateTime)}
-            {"\n"}
-            Date de début du travail {"\t"}
-            {renderDateTextElement(item.partogramme.workStartDateTime)}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={[
-                styles.infoFont,
-                { color: patientNameTextColor, opacity: 1 },
-              ]}
-            >
-              Statut Patient :
-            </Text>
-            <Text
-              style={[
-                styles.infoFont,
-                styles.statusTextStyle,
-                { 
-                  color: "#403572", 
-                  opacity: 1, 
-                  marginLeft: 10,
-                  backgroundColor: getStatusBackgroundColor(item.partogramme.state), 
-                  textAlign: "left",
-                },
-              ]}
-            >
-              {getStringByEnum(partogrammeStates, item.partogramme.state)}
-            </Text>
-          </View>
-        </View>
-      </TapGestureHandler>
-    </TouchableOpacity>
-  </View>
-));
+        </TapGestureHandler>
+      </TouchableOpacity>
+    </View>
+  ),
+);
 
 const EmptyListMessage = ({}) => {
   return (
@@ -183,10 +193,10 @@ export const PartogrammeList = observer(
           {
             text: "Supprimer",
             style: "destructive",
-            onPress: () => item.delete(),
+            onPress: () => rootStore.partogrammeStore.removePartogramme(item), // ← changed
           },
         ],
-        { cancelable: true }
+        { cancelable: true },
       );
     };
 
@@ -229,7 +239,7 @@ export const PartogrammeList = observer(
         }}
       />
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({

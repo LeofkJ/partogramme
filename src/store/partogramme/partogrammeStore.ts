@@ -242,6 +242,7 @@ export class PartogrammeStore {
 
   // Delete a partogramme from the store
   async removePartogramme(partogramme: Partogramme) {
+    partogramme.partogramme.isDeleted = true;  // ← add this line
     await this.transportLayer
       .updatePartogramme(partogramme.partogramme)
       .then(() => {
@@ -257,14 +258,14 @@ export class PartogrammeStore {
         });
         return Promise.resolve(partogramme);
       })
-      .catch((error) => {
-        runInAction(() => {
-          this.state = "error";
-          console.log(error);
-        });
-        return Promise.reject(error);
+    .catch((error) => {
+      runInAction(() => {
+        this.state = "error";
+        console.log(error);
       });
-  }
+      return Promise.reject(error);
+    });
+}
 
   // Update the focused partogramme
   updateSelectedPartogramme(id: string) {
