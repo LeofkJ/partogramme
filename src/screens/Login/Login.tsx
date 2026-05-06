@@ -12,21 +12,16 @@ import "react-native-url-polyfill/auto";
 import CustomButton from "../../components/CustomButton";
 import { rootStore } from "../../store/rootStore";
 import { supabase } from "../../initSupabase";
-import { Dialog } from '@rneui/themed';
 import { observer } from "mobx-react";
+
 export type Props = {
   navigation: any;
 };
 
-export const ScreenLogin: React.FC<Props> = observer( ({ navigation }) => {
-  // Login variables
-  // const [email, SetEmail] = useState("victorbellemin@outlook.fr");
-  // const [password, SetPassword] = useState("jeanne42");
-
+export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(false);
 
   useEffect(() => {
-    // Handle app state changes
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === "inactive" || nextAppState === "background") {
       }
@@ -34,68 +29,37 @@ export const ScreenLogin: React.FC<Props> = observer( ({ navigation }) => {
 
     const handleAuthStateChange = (event: any) => {
       if (event === "SIGNED_OUT") {
-        // User is logged out, handle your cleanup process here
-        // e.g., clear sensitive data from MobX or secure storage
-        console.log("Auth Event listener : User is logged out");
-        // Clean every store
-        // rootStore.profileStore.cleanUp();
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
       }
-      if (event === "SIGNED_IN") {
-        // User is logged in
-        console.log("Auth Event listener : User is logged in");
-      }
     };
 
-    // Listen to Supabase auth state change
     supabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Listen to AppState changes to stop listening when the app is in the background or inactive
     const subscription = AppState.addEventListener(
       "change",
-      handleAppStateChange
+      handleAppStateChange,
     );
 
-    // Clean up listeners when the component unmounts
     return () => {
       subscription.remove();
     };
   }, []);
 
-  useEffect(() => {
-    const subscription = navigation.addListener("focus", () => {
-      supabase.auth.signOut();
-    });
-
-    const cleanup = () => {
-      // Call your cleanup function here
-      console.log("Screen is unmounted or quit");
-    };
-
-    return () => {
-      cleanup();
-      subscription();
-    };
-  }, [navigation]);
-
   const LoginButtonPressed = () => {
-    console.log("Function : LoginButtonPressed");
-    console.log("Email : " + rootStore.profileStore.email);
-    console.log("Password : " + rootStore.profileStore.password);
     setIsLoadingDialogVisible(true);
     rootStore.profileStore
-      .signInWithEmail(rootStore.profileStore.email, rootStore.profileStore.password)
+      .signInWithEmail(
+        rootStore.profileStore.email,
+        rootStore.profileStore.password,
+      )
       .then((result) => {
         if (result) {
-          console.log("Login success");
           navigation.navigate("Screen_Menu");
           setIsLoadingDialogVisible(false);
         }
       })
       .catch((error) => {
-        console.log("Login error");
-        console.log(error.message);
         setIsLoadingDialogVisible(false);
         Alert.alert("Login error : " + error.message);
       });
@@ -127,14 +91,11 @@ export const ScreenLogin: React.FC<Props> = observer( ({ navigation }) => {
         style={{}}
         styleText={{}}
       />
-      <Dialog
-        isVisible={isLoadingDialogVisible}
-        style={{ backgroundColor: "transparent"}}
-      >
-        <Dialog.Loading
-          loadingStyle={{ width: 100, height: 100, backgroundColor: "transparent" }}
-        />
-      </Dialog>
+      {isLoadingDialogVisible && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Connexion en cours...</Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -143,7 +104,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     backgroundColor: "#ffffff",
-    justifyContent: "center", // Center vertically
+    justifyContent: "center",
     alignItems: "center",
   },
   text: {
@@ -168,5 +129,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     margin: 2,
     fontWeight: "bold",
+  },
+  loadingContainer: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#403572",
+    fontSize: 16,
   },
 });
