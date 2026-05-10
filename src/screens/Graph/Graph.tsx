@@ -42,18 +42,8 @@ export type Props = {
   navigation: any;
 };
 
-/**
- * Screen for the graph
- * @param navigation - navigation object that allowed us to navigate between screens
- *
- * TODO: Add the graph
- *
- */
 export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
-  // State Variable to indicate screen is ready
   const [isReady, setIsReady] = useState(false);
-
-  // State variables to control the dialogs
   const [isFcDialogVisible, setFcDialogVisible] = useState(false);
   const [isDilationDialogVisible, setDilationDialogVisible] = useState(false);
   const [isDescentBabyDialogVisible, setDescentBabyDialogVisible] =
@@ -66,23 +56,28 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     useState(false);
   const [isChangeStateDialogVisible, setChangeStateDialogVisible] =
     useState(false);
-
-  // State variables to control the error dialog
   const [isErrorDialogVisible, setIsErrorDialogVisible] = useState(false);
   const [errorCode, setErrorCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  // State variable use for state change
   const [newState, setNewState] = useState("");
 
   const partogramme = rootStore.partogrammeStore.selectedPartogramme;
   if (partogramme === undefined) {
-    console.log("Partogramme selected is undefined");
     navigation.goBack();
   }
 
+  // Role and status helpers
+  const userRole = rootStore.userInfoStore.userInfo.role;
+  const status = partogramme?.partogramme.state;
+  const isNurse = userRole === "NURSE";
+  const isDoctor = userRole === "DOCTOR";
+
+  // Nurse can edit when EN COURS, doctor can edit when TRANSFERÉ
+  const canEdit =
+    (isNurse && status === "IN_PROGRESS") ||
+    (isDoctor && status === "TRANSFERRED");
+
   useEffect(() => {
-    // Function to be called on screen opening
     InteractionManager.runAfterInteractions(() => {
       fetchData();
       setTimeout(() => setIsReady(true), 1);
@@ -90,167 +85,121 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      // The screen is focused
-      // Call any action
-    });
-
-    const cleanup = () => {
-      // Call your cleanup function here
-      console.log("Screen is unmounted or quit");
-    };
-
+    const unsubscribe = navigation.addListener("focus", () => {});
+    const cleanup = () => {};
     return () => {
       cleanup();
       unsubscribe();
     };
   }, [navigation]);
 
-  // Create a new frequency baby data and add it to the partogramme
   const onDialogCloseAddFcBaby = (data: string, delta: string | null) => {
-    if (partogramme === null) {
-      console.error("No patient selected");
-      return;
-    }
-    if (delta === "") {
-      delta = null;
-    }
+    if (partogramme === null) return;
+    if (delta === "") delta = null;
     partogramme?.babyHeartFrequencyStore
       .createBabyHeartFrequency(
         Number(data),
         new Date().toISOString(),
-        Number(delta)
+        Number(delta),
       )
-      .then(() => {
-        console.log("Data added to the partogramme");
-      });
+      .then(() => {});
     setFcDialogVisible(false);
   };
 
-  // Create a new dilatation data and add it to the partogramme
   const onDialogCloseAddDilation = (data: string, delta: string | null) => {
-    if (partogramme === null) {
-      console.error("No patient selected");
-      return;
-    }
-    if (delta === "") {
-      delta = null;
-    }
+    if (partogramme === null) return;
+    if (delta === "") delta = null;
     partogramme?.dilationStore.createDilation(
       new Date().toISOString(),
       Number(data),
-      Number(delta)
+      Number(delta),
     );
     setDilationDialogVisible(false);
   };
 
-  // Create a new descent baby data and add it to the partogramme
   const onDialogCloseAddDescentBaby = (data: string, delta: string | null) => {
-    if (partogramme === null) {
-      console.error("No patient selected");
-      return;
-    }
-    if (delta === "") {
-      delta = null;
-    }
+    if (partogramme === null) return;
+    if (delta === "") delta = null;
     partogramme?.babyDescentStore.createBabyDescent(
       Number(data),
       new Date().toISOString(),
-      Number(delta)
+      Number(delta),
     );
     setDescentBabyDialogVisible(false);
   };
 
-  // Create a new data into the selected data store and add it to the partogramme
   const onDialogCloseAddDataTable = (
     dataStore?: DataInputTable_t,
-    data?: string
+    data?: string,
   ) => {
-    // Check parameters
     if (partogramme === null || dataStore === undefined || data === undefined) {
-      console.error("No patient selected");
       Alert.alert(
-        "Code Error : Unknown data store type. \n contact the administrator"
+        "Code Error : Unknown data store type. \n contact the administrator",
       );
       return;
     }
-
-    // Depending on the parameters create the correct data for the partogram
     if (dataStore instanceof AmnioticLiquidStore) {
       dataStore
         .createAmnioticLiquid(
           new Date().toISOString(),
-          dataStore.highestRank + 1,
-          data as Database["public"]["Enums"]["LiquidState"]
+          Number(dataStore.highestRank) + 1,
+          data as Database["public"]["Enums"]["LiquidState"],
         )
-        .then(() => {
-          console.log("Data added to the partogramme");
-        })
         .catch((error) => {
-          console.error(error);
           Platform.OS === "web" ? null : Alert.alert(error.message);
         });
     } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
       dataStore.createNew(
         Number(data),
         new Date().toISOString(),
-        dataStore.highestRank + 1
+        Number(dataStore.highestRank) + 1,
       );
     } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
       dataStore.createNew(
         Number(data),
         new Date().toISOString(),
-        dataStore.highestRank + 1
+        Number(dataStore.highestRank) + 1,
       );
     } else if (dataStore instanceof MotherContractionsFrequencyStore) {
       dataStore.createMotherContractionsFrequency(
         Number(data),
         new Date().toISOString(),
-        dataStore.highestRank + 1
+        Number(dataStore.highestRank) + 1,
       );
     } else if (dataStore instanceof MotherContractionDurationStore) {
       dataStore.createData({
         value: Number(data),
         created_at: new Date().toISOString(),
-        Rank: dataStore.highestRank + 1,
+        Rank: Number(dataStore.highestRank) + 1,
       });
     } else if (dataStore instanceof MotherHeartFrequencyStore) {
       dataStore.createMotherHeartFrequency(
         Number(data),
         new Date().toISOString(),
-        dataStore.highestRank + 1
+        Number(dataStore.highestRank) + 1,
       );
     } else if (dataStore instanceof MotherTemperatureStore) {
       dataStore.createMotherTemperature(
         Number(data),
         new Date().toISOString(),
-        dataStore.highestRank + 1
+        Number(dataStore.highestRank) + 1,
       );
     } else {
-      console.error("Unknown data store type");
       Alert.alert(
-        "Code Error : Unknown data store type. \n contact the administrator"
+        "Code Error : Unknown data store type. \n contact the administrator",
       );
       setAddTableDataDialogVisible(false);
       return;
     }
-    console.log("Data added to the partogramme");
     setAddTableDataDialogVisible(false);
   };
 
-  // Function that is called when the user clicks on the add comment button
   const onDialogCloseAddComment = (comment: string) => {
-    if (partogramme === null) {
-      console.error("No patient selected");
-      return;
-    }
+    if (partogramme === null) return;
     partogramme?.commentStore
       .createData({
         value: comment,
         created_at: new Date().toISOString(),
-      })
-      .then(() => {
-        console.log("Comment added to the partogramme");
       })
       .catch((error) => {
         setErrorMsg(error.message);
@@ -260,43 +209,14 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     setAddCommentDialogVisible(false);
   };
 
-  // This function is called when the user clicks on the add comment button
-  const openAddCommentDialog = () => {
-    console.log("Function : open Dialog Add Comment");
-    setAddCommentDialogVisible(true);
-  };
+  const openAddCommentDialog = () => setAddCommentDialogVisible(true);
+  const openFcDialog = () => setFcDialogVisible(true);
+  const openDilationDialog = () => setDilationDialogVisible(true);
+  const openDescentBabyDialog = () => setDescentBabyDialogVisible(true);
+  const openAddDataTable = () => setAddTableDataDialogVisible(true);
 
-  // This function is called when the user clicks on the heartbeat button
-  const openFcDialog = () => {
-    console.log("Function : open Dialog FC");
-    setFcDialogVisible(true);
-  };
-
-  // Function is called when the user clicks on the add dilation button
-  const openDilationDialog = () => {
-    console.log("Function : open Dialog Dilation");
-    setDilationDialogVisible(true);
-  };
-
-  // function that is called when the user clicks on the add descent baby button
-  const openDescentBabyDialog = () => {
-    console.log("Function : open Dialog Descent Baby");
-    setDescentBabyDialogVisible(true);
-  };
-
-  // Function that is called when the user click on the adddata table button
-  const openAddDataTable = () => {
-    console.log("Function : open Dialog Add Data Table");
-    setAddTableDataDialogVisible(true);
-  };
-
-  // Fetch every data from the database related to the selected partogramme
   const fetchData = () => {
-    console.log("Function : fetchData");
-    if (partogramme === null) {
-      console.log("No patient selected");
-      return;
-    }
+    if (partogramme === null) return;
     partogramme?.babyHeartFrequencyStore.loadBabyHeartFrequencies();
     partogramme?.babyDescentStore.loadBabyDescents();
     partogramme?.dilationStore.loadDilations();
@@ -306,24 +226,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     partogramme?.motherContractionDurationStore.load();
     partogramme?.motherTemperatureStore.loadMotherTemperatures();
     partogramme?.motherHeartRateFrequencyStore.loadMotherHeartFrequencies();
-    partogramme?.amnioticLiquidStore
-      .loadAmnioticLiquids()
-      .then(() => {
-        console.log("AmnioticLiquids loaded");
-      })
-      .catch((error) => {
-        console.error("Error while loading amniotic liquids");
-        console.error(error);
-      });
-    partogramme?.commentStore
-      .load()
-      .then(() => {
-        console.log("Comments loaded");
-      })
-      .catch((error) => {
-        console.error("Error while loading comments");
-        console.error(error);
-      });
+    partogramme?.amnioticLiquidStore.loadAmnioticLiquids();
+    partogramme?.commentStore.load();
   };
 
   if (!isReady) {
@@ -334,9 +238,6 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     );
   } else {
     return (
-      /**
-       * SafeAreaView is used to avoid the notch on the top of the screen
-       */
       <View style={{ flexGrow: 1 }}>
         <ScrollView
           style={styles.body}
@@ -352,11 +253,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <View style={{ flex: 1, marginTop: 5, width: "95%" }}>
             <View
               style={[
-                {
-                  paddingTop: 5,
-                  paddingBottom: 5,
-                  alignContent: "center",
-                },
+                { paddingTop: 5, paddingBottom: 5, alignContent: "center" },
                 styles.backGroundInfo,
               ]}
             >
@@ -369,7 +266,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     styles.infoText,
                     {
                       backgroundColor: getStatusBackgroundColor(
-                        partogramme!.asJson.state
+                        partogramme!.asJson.state,
                       ),
                       borderRadius: 5,
                       padding: 2,
@@ -378,7 +275,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 >
                   {getStringByEnum(
                     partogrammeStates,
-                    partogramme?.asJson.state
+                    partogramme?.asJson.state,
                   )}
                 </Text>
               </View>
@@ -386,75 +283,85 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 Mise à jour du statut :{" "}
               </Text>
               <View style={{ flex: 1, flexDirection: "row", width: "100%" }}>
-                <TouchableOpacity
-                  disabled={partogramme!.asJson.state !== "ADMITTED"}
-                  onPress={() => {
-                    setNewState("IN_PROGRESS");
-                    setChangeStateDialogVisible(true);
-                  }}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#403572",
-                    borderRadius: 5,
-                    padding: 2,
-                    alignItems: "center",
-                    opacity: partogramme!.asJson.state === "ADMITTED" ? 1 : 0.4,
-                  }}
-                >
-                  <Text
-                    style={[styles.infoText, { padding: 2, color: "white" }]}
+                {/* EN COURS — nurse only, when ADMITTED */}
+                {isNurse && (
+                  <TouchableOpacity
+                    disabled={partogramme!.asJson.state !== "ADMITTED"}
+                    onPress={() => {
+                      setNewState("IN_PROGRESS");
+                      setChangeStateDialogVisible(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#403572",
+                      borderRadius: 5,
+                      padding: 2,
+                      alignItems: "center",
+                      opacity:
+                        partogramme!.asJson.state === "ADMITTED" ? 1 : 0.4,
+                    }}
                   >
-                    {"EN COURS"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={partogramme!.asJson.state !== "IN_PROGRESS"}
-                  activeOpacity={0.2}
-                  onPress={() => {
-                    setNewState("TRANSFERRED");
-                    setChangeStateDialogVisible(true);
-                  }}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#403572",
-                    borderRadius: 5,
-                    padding: 2,
-                    marginLeft: 5,
-                    alignItems: "center",
-                    opacity:
-                      partogramme!.asJson.state === "IN_PROGRESS" ? 1 : 0.4,
-                  }}
-                >
-                  <Text
-                    style={[styles.infoText, { padding: 2, color: "white" }]}
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: "white" }]}
+                    >
+                      {"EN COURS"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* TRANSFERÉ — nurse only, when IN_PROGRESS */}
+                {isNurse && (
+                  <TouchableOpacity
+                    disabled={partogramme!.asJson.state !== "IN_PROGRESS"}
+                    activeOpacity={0.2}
+                    onPress={() => {
+                      setNewState("TRANSFERRED");
+                      setChangeStateDialogVisible(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#403572",
+                      borderRadius: 5,
+                      padding: 2,
+                      marginLeft: 5,
+                      alignItems: "center",
+                      opacity:
+                        partogramme!.asJson.state === "IN_PROGRESS" ? 1 : 0.4,
+                    }}
                   >
-                    {"TRANSFERÉ"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={partogramme!.asJson.state !== "IN_PROGRESS"}
-                  activeOpacity={0.2}
-                  onPress={() => {
-                    setNewState("WORK_FINISHED");
-                    setChangeStateDialogVisible(true);
-                  }}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#403572",
-                    borderRadius: 5,
-                    padding: 2,
-                    marginLeft: 5,
-                    alignItems: "center",
-                    opacity:
-                      partogramme!.asJson.state === "IN_PROGRESS" ? 1 : 0.4,
-                  }}
-                >
-                  <Text
-                    style={[styles.infoText, { padding: 2, color: "white" }]}
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: "white" }]}
+                    >
+                      {"TRANSFERÉ"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* TERMINÉ — nurse when IN_PROGRESS, doctor when TRANSFERRED */}
+                {((isNurse && status === "IN_PROGRESS") ||
+                  (isDoctor && status === "TRANSFERRED")) && (
+                  <TouchableOpacity
+                    activeOpacity={0.2}
+                    onPress={() => {
+                      setNewState("WORK_FINISHED");
+                      setChangeStateDialogVisible(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#403572",
+                      borderRadius: 5,
+                      padding: 2,
+                      marginLeft: 5,
+                      alignItems: "center",
+                    }}
                   >
-                    {"TERMINÉ"}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: "white" }]}
+                    >
+                      {"TERMINÉ"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
             <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
@@ -466,12 +373,18 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               {formatDateString(partogramme!.asJson.workStartDateTime)}
             </Text>
             <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-              Nom de l'hôpital : {rootStore.userInfoStore.hospitals.filter((h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId)[0].name}
+              Nom de l'hôpital :{" "}
+              {
+                rootStore.userInfoStore.hospitals.filter(
+                  (h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId,
+                )[0]?.name
+              }
             </Text>
             <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
               Numéro de dossier : {partogramme?.asJson.noFile}
             </Text>
           </View>
+
           <DialogConfirm
             Title="Confirmation du changement d'état"
             isVisible={isChangeStateDialogVisible}
@@ -479,11 +392,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             onValidate={() => {
               partogramme!
                 .changeState(
-                  newState as Database["public"]["Enums"]["PartogrammeState"]
+                  newState as Database["public"]["Enums"]["PartogrammeState"],
                 )
-                .then(() => {
-                  console.log("Partogramme state changed");
-                })
                 .catch((error) => {
                   setErrorMsg(error.message);
                   setErrorCode(error.code);
@@ -491,11 +401,11 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 });
               setChangeStateDialogVisible(false);
             }}
-            InfoText={`Voulez-vous vraiment changer l'état du partogramme vers ${partogrammeStates[newState]} ?`}
+            InfoText={`Voulez-vous vraiment changer l'état du partogramme vers ${partogrammeStates[newState as keyof typeof partogrammeStates]} ?`}
           />
+
           <Text style={styles.textTitle}>Fréquence Cardiaque du bébé</Text>
           <BabyGraph
-            // babyHeartFrequencyList={partogramme?.babyHeartFrequencyStore}
             data={
               rootStore.partogrammeStore.selectedPartogramme
                 ?.babyHeartFrequencyStore.babyHeartFrequencyGraphData
@@ -510,19 +420,17 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             step={10}
             dataName={"Fréquence cardiaque du bébé"}
           />
-          {
-            // Render the button if partogramme isn't locked
-            !partogramme!.isPartogrammeDataLocked && (
-              <CustomButton
-                title="Ajouter FC bébé"
-                color="#403572"
-                disabled={(partogramme!.partogramme.state !== "IN_PROGRESS")}
-                style={styles.buttonStyle}
-                onPressFunction={openFcDialog}
-                styleText={{ fontSize: 15, fontWeight: "bold" }}
-              />
-            )
-          }
+          {canEdit && (
+            <CustomButton
+              title="Ajouter FC bébé"
+              color="#403572"
+              disabled={false}
+              style={styles.buttonStyle}
+              onPressFunction={openFcDialog}
+              styleText={{ fontSize: 15, fontWeight: "bold" }}
+            />
+          )}
+
           <Text style={styles.textTitle}>Graphique de dilatation</Text>
           <DilationGraph
             dilationStore={partogramme?.dilationStore}
@@ -547,32 +455,26 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               marginLeft: 20,
             }}
           >
-            {
-              // Render the button if partogramme isn't locked
-              !partogramme!.isPartogrammeDataLocked && (
-                <CustomButton
-                  title="Ajouter dilatation"
-                  color="#403572"
-                  disabled={(partogramme!.partogramme.state !== "IN_PROGRESS")}
-                  style={styles.buttonStyle2}
-                  onPressFunction={openDilationDialog}
-                  styleText={{ fontSize: 15, fontWeight: "bold" }}
-                />
-              )
-            }
-            {
-              // Render the button if partogramme isn't locked
-              !partogramme!.isPartogrammeDataLocked && (
-                <CustomButton
-                  title="Ajouter descente bébé"
-                  color="#403572"
-                  disabled={(partogramme!.partogramme.state !== "IN_PROGRESS")}
-                  style={styles.buttonStyle2}
-                  onPressFunction={openDescentBabyDialog}
-                  styleText={{ fontSize: 15, fontWeight: "bold" }}
-                />
-              )
-            }
+            {canEdit && (
+              <CustomButton
+                title="Ajouter dilatation"
+                color="#403572"
+                disabled={false}
+                style={styles.buttonStyle2}
+                onPressFunction={openDilationDialog}
+                styleText={{ fontSize: 15, fontWeight: "bold" }}
+              />
+            )}
+            {canEdit && (
+              <CustomButton
+                title="Ajouter descente bébé"
+                color="#403572"
+                disabled={false}
+                style={styles.buttonStyle2}
+                onPressFunction={openDescentBabyDialog}
+                styleText={{ fontSize: 15, fontWeight: "bold" }}
+              />
+            )}
             <DialogDataInputGraph
               visible={isDescentBabyDialogVisible}
               onClose={onDialogCloseAddDescentBaby}
@@ -583,6 +485,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               dataName={"Descente du bébé"}
             />
           </View>
+
           <DataTable
             maxHours={12}
             tableData={[
@@ -599,38 +502,33 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               partogramme!.amnioticLiquidStore.amnioticLiquidAsTableString,
             ]}
           />
-          {
-            // Render the button if partogramme isn't locked
-            !partogramme!.isPartogrammeDataLocked && (
-              <CustomButton
-                title="Ajouter des données au tableau"
-                color="#403572"
-                disabled={(partogramme!.partogramme.state !== "IN_PROGRESS")}
-                style={styles.buttonStyle2}
-                onPressFunction={openAddDataTable}
-                styleText={{ fontSize: 15, fontWeight: "bold" }}
-              />
-            )
-          }
-          {
-            // Render the DialogDataInputTable if partogramme is defined
-            partogramme && (
-              <DialogDataInputTable
-                visible={isAddTableDataDialogVisible}
-                onClose={onDialogCloseAddDataTable}
-                onCancel={() => setAddTableDataDialogVisible(false)}
-                data={[
-                  partogramme.amnioticLiquidStore,
-                  partogramme.motherSystolicBloodPressureStore,
-                  partogramme.motherDiastolicBloodPressureStore,
-                  partogramme.motherHeartRateFrequencyStore,
-                  partogramme.motherTemperatureStore,
-                  partogramme.motherContractionFrequencyStore,
-                  partogramme.motherContractionDurationStore,
-                ]}
-              />
-            )
-          }
+          {canEdit && (
+            <CustomButton
+              title="Ajouter des données au tableau"
+              color="#403572"
+              disabled={false}
+              style={styles.buttonStyle2}
+              onPressFunction={openAddDataTable}
+              styleText={{ fontSize: 15, fontWeight: "bold" }}
+            />
+          )}
+          {partogramme && (
+            <DialogDataInputTable
+              visible={isAddTableDataDialogVisible}
+              onClose={onDialogCloseAddDataTable}
+              onCancel={() => setAddTableDataDialogVisible(false)}
+              data={[
+                partogramme.amnioticLiquidStore,
+                partogramme.motherSystolicBloodPressureStore,
+                partogramme.motherDiastolicBloodPressureStore,
+                partogramme.motherHeartRateFrequencyStore,
+                partogramme.motherTemperatureStore,
+                partogramme.motherContractionFrequencyStore,
+                partogramme.motherContractionDurationStore,
+              ]}
+            />
+          )}
+
           <CommentsSlider
             data={partogramme!.commentStore.DataListAsJson}
             title="Liste des Commentaires"
@@ -641,34 +539,29 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             onCancel={() => setAddCommentDialogVisible(false)}
             data_name={"Ajouter un commentaire"}
           />
-          {
-            // Render the button if partogramme isn't locked
-            !partogramme!.isPartogrammeDataLocked && (
-              <CustomButton
-                title="Ajouter un commentaire"
-                color="#403572"
-                disabled={(partogramme!.partogramme.state !== "IN_PROGRESS")}
-                style={styles.buttonAddCommentary}
-                onPressFunction={openAddCommentDialog}
-                styleText={{ fontSize: 15, fontWeight: "bold" }}
-              />
-            )
-          }
+          {canEdit && (
+            <CustomButton
+              title="Ajouter un commentaire"
+              color="#403572"
+              disabled={false}
+              style={styles.buttonAddCommentary}
+              onPressFunction={openAddCommentDialog}
+              styleText={{ fontSize: 15, fontWeight: "bold" }}
+            />
+          )}
         </ScrollView>
-        <FAB
-          size="large"
-          title=""
-          color="#9F90D4"
-          icon={{
-            name: "pen",
-            color: "white",
-            type: "font-awesome-5",
-          }}
-          style={styles.overlayPenButton}
-          onPress={() => {
-            setDataModifierDialogVisible(true);
-          }}
-        />
+
+        {canEdit && (
+          <FAB
+            size="large"
+            title=""
+            color="#9F90D4"
+            icon={{ name: "pen", color: "white", type: "font-awesome-5" }}
+            style={styles.overlayPenButton}
+            onPress={() => setDataModifierDialogVisible(true)}
+          />
+        )}
+
         <ErrorDialog
           isVisible={isErrorDialogVisible}
           errorCode={errorCode}
@@ -696,7 +589,6 @@ const styles = StyleSheet.create({
   },
   textTitle: {
     marginTop: 50,
-    // paddingTop: 20,
     fontSize: 20,
     fontWeight: "bold",
     color: "#403572",

@@ -6,8 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { DialogNurseInfo } from "../../components/Dialogs/DialogNurseInfo";
 import { useState, useEffect } from "react";
 import { rootStore } from "../../store/rootStore";
-import { userInfo } from 'os';
-import { UserInfoStore, UserInfo } from '../../store/user/userInfoStore';
+import { UserInfoStore, UserInfo } from "../../store/user/userInfoStore";
 
 export type Props = {
   navigation: any;
@@ -20,61 +19,55 @@ export type Props = {
 export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
   const [isNurseInfoDialogVisible, setNurseInfoDialogVisible] = useState(false);
   const [UserInfoStore] = useState(rootStore.userInfoStore);
-  
-  // fetch nurse info based on logged in user id
+
+  const isNurse = rootStore.userInfoStore.userInfo.role === "NURSE";
+
   useEffect(() => {
-    rootStore.userInfoStore.fetchUserInfo().then((data) => {
-      // Ask for the neccesary informations if it is the first time
-      if (
-        rootStore.userInfoStore.userInfo.firstName === "" ||
-        rootStore.userInfoStore.userInfo.lastName === "" ||
-        rootStore.userInfoStore.userInfo.refDoctorId === ""
-      ) {
-        setNurseInfoDialogVisible(true);
-      }
-      else {
-        // load partogrammes when the component is mounted
-        if (rootStore.userInfoStore.userInfo.role === "NURSE") {
-          console.log("fetch partogrammes for nurse");
-          rootStore.partogrammeStore.fetchFromServer(
-            rootStore.profileStore.profile.id
-          );
-        } else if (rootStore.userInfoStore.userInfo.role === "DOCTOR") {
-          console.log("fetch partogrammes for doctor");
-          rootStore.partogrammeStore.fetchFromServer();
+    rootStore.userInfoStore
+      .fetchUserInfo()
+      .then((data) => {
+        if (
+          rootStore.userInfoStore.userInfo.firstName === "" ||
+          rootStore.userInfoStore.userInfo.lastName === "" ||
+          rootStore.userInfoStore.userInfo.refDoctorId === ""
+        ) {
+          setNurseInfoDialogVisible(true);
+        } else {
+          if (rootStore.userInfoStore.userInfo.role === "NURSE") {
+            rootStore.partogrammeStore.fetchFromServer(
+              rootStore.profileStore.profile.id,
+            );
+          } else if (rootStore.userInfoStore.userInfo.role === "DOCTOR") {
+            rootStore.partogrammeStore.fetchFromServer();
+          }
         }
-      }
-    })
-    .catch((error) => {
-      if (error.code === "PGRST116") {
-        setNurseInfoDialogVisible(true);
-      }
-      console.log(error);
-    });
+      })
+      .catch((error) => {
+        if (error.code === "PGRST116") {
+          setNurseInfoDialogVisible(true);
+        }
+        console.log(error);
+      });
   }, []);
 
   return (
-    /**
-     * SafeAreaView is used to avoid the notch on the top of the screen
-     */
-    <View 
-      style={styles.body}>
+    <View style={styles.body}>
       <Text style={styles.titleText}>
-        Partogrammes de {rootStore.userInfoStore.userInfo.firstName}{" "}{rootStore.userInfoStore.userInfo.lastName}
+        Partogrammes de {rootStore.userInfoStore.userInfo.firstName}{" "}
+        {rootStore.userInfoStore.userInfo.lastName}
       </Text>
       <View style={styles.listContainer}>
-        <PartogrammeList
-          title={"Partogrammes"}
-          navigation={navigation}
-        ></PartogrammeList>
+        <PartogrammeList title={"Partogrammes"} navigation={navigation} />
+        {isNurse && (
           <TouchableOpacity
             style={styles.button}
             onPress={() => {
               navigation.navigate("Screen_AddPartogramme");
             }}
           >
-          <FontAwesome5 name={"plus"} size={20} color={"#ffffff"} />
-        </TouchableOpacity>
+            <FontAwesome5 name={"plus"} size={20} color={"#ffffff"} />
+          </TouchableOpacity>
+        )}
       </View>
       <DialogNurseInfo
         isVisible={isNurseInfoDialogVisible}
