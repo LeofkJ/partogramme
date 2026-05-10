@@ -8,13 +8,14 @@ import React, { useState } from "react";
 import {
   Alert,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { TapGestureHandler } from "react-native-gesture-handler";
-import Icon from "react-native-vector-icons/FontAwesome"; // Assuming you want to use the FontAwesome icon library
+import Icon from "react-native-vector-icons/FontAwesome";
 import { rootStore } from "../store/rootStore";
 import {
   Partogramme,
@@ -23,6 +24,9 @@ import {
 } from "../store/partogramme/partogrammeStore";
 import { getStringByEnum, partogrammeStates } from "../../types/constants";
 import { Database } from "../../types/supabase";
+
+declare const window: any;
+
 export interface PartogrammeListProps {
   title?: string;
   navigation: any;
@@ -58,7 +62,7 @@ const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
   return patientName;
 };
 
-const renderDateTextElement = (itemDate: string): string => {
+const renderDateTextElement = (itemDate: string | null): string => {
   let retDate = "";
   if (itemDate !== null) {
     let dateFmt = new Date(itemDate);
@@ -76,14 +80,6 @@ const renderDateTextElement = (itemDate: string): string => {
   return retDate;
 };
 
-/**
- *  This function render each item depending of item object
- * @param item Partogramme item of the partogramme list
- * @param onPress function that is called when the item is pressed
- * @param backgroundColor background color of the item
- * @param textColor text color of the item
- * @returns the rendered item
- */
 const Item = observer(
   ({
     item,
@@ -91,8 +87,8 @@ const Item = observer(
     onDoublePress,
     onDeleteButtonPress,
     backgroundColor,
-    patientNameTextColor: patientNameTextColor,
-    infoTextColor: infoTextColor,
+    patientNameTextColor,
+    infoTextColor,
   }: ItemProps) => (
     <View style={styles.itemView}>
       <TouchableOpacity
@@ -109,7 +105,8 @@ const Item = observer(
           <View style={{ flexDirection: "column", margin: 10 }}>
             <View style={{ flexDirection: "row" }}>
               <FontAwesomeIcon
-                style={[styles.icon, { color: patientNameTextColor }]}
+                style={styles.icon}
+                color={patientNameTextColor}
                 icon={faUser}
               />
               <Text
@@ -164,7 +161,6 @@ const Item = observer(
 
 const EmptyListMessage = ({}) => {
   return (
-    // Flat List Item
     <Text style={styles.emptyListStyle}>Aucun partogramme disponible !</Text>
   );
 };
@@ -172,39 +168,39 @@ const EmptyListMessage = ({}) => {
 export const PartogrammeList = observer(
   ({ title, navigation }: PartogrammeListProps) => {
     const [selectedId, setSelectedId] = useState<string>();
-    const [isDeleteConfirmDialogVisible, setDeleteConfirmDialogVisible] =
-      useState(false);
 
     const partogrammeSelected = (id: string) => {
-      console.log("Partogramme selected: " + id);
       rootStore.partogrammeStore.updateSelectedPartogramme(id);
       navigation.navigate("Screen_Graph");
     };
 
     const handleDeletePress = (item: Partogramme) => {
-      Alert.alert(
-        "Confirmation",
-        "Êtes-vous sûre de vouloir supprimer ce partogramme?",
-        [
-          {
-            text: "Annuler",
-            style: "cancel",
-          },
-          {
-            text: "Supprimer",
-            style: "destructive",
-            onPress: () => rootStore.partogrammeStore.removePartogramme(item), // ← changed
-          },
-        ],
-        { cancelable: true },
-      );
+      if (Platform.OS === "web") {
+        if (
+          window.confirm("Êtes-vous sûre de vouloir supprimer ce partogramme?")
+        ) {
+          rootStore.partogrammeStore.removePartogramme(item);
+        }
+      } else {
+        Alert.alert(
+          "Confirmation",
+          "Êtes-vous sûre de vouloir supprimer ce partogramme?",
+          [
+            {
+              text: "Annuler",
+              style: "cancel",
+            },
+            {
+              text: "Supprimer",
+              style: "destructive",
+              onPress: () => rootStore.partogrammeStore.removePartogramme(item),
+            },
+          ],
+          { cancelable: true },
+        );
+      }
     };
 
-    /**
-     * This function render each item depending of item object
-     * @param item Partogramme item of the partogramme list
-     * @returns the rendered item
-     */
     const renderItem = ({ item }: { item: Partogramme }) => {
       const backgroundColor =
         item.partogramme.id === selectedId ? "#403572" : "#F6F5Ff";
@@ -214,7 +210,6 @@ export const PartogrammeList = observer(
         item.partogramme.id === selectedId ? "white" : "#403572";
 
       return (
-        // Flat List Item
         <Item
           item={item}
           onPress={() => setSelectedId(item.partogramme.id)}
@@ -230,7 +225,7 @@ export const PartogrammeList = observer(
     return (
       <FlatList
         style={styles.list}
-        data={rootStore.partogrammeStore.partogrammeList.slice()} // Use .slice() to subscribe to the partogramme store
+        data={rootStore.partogrammeStore.partogrammeList.slice()}
         renderItem={renderItem}
         keyExtractor={(item) => item.partogramme.id}
         ListEmptyComponent={EmptyListMessage}
