@@ -15,8 +15,7 @@ import {
   Cell,
 } from "react-native-reanimated-table";
 import { tableTitles } from "../../../types/constants";
-import { table } from "console";
-import { Button, ButtonGroup, withTheme, Icon } from "@rneui/themed";
+import { Button, Icon } from "@rneui/themed";
 import { data_t } from "../../store/partogramme/partogrammeStore";
 
 interface Props {
@@ -41,7 +40,6 @@ const DataListTable: React.FC<Props> = ({
       buttonStyle = {styles.btn}
       onPress={
         () => {
-          console.log("pressed" + index.toString());
           onPress(index);
         }
       }>
@@ -94,7 +92,6 @@ const DataListTable: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     flexDirection: "row",
     backgroundColor: "#F6F3F3",
     width: "100%",

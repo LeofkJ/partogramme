@@ -12,14 +12,12 @@ export const DoubleTap = ({ onTap, onDoubleTap}: DoubleTapProps, {children}) => 
 
     const onSingleTapEvent = (event: any) => {
         if (event.nativeEvent.state === State.ACTIVE) {
-            console.log("single tap 1");
             props.onTap();
         }
     };
 
     const onDoubleTapEvent = (event: any) => {
         if (event.nativeEvent.state === State.ACTIVE) {
-            console.log("double tap 1");
             props.onDoubleTap();
         }
     };

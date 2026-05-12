@@ -35,7 +35,6 @@ const createTableData = (dataList: data_t[]) => {
     dataRow.push(date); // data timestamp
     tableData.push(dataRow);
   }
-  // console.log(tableData);
   return tableData;
 };
 
@@ -72,7 +71,6 @@ const DataModifierDialog: React.FC<Props> = observer(({
             title={"Données des 10 dernières minutes"}
             dataList={partogramme.Last10MinutesDataIds.slice()}
             onEditButtonPress={(item) => {
-              console.log("Edit button pressed !");
               runInAction(() => {
                 item.partogrammeStore.editedDataId = item.data.id;
               });
@@ -104,7 +102,6 @@ const DataModifierDialog: React.FC<Props> = observer(({
             .catch((error:any) => {
                 setErrorMessage(error.message);
                 setIsErrorDialogVisible(true);
-                console.log(error);
             });
 
           }}

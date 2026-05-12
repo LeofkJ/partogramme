@@ -38,50 +38,41 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     const [dateTimeUpdated, setDateTimeUpdated] = useState("");
 
     const handleTimeAdmissionChanged = (time: Date | undefined) => {
-      console.log("Function : handleTimeChanged");
       if (time !== undefined) {
         admissionDateTime.setHours(time.getHours());
         admissionDateTime.setMinutes(time.getMinutes());
         onChangeAdmissionDateTime(admissionDateTime);
       }
-      console.log("Admission date time changed : " + admissionDateTime);
     };
 
     const handleDateAdmissionChanged = (date: Date | undefined) => {
-      console.log("Function : handleDateChanged");
       if (date !== undefined) {
         admissionDateTime.setFullYear(date.getFullYear());
         admissionDateTime.setMonth(date.getMonth());
         admissionDateTime.setDate(date.getDate());
         onChangeAdmissionDateTime(admissionDateTime);
       }
-      console.log("Admission date time changed : " + admissionDateTime);
     };
 
     const handleTimeWorkStartChanged = (time: Date | undefined) => {
-      console.log("Function : handleTimeChanged");
       if (time !== undefined) {
         workStartDateTime.setHours(time.getHours());
         workStartDateTime.setMinutes(time.getMinutes());
         onChangeWorkStartDate(workStartDateTime);
       }
-      console.log("Work start date time changed : " + workStartDateTime);
     };
 
     const handleDateWorkStartChanged = (date: Date | undefined) => {
-      console.log("Function : handleDateChanged");
       if (date !== undefined) {
         workStartDateTime.setFullYear(date.getFullYear());
         workStartDateTime.setMonth(date.getMonth());
         workStartDateTime.setDate(date.getDate());
         onChangeWorkStartDate(workStartDateTime);
       }
-      console.log("Work start date time changed : " + workStartDateTime);
     };
 
     // This function is called when the user clicks on the create button
     const createButtonPressed = () => {
-      console.log("Function : createButtonPressed");
       rootStore.partogrammeStore.createPartogramme(
         admissionDateTime.toISOString(),
         commentary,
@@ -89,14 +80,11 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
         patientLastName,
         Number(noFile),
         "ADMITTED",
-        null,
+        workStartDateTime.toISOString(),
       )
         .then(() => {
-          console.log("Partogramme created");
         })
         .catch((error) => {
-          console.log("Error while creating partogramme code " + error.code);
-          console.log(error.message);
         });
       // Navigate to the menu screen
       navigation.navigate("Screen_Menu");
@@ -173,6 +161,11 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             title="Date et heure d'admission"
             onDateChange={handleDateAdmissionChanged}
             onTimeChange={handleTimeAdmissionChanged}
+          />
+          <DateTimePickerUIBloc
+            title="Date et heure de début du travail"
+            onDateChange={handleDateWorkStartChanged}
+            onTimeChange={handleTimeWorkStartChanged}
           />
           <View style={[styles.backGroundInfo,
           {

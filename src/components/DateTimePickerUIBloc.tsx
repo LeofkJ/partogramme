@@ -62,15 +62,11 @@ export default class DateTimePickerUIBloc extends React.Component<
   }
 
   onDismiss = () => {
-    console.log("Time picker dismissed!");
     this.setIsTimePickerVisible(false);
   };
 
   onConfirm = (hoursAndMinutes: { hours: number; minutes: number }) => {
     this.setIsTimePickerVisible(false);
-    console.log(
-      "Selected hours :" + hoursAndMinutes.hours + ":" + hoursAndMinutes.minutes
-    );
     let date = new Date(
       0,
       0,

@@ -3,6 +3,8 @@ import uuid from "react-native-uuid";
 import { Database } from "../../../types/supabase";
 import { TransportLayer } from "../../transport/transportLayer";
 import { RootStore } from "../rootStore";
+import { supabase } from "../../initSupabase";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import {
   BabyHeartFrequency,
   BabyHeartFrequencyStore,
@@ -100,14 +102,15 @@ export class PartogrammeStore {
   isInSync = false;
   selectedPartogrammeId: string | null = null;
   transportLayer: TransportLayer;
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(rootStore: RootStore, transportLayer: TransportLayer) {
     makeAutoObservable(this, {
       rootStore: false,
       transportLayer: false,
+      realtimeChannel: false,
       isInSync: false,
       selectedPartogramme: computed,
-
     });
     this.rootStore = rootStore;
     this.transportLayer = transportLayer;
@@ -126,12 +129,9 @@ export class PartogrammeStore {
       .fetchPartogrammes(this.rootStore.userInfoStore.userInfo.hospitalId)
       .then((fetchedPartogrammes) => {
         runInAction(() => {
-          console.log("Partogrammes fetched from server :" + fetchedPartogrammes.length);
-          
           if (fetchedPartogrammes) {
             fetchedPartogrammes.forEach((json: Partogramme_t["Row"]) =>
               this.updatePartogrammeFromServer(json).catch((error) => {
-                console.log(error);
                 return Promise.reject(error);
               })
             );
@@ -143,9 +143,55 @@ export class PartogrammeStore {
         runInAction(() => {
           this.state = "error";
         });
-        console.log(error);
         return Promise.reject(error);
       });
+
+    this.subscribeToRealtime();
+  }
+
+  // Subscribe to real-time changes on the Partogramme table for the current hospital
+  private subscribeToRealtime() {
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+    }
+
+    const hospitalId = this.rootStore.userInfoStore.userInfo.hospitalId;
+
+    this.realtimeChannel = supabase
+      .channel("partogramme-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "Partogramme",
+          filter: `hospitalId=eq.${hospitalId}`,
+        },
+        (payload) => {
+          runInAction(() => {
+            this.updatePartogrammeFromServer(
+              payload.new as Partogramme_t["Row"]
+            );
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "Partogramme",
+          filter: `hospitalId=eq.${hospitalId}`,
+        },
+        (payload) => {
+          runInAction(() => {
+            this.updatePartogrammeFromServer(
+              payload.new as Partogramme_t["Row"]
+            );
+          });
+        }
+      )
+      .subscribe();
   }
 
   // Update a partogramme with information from the server. Guarantees a partogramme only
@@ -184,7 +230,6 @@ export class PartogrammeStore {
         .catch((error) => {
           runInAction(() => {
             this.state = "error";
-            console.log(error);
           });
           return Promise.reject(error);
         });
@@ -220,7 +265,6 @@ export class PartogrammeStore {
       hospitalId ? hospitalId : this.rootStore.userInfoStore.userInfo.hospitalId,
       refDoctorId? refDoctorId : this.rootStore.userInfoStore.userInfo.refDoctorId,
     );
-    console.log("Partogramme : " + JSON.stringify(partogramme.partogramme))
     this.state = "pending";
     await this.transportLayer
       .insertPartogramme(partogramme.partogramme)
@@ -252,16 +296,12 @@ export class PartogrammeStore {
             this.partogrammeList.indexOf(partogramme),
             1
           );
-          console.log(
-            "Partogramme deleted from server id: " + partogramme.partogramme.id
-          );
         });
         return Promise.resolve(partogramme);
       })
     .catch((error) => {
       runInAction(() => {
         this.state = "error";
-        console.log(error);
       });
       return Promise.reject(error);
     });
@@ -276,7 +316,10 @@ export class PartogrammeStore {
    * This function Clean Up every partogramme.
    */
   cleanUp() {
-    console.log("CleanUp partogrammeStore");
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+      this.realtimeChannel = null;
+    }
     this.state = "done";
     this.selectedPartogrammeId = null;
     this.partogrammeList.splice(0, this.partogrammeList.length);
@@ -453,7 +496,6 @@ export class Partogramme {
 
     if (!this.isActive) {
       this.changeState("WORK_FINISHED");
-      console.log("Partogramme state changed to WORK_FINISHED since it is not active anymore");
     }
     this.startPeriodicCheckForPartogrammeState();
   }
@@ -485,7 +527,6 @@ export class Partogramme {
    * This function Clean Up every dataStore.
    */
   dispose() {
-    console.log("Disposing partogramme");
   }
 
   /**
@@ -575,7 +616,6 @@ export class Partogramme {
       .catch((error) => {
         runInAction(() => {
           this.store.state = "error";
-          console.log(error);
         });
         return Promise.reject(error);
       });
@@ -599,7 +639,6 @@ export class Partogramme {
     this.periodicInterval = setInterval(() => {
       if (!this.isActive) {
         this.changeState("WORK_FINISHED");
-        console.log("Partogramme state changed to WORK_FINISHED since it is not active anymore");
         clearInterval(this.periodicInterval);
       }
     }, 60000);

@@ -55,7 +55,6 @@ export class AmnioticLiquidStore {
             fetchedLiquids.forEach((json: AmnioticLiquid_t["Row"]) =>
               this.updateAmnioticLiquidFromServer(json)
                 .catch((error) => {
-                  console.log(error);
                   Platform.OS === "web"
                     ? null
                     : Alert.alert(
@@ -70,7 +69,6 @@ export class AmnioticLiquidStore {
         });
       })
       .catch((error:any) => {
-        console.log(error);
         this.state = "error";
         Platform.OS !== "web"
           ? null
@@ -110,7 +108,6 @@ export class AmnioticLiquidStore {
         })
         .catch((error:any) => {
           runInAction(() => {
-            console.log(error);
             this.state = "error";
           });
           return Promise.reject(error);
@@ -120,7 +117,6 @@ export class AmnioticLiquidStore {
       this.removeAmnioticLiquid(liquid)
         .then(() => { })
         .catch((error) => {
-          console.log(error);
           Platform.OS === "web"
             ? null
             : Alert.alert(
@@ -162,7 +158,6 @@ export class AmnioticLiquidStore {
       })
       .catch((error:any) => {
         runInAction(() => {
-          console.log(error);
           this.state = "error";
         });
         return Promise.reject(error);
@@ -187,7 +182,6 @@ export class AmnioticLiquidStore {
       .catch((error:any) => {
         runInAction(() => {
           liquid.data.isDeleted = false;
-          console.log(error);
           this.state = "error";
         });
         return Promise.reject(error);
@@ -289,10 +283,8 @@ export class AmnioticLiquid {
   delete() {
     this.store.removeAmnioticLiquid(this)
       .then(() => {
-        console.log("Amniotic liquid deleted");
       })
       .catch((error) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -308,13 +300,11 @@ export class AmnioticLiquid {
     this.store.transportLayer
       .updateAmnioticLiquid(updatedData)
       .then((response:any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         })
       })
       .catch((error:any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -329,6 +319,5 @@ export class AmnioticLiquid {
   }
 
   dispose() {
-    console.log("Disposing amniotic liquid");
   }
 }

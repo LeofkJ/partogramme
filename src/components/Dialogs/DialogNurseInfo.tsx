@@ -51,7 +51,6 @@ class UiState {
   }
 
   toggleErrorDialog() {
-    console.log("toggleErrorDialog");
     this.isErrorDialogVisible = !this.isErrorDialogVisible;
   }
 
@@ -150,13 +149,9 @@ class UiState {
       doctorIds.forEach(async (doctorId) => {
         await this.fetchDoctorInfos(doctorId)
           .then((data) => {
-            console.log("Fetched doctors infos");
-            console.log(data);
           }
           )
           .catch((error) => {
-            console.log("Failed to fetch doctors infos");
-            console.log(error);
           });
       });
     });
@@ -172,8 +167,6 @@ class UiState {
         return Promise.resolve(this.userInfoStore.doctorInfos);
       })
       .catch((error) => {
-        console.log("Failed to fetch doctors infos id : " + doctorId);
-        console.log(error);
         return Promise.reject(error);
       });
   }
@@ -219,21 +212,14 @@ export const DialogNurseInfo = observer(
       uiState
         .fetchDoctorProfiles(userInfo)
         .then((data) => {
-          console.log("Fetched doctors infos");
-          console.log(data);
         })
         .catch((error) => {
-          console.log("Failed to fetch doctors infos");
-          console.log(error);
         });
       uiState
         .fetchHospitalNames(userInfo)
         .then((data) => {
-          console.log("Fetched hospitals infos");
         })
         .catch((error) => {
-          console.log("Failed to fetch hospitals infos");
-          console.log(error);
         });
     }, []);
 
@@ -270,7 +256,6 @@ export const DialogNurseInfo = observer(
           setIsVisible(false);
         })
         .catch((error) => {
-          console.log("Error updating nurse info", error);
           if (Platform.OS === "android") {
             ToastAndroid.show(
               "Erreur lors de la mise à jour des informations",
@@ -338,7 +323,6 @@ export const DialogNurseInfo = observer(
           style={styles.input}
           onValueChange={(itemValue: string, itemIndex) => {
             uiState.setHospitalSelectedValue = itemValue;
-            console.log("itemValue : " + itemValue);
             userInfo.setUserInfoHospitalId(itemValue);
           }}
         >

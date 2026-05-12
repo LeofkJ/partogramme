@@ -194,13 +194,11 @@ export class BabyDescent {
     this.store.transportLayer
       .updateBabyDescent(updatedData)
       .then((response) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         })
       })
       .catch((error) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -215,6 +213,5 @@ export class BabyDescent {
   }
 
   dispose() {
-    console.log("Disposing baby descent");
   }
 }

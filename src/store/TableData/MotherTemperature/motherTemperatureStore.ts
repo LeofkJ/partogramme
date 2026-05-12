@@ -141,7 +141,6 @@ export class MotherTemperatureStore {
 
   // CleanUp mother temperature store
   cleanUp() {
-    console.log("Disposing mother temperature store");
     this.dataList.splice(0, this.dataList.length);
   }
 }
@@ -215,13 +214,11 @@ export class MotherTemperature {
     this.store.transportLayer
       .updateMotherTemperature(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -240,6 +237,5 @@ export class MotherTemperature {
   }
 
   dispose() {
-    console.log("Disposing mother temperature");
   }
 }

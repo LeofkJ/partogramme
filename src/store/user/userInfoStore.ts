@@ -129,14 +129,12 @@ export class UserInfoStore {
       .fetchUserInfo(this.ProfileStore.profile.id)
       .then((data) => {
         isLoggedIn = true;
-        console.log(data);
         runInAction(() => {
           this.userInfo = data;
         });
         this.state = "done";
       })
       .catch((error: PostgrestError) => {
-        console.log("Error fetching user info: " + error.message);
         this.state = "error";
         if (Platform.OS === "android") {
           if (error.code !== "PGRST116") {
@@ -156,14 +154,12 @@ export class UserInfoStore {
     await this.transportLayer
       .createUserInfo(this.userInfo)
       .then((data) => {
-        console.log(data);
         runInAction(() => {
           this.in_sync = true;
         });
         this.state = "done";
       })
       .catch((error) => {
-        console.log("Error creating user info: " + error.message);
         this.state = "error";
         Alert.alert(error.message);
       });
@@ -175,16 +171,11 @@ export class UserInfoStore {
    */
   async saveUserInfo() {
     this.in_sync = false;
-    console.log(
-      "this.ProfileStore.profile.id= " + this.ProfileStore.profile.id
-    );
     this.userInfo.profileId = this.ProfileStore.profile.id;
     this.userInfo.id = uuid.v4().toString();
-    console.log(this.userInfo);
     await this.transportLayer
       .saveUserInfo(this.userInfo)
       .then((data) => {
-        console.log(data);
         runInAction(() => {
           this.in_sync = true;
         });
@@ -192,7 +183,6 @@ export class UserInfoStore {
         return Promise.resolve(data);
       })
       .catch((error) => {
-        console.log("Error saving user info: " + error.message);
         this.state = "error";
         if (Platform.OS === "android") {
           Alert.alert(error.message);
@@ -209,7 +199,6 @@ export class UserInfoStore {
    * This function Clean Up every partogramme.
    */
   cleanUp() {
-    console.log("CleanUp UserInfoStore");
     this.userInfo = {
       firstName: "",
       id: "",

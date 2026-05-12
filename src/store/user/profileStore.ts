@@ -66,15 +66,12 @@ export class ProfileStore {
       password: password,
     });
     if (error) {
-      console.log("Error signing in: " + error.message);
       this.state = "error";
       Alert.alert(error.message);
       return Promise.reject(error);
     }
     if (data) {
       isLoggedIn = true;
-      console.log(data);
-      console.log("User logged in with id :" + data.user.id);
       runInAction(() => {
         this.state = "done";
         this.profile.email = data.user.email!;

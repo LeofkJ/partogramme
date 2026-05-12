@@ -210,13 +210,11 @@ export class MotherHeartFrequency {
     this.store.transportLayer
       .updateMotherHeartFrequency(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -235,6 +233,5 @@ export class MotherHeartFrequency {
   }
 
   dispose() {
-    console.log("Disposing mother heart frequency");
   }
 }

@@ -105,14 +105,12 @@ export class MotherSystolicBloodPressureStore {
     );
     this.transportLayer.createSystolicMotherBloodPressure(pressure.data)
     .then((response: any) => {
-      console.log(this.name + " created");
       runInAction(() => {
         this.dataList.push(pressure);
       });
     }
     )
     .catch((error: any) => {
-      console.log(error);
       Platform.OS === "web"
         ? null
         : Alert.alert(
@@ -232,13 +230,11 @@ export class MotherSystolicBloodPressure {
     this.store.transportLayer
       .updateSystolicMotherBloodPressure(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -257,6 +253,5 @@ export class MotherSystolicBloodPressure {
   }
 
   dispose() {
-    console.log("Disposing mother blood pressure");
   }
 }

@@ -59,13 +59,11 @@ export class CommentStore extends DataStore {
       );
       this.transportLayer.insertComment(data.data)
       .then((response: any) => {
-        console.log(this.name + " created");
         runInAction(() => {
           this.dataList.push(data);
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -84,13 +82,11 @@ export class CommentStore extends DataStore {
     this.transportLayer
       .deleteComment(comment.data.id)
       .then((response: any) => {
-        console.log(this.name + " deleted");
         runInAction(() => {
           this.dataList.splice(this.dataList.indexOf(comment), 1);
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -209,13 +205,11 @@ export class Comment {
     this.store.transportLayer
       .updateComment(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -234,7 +228,6 @@ export class Comment {
   }
 
   dispose() {
-    console.log("Disposing mother blood pressure");
   }
 }
 

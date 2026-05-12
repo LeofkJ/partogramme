@@ -61,13 +61,11 @@ export class MotherContractionDurationStore extends DataStore {
     this.transportLayer
       .insertMotherContractionDuration(data.data)
       .then((response: any) => {
-        console.log(this.name + " created");
         runInAction(() => {
           this.dataList.push(data);
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -86,13 +84,11 @@ export class MotherContractionDurationStore extends DataStore {
     this.transportLayer
       .deleteMotherContractionDuration(data.data)
       .then((response: any) => {
-        console.log(this.name + " deleted");
         runInAction(() => {
           this.dataList.splice(this.dataList.indexOf(data), 1);
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -230,13 +226,11 @@ export class MotherContractionDuration {
     this.store.transportLayer
       .updateMotherContractionDuration(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -255,6 +249,5 @@ export class MotherContractionDuration {
   }
 
   dispose() {
-    console.log("Disposing mother blood pressure");
   }
 }

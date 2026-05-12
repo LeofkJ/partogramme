@@ -57,7 +57,6 @@ export abstract class DataStore {
       });
     })
     .catch((error: any) => {
-      console.log(error);
       this.isLoading = false;
       return Promise.reject(error);
     });

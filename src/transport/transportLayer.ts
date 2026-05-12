@@ -88,7 +88,6 @@ export class TransportLayer {
       .select("*")
       .eq("partogrammeId", partogrammeId);
     if (error) {
-      // console.log(error);
       throw error;
     }
     return data;
@@ -228,7 +227,6 @@ export class TransportLayer {
       .select("*")
       .eq("partogrammeId", partogrammeId);
     if (error) {
-      console.log(error);
       throw error;
     }
     return data;
@@ -241,7 +239,6 @@ export class TransportLayer {
       .upsert({ ...amnioticLiquid })
       .eq("id", amnioticLiquid.id);
     if (error) {
-      // console.log(error);
       throw error;
     }
     return data;
@@ -253,7 +250,6 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .insert({ ...amnioticLiquid });
     if (error) {
-      // console.log(error);
       throw error;
     }
     return data;
@@ -357,10 +353,8 @@ export class TransportLayer {
       .update(motherBloodPressure)
       .eq("id", motherBloodPressure.id);
     if (error) {
-      console.log(error);
       throw error;
     }
-    console.log("Data updated :" + data);
     return data;
   }
 

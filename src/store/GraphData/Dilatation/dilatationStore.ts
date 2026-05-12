@@ -183,13 +183,11 @@ export class Dilation {
     this.store.transportLayer
       .updateSystolicMotherBloodPressure(updatedData)
       .then((response: any) => {
-        console.log( this.store.name + " updated");
         runInAction(() => {
           this.data = updatedData;
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -208,6 +206,5 @@ export class Dilation {
   }
 
   dispose() {
-    console.log("Disposing dilation");
   }
 }

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import 'react-native-url-polyfill/auto';
 
 // Screen Importation
@@ -28,6 +29,7 @@ const linking = {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
       <NavigationContainer
       linking={linking}
       >
@@ -71,6 +73,7 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

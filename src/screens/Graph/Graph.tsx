@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { observer } from "mobx-react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DialogDataInputGraph from "../../components/Dialogs/DialogDataInputGraph";
 import { useEffect, useState } from "react";
 import CustomButton from "../../components/CustomButton";
@@ -43,6 +44,7 @@ export type Props = {
 };
 
 export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [isReady, setIsReady] = useState(false);
   const [isFcDialogVisible, setFcDialogVisible] = useState(false);
   const [isDilationDialogVisible, setDilationDialogVisible] = useState(false);
@@ -557,7 +559,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             title=""
             color="#9F90D4"
             icon={{ name: "pen", color: "white", type: "font-awesome-5" }}
-            style={styles.overlayPenButton}
+            style={[styles.overlayPenButton, { bottom: 20 + insets.bottom, right: 20 + insets.right }]}
             onPress={() => setDataModifierDialogVisible(true)}
           />
         )}
@@ -586,6 +588,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContentStyle: {
     alignItems: "center",
+    paddingBottom: 100,
   },
   textTitle: {
     marginTop: 50,
@@ -632,8 +635,6 @@ const styles = StyleSheet.create({
   },
   overlayPenButton: {
     position: "absolute",
-    bottom: "5%",
-    right: "5%",
   },
   titleText: {
     textAlign: "left",

@@ -94,12 +94,12 @@ const DataTable: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     flexDirection: "row",
     padding: 16,
     paddingTop: 30,
     backgroundColor: "#fff",
     width: "100%",
+    minHeight: 470,
     alignSelf: "center",
   },
   head: { height: 40, backgroundColor: "#f1f8ff", width: "100%" },

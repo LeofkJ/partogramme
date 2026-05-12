@@ -6,8 +6,6 @@ import {SUPABASEURL, SUPABASEKEY} from "@env"
 const supabaseUrl = SUPABASEURL
 const supabaseKey = SUPABASEKEY
 
-console.log("supabaseUrl", supabaseUrl)
-console.log("supabaseKey", supabaseKey)
 // Better put your these secret keys in .env file
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
     auth: {

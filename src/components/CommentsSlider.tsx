@@ -104,18 +104,18 @@ const Item: React.FC<ItemProps> = observer( ({data}: ItemProps) => {
 const styles = StyleSheet.create({
   // Put styles here
   container: {
-    flex: 1,
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     width: "100%",
+    height: 200,
   },
   list: {
     marginTop: 5,
     alignContent: "center",
     alignSelf: "center",
     width: "90%",
-    height: "100%",
+    height: 170,
   },
   emptyListStyle: {
     padding: 10,

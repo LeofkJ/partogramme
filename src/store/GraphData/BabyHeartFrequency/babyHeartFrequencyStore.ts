@@ -113,7 +113,6 @@ export class BabyHeartFrequencyStore {
         });
       })
       .catch((error:any) => {
-        console.log(error);
         Alert.alert("Erreur", 
         "Impossible d'ajouter la fréquence cardiaque du bébé. \n Veuillez réessayer plus tard.");
         runInAction(() => {
@@ -206,10 +205,6 @@ export class BabyHeartFrequency {
   get asGraphData() {
     const deltaTime = new Date(this.data.created_at).getTime() - new Date(this.partogrammeStore.asJson.workStartDateTime).getTime();
     const hours = deltaTime / (1000 * 60 * 60); // Calculate hours difference
-    console.log("work start date time : " + this.partogrammeStore.asJson.workStartDateTime);
-    console.log("created at : " + this.data.created_at);
-    console.log("delta time : " + deltaTime);
-    console.log(hours);
     return {x: hours, y: this.data.value};
   };
 
@@ -235,7 +230,6 @@ export class BabyHeartFrequency {
     this.store.transportLayer
       .updateBabyHeartFrequency(updatedData)
       .then((response: any) => {
-        console.log(this.store.name + " updated");
         runInAction(() => {
           this.data = {
             ...updatedData,
@@ -243,7 +237,6 @@ export class BabyHeartFrequency {
         });
       })
       .catch((error: any) => {
-        console.log(error);
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -262,6 +255,5 @@ export class BabyHeartFrequency {
   }
 
   dispose() {
-    console.log("Disposing baby heart frequency");
   }
 }

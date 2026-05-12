@@ -46,12 +46,11 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         if (error.code === "PGRST116") {
           setNurseInfoDialogVisible(true);
         }
-        console.log(error);
       });
   }, []);
 
   return (
-    <View style={styles.body}>
+    <SafeAreaView style={styles.body}>
       <Text style={styles.titleText}>
         Partogrammes de {rootStore.userInfoStore.userInfo.firstName}{" "}
         {rootStore.userInfoStore.userInfo.lastName}
@@ -74,7 +73,7 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         userInfo={rootStore.userInfoStore}
         setIsVisible={setNurseInfoDialogVisible}
       />
-    </View>
+    </SafeAreaView>
   );
 });
 
@@ -83,15 +82,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#ffffff",
     alignItems: "center",
-    height: "99%",
   },
   listContainer: {
     flex: 1,
     marginTop: 15,
-    marginBottom: "8%",
     paddingTop: 10,
     alignItems: "center",
-    height: "95%",
+    width: "100%",
   },
   text: {
     color: "#000000",
@@ -125,7 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: "absolute",
-    bottom: "-3%",
-    left: "70%",
+    bottom: 20,
+    alignSelf: "center",
   },
 });
