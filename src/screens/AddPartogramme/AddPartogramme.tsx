@@ -1,6 +1,4 @@
-import {
-  StyleSheet, View, TextInput, ScrollView, Text
-} from "react-native";
+import { StyleSheet, View, TextInput, ScrollView, Text } from "react-native";
 import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import CustomButton from "../../components/CustomButton";
@@ -15,14 +13,9 @@ export type Props = {
 class UiState {
   constructor() {
     makeAutoObservable(this);
-    // TODO : Move ui state to teh store
   }
 }
 
-/**
- * Screen to add a partogramme
- * @param navigation navigation object component to navigate between screens
- */
 export const ScreenAddPartogramme: React.FC<Props> = observer(
   ({ navigation }) => {
     const [userInfoStore] = useState(rootStore.userInfoStore);
@@ -33,8 +26,6 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     const [noFile, onChangeNoFile] = useState("");
     const [admissionDateTime, onChangeAdmissionDateTime] = useState(new Date());
     const [workStartDateTime, onChangeWorkStartDate] = useState(new Date());
-
-    // Variables to update dates and control the date picker
     const [dateTimeUpdated, setDateTimeUpdated] = useState("");
 
     const handleTimeAdmissionChanged = (time: Date | undefined) => {
@@ -71,22 +62,19 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
       }
     };
 
-    // This function is called when the user clicks on the create button
     const createButtonPressed = () => {
-      rootStore.partogrammeStore.createPartogramme(
-        admissionDateTime.toISOString(),
-        commentary,
-        patientFirstName,
-        patientLastName,
-        Number(noFile),
-        "ADMITTED",
-        workStartDateTime.toISOString(),
-      )
-        .then(() => {
-        })
-        .catch((error) => {
-        });
-      // Navigate to the menu screen
+      rootStore.partogrammeStore
+        .createPartogramme(
+          admissionDateTime.toISOString(),
+          commentary,
+          patientFirstName,
+          patientLastName,
+          Number(noFile),
+          "ADMITTED",
+          workStartDateTime.toISOString(),
+        )
+        .then(() => {})
+        .catch((error) => {});
       navigation.navigate("Screen_Menu");
     };
 
@@ -96,14 +84,13 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           contentContainerStyle={styles.scrollView}
           automaticallyAdjustKeyboardInsets={true}
         >
-          <View style={[styles.backGroundInfo,
-          {
-            alignContent: "center",
-            justifyContent: "center",
-          }]}>
-            <Text style={styles.infoTitleText}>
-              Prénom du patient :
-            </Text>
+          <View
+            style={[
+              styles.backGroundInfo,
+              { alignContent: "center", justifyContent: "center" },
+            ]}
+          >
+            <Text style={styles.infoTitleText}>Prénom du patient :</Text>
             <TextInput
               style={styles.input}
               placeholder="Prénom du patient"
@@ -112,11 +99,12 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
               onChangeText={(text) => onChangePatientFirstName(text)}
             />
           </View>
-          <View style={[styles.backGroundInfo,
-          {
-            alignContent: "center",
-            justifyContent: "center",
-          }]}>
+          <View
+            style={[
+              styles.backGroundInfo,
+              { alignContent: "center", justifyContent: "center" },
+            ]}
+          >
             <Text style={styles.infoTitleText}>
               Nom de famille du patient :
             </Text>
@@ -128,32 +116,28 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
               onChangeText={(text) => onChangePatientLastName(text)}
             />
           </View>
-          <View style={[styles.backGroundInfo,
-          {
-            alignContent: "center",
-            justifyContent: "center",
-          }]}>
-            <Text style={styles.infoTitleText}>
-              Nom de l'hôpital :
-            </Text>
-            <Text
-              style={styles.input}
-              >{userInfoStore.hospitalName}</Text>
+          <View
+            style={[
+              styles.backGroundInfo,
+              { alignContent: "center", justifyContent: "center" },
+            ]}
+          >
+            <Text style={styles.infoTitleText}>Nom de l'hôpital :</Text>
+            <Text style={styles.input}>{userInfoStore.hospitalName}</Text>
           </View>
-          <View style={[styles.backGroundInfo,
-          {
-            alignContent: "center",
-            justifyContent: "center",
-          }]}>
-            <Text style={styles.infoTitleText}>
-              Numéro de dossier :
-            </Text>
+          <View
+            style={[
+              styles.backGroundInfo,
+              { alignContent: "center", justifyContent: "center" },
+            ]}
+          >
+            <Text style={styles.infoTitleText}>Numéro de dossier :</Text>
             <TextInput
               style={styles.input}
               placeholder="Numéro de dossier"
               textAlign="left"
               placeholderTextColor={"#939F99"}
-              keyboardType='numeric'
+              keyboardType="numeric"
               onChangeText={(text) => onChangeNoFile(text)}
             />
           </View>
@@ -167,14 +151,13 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             onDateChange={handleDateWorkStartChanged}
             onTimeChange={handleTimeWorkStartChanged}
           />
-          <View style={[styles.backGroundInfo,
-          {
-            alignContent: "center",
-            justifyContent: "center",
-          }]}>
-            <Text style={styles.infoTitleText}>
-              Commentaire :
-            </Text>
+          <View
+            style={[
+              styles.backGroundInfo,
+              { alignContent: "center", justifyContent: "center" },
+            ]}
+          >
+            <Text style={styles.infoTitleText}>Commentaire :</Text>
             <TextInput
               editable={true}
               multiline={true}
@@ -201,11 +184,12 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             style={{ width: 100, height: 50, margin: 10, borderRadius: 5 }}
             onPressFunction={createButtonPressed}
             styleText={{}}
+            disabled={false}
           />
         </ScrollView>
       </View>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({
@@ -250,7 +234,6 @@ const styles = StyleSheet.create({
   },
   backGroundInfo: {
     backgroundColor: "#d5d0e9",
-    // paddingLeft: 5,
     borderTopLeftRadius: 5,
     borderTopRightRadius: 5,
     borderBottomWidth: 1,
