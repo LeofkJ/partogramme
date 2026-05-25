@@ -3,7 +3,7 @@ import { AmnioticLiquid_t as AmnioticLiquid_t } from "../store/TableData/Amnioti
 import { BabyDescent_t } from "../store/GraphData/BabyDescent/babyDescentStore";
 import { BabyHeartFrequency_t } from "../store/GraphData/BabyHeartFrequency/babyHeartFrequencyStore";
 import { Dilation_t } from "../store/GraphData/Dilatation/dilatationStore";
-import { MotherSystolicBloodPressure_t} from "../store/TableData/MotherSystolicBloodPressure/motherSystolicBloodPressureStore";
+import { MotherSystolicBloodPressure_t } from "../store/TableData/MotherSystolicBloodPressure/motherSystolicBloodPressureStore";
 import { MotherContractionsFrequency_t } from "../store/TableData/MotherContractionsFrequency/motherContractionsFrequencyStore";
 import { MotherHeartFrequency_t } from "../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore";
 import { MotherTemperature_t } from "../store/TableData/MotherTemperature/motherTemperatureStore";
@@ -23,18 +23,14 @@ export class TransportLayer {
         .eq("nurseId", nurseId)
         .eq("hospitalId", hospitalId)
         .eq("isDeleted", false);
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data;
     } else {
       const { data, error } = await supabase
         .from("Partogramme")
         .select("*")
         .eq("isDeleted", false);
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data;
     }
   }
@@ -44,9 +40,7 @@ export class TransportLayer {
       .from("Partogramme")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -55,9 +49,7 @@ export class TransportLayer {
       .from("Partogramme")
       .upsert({ ...partogramme })
       .eq("id", partogramme.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -65,9 +57,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Partogramme")
       .insert({ ...partogramme });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -76,9 +66,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -87,9 +75,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -98,9 +84,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -108,9 +92,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("BabyHeartFrequency")
       .insert({ ...frequency });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -119,9 +101,7 @@ export class TransportLayer {
       .from("Dilation")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -130,9 +110,7 @@ export class TransportLayer {
       .from("Dilation")
       .upsert({ ...dilation })
       .eq("id", dilation.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -140,9 +118,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Dilation")
       .insert({ ...dilation });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -151,9 +127,7 @@ export class TransportLayer {
       .from("Dilation")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -162,9 +136,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -173,9 +145,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .upsert({ ...babyDescent })
       .eq("id", babyDescent.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -183,9 +153,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("BabyDescent")
       .insert({ ...babyDescent });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -194,9 +162,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -205,9 +171,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -216,9 +180,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .upsert({ ...amnioticLiquid })
       .eq("id", amnioticLiquid.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -226,9 +188,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("amnioticLiquid")
       .insert({ ...amnioticLiquid });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -237,9 +197,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .update({ isDeleted: true })
       .eq("id", amnioticLiquidId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -248,34 +206,28 @@ export class TransportLayer {
       .from("MotherSystolicBloodPressure")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async createSystolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Insert"]
+    motherBloodPressure: MotherSystolicBloodPressure_t["Insert"],
   ) {
     const { data, error } = await supabase
       .from("MotherSystolicBloodPressure")
       .insert(motherBloodPressure);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async updateSystolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Update"]
+    motherBloodPressure: MotherSystolicBloodPressure_t["Update"],
   ) {
     const { data, error } = await supabase
       .from("MotherSystolicBloodPressure")
       .update(motherBloodPressure)
       .eq("id", motherBloodPressure.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -284,9 +236,7 @@ export class TransportLayer {
       .from("MotherSystolicBloodPressure")
       .update({ isDeleted: true })
       .eq("id", motherBloodPressureId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -295,34 +245,28 @@ export class TransportLayer {
       .from("MotherDiastolicBloodPressure")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async createDiastolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Insert"]
+    motherBloodPressure: MotherSystolicBloodPressure_t["Insert"],
   ) {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
       .insert(motherBloodPressure);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async updateDiastolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Update"]
+    motherBloodPressure: MotherSystolicBloodPressure_t["Update"],
   ) {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
       .update(motherBloodPressure)
       .eq("id", motherBloodPressure.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -331,9 +275,7 @@ export class TransportLayer {
       .from("MotherDiastolicBloodPressure")
       .update({ isDeleted: true })
       .eq("id", motherBloodPressureId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -342,9 +284,7 @@ export class TransportLayer {
       .from("MotherContractionsFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -353,34 +293,28 @@ export class TransportLayer {
       .from("MotherContractionsFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async updateMotherContractionsFrequency(
-    frequency: MotherContractionsFrequency_t["Row"]
+    frequency: MotherContractionsFrequency_t["Row"],
   ) {
     const { data, error } = await supabase
       .from("MotherContractionsFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async insertMotherContractionsFrequency(
-    frequency: MotherContractionsFrequency_t["Row"]
+    frequency: MotherContractionsFrequency_t["Row"],
   ) {
     const { data, error } = await supabase
       .from("MotherContractionsFrequency")
       .insert({ ...frequency });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -389,9 +323,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -400,9 +332,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -411,9 +341,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -421,9 +349,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherHeartFrequency")
       .insert({ ...frequency });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -432,9 +358,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -443,9 +367,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -454,9 +376,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .upsert({ ...temperature })
       .eq("id", temperature.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -464,9 +384,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherTemperature")
       .insert({ ...temperature });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -475,47 +393,39 @@ export class TransportLayer {
       .from("MotherContractionDuration")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async deleteMotherContractionDuration(
-    motherContraction: MotherContractionDuration_t["Row"]
+    motherContraction: MotherContractionDuration_t["Row"],
   ) {
     const { data, error } = await supabase
       .from("MotherContractionDuration")
       .update({ isDeleted: true })
       .eq("id", motherContraction.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async updateMotherContractionDuration(
-    duration: MotherContractionDuration_t["Row"]
+    duration: MotherContractionDuration_t["Row"],
   ) {
     const { data, error } = await supabase
       .from("MotherContractionDuration")
       .upsert({ ...duration })
       .eq("id", duration.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async insertMotherContractionDuration(
-    duration: MotherContractionDuration_t["Insert"]
+    duration: MotherContractionDuration_t["Insert"],
   ) {
     const { data, error } = await supabase
       .from("MotherContractionDuration")
       .insert({ ...duration });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -524,9 +434,7 @@ export class TransportLayer {
       .from("Comment")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -535,9 +443,7 @@ export class TransportLayer {
       .from("Comment")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -546,9 +452,7 @@ export class TransportLayer {
       .from("Comment")
       .upsert({ ...comment })
       .eq("id", comment.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -556,9 +460,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Comment")
       .insert({ ...comment });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
@@ -568,19 +470,13 @@ export class TransportLayer {
       .select("*")
       .eq("profileId", profileId)
       .single();
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async createUserInfo(userInfo: UserInfo["Row"]) {
-    const { data, error } = await supabase
-      .from("userInfo")
-      .insert(userInfo);
-    if (error) {
-      throw error;
-    }
+    const { data, error } = await supabase.from("userInfo").insert(userInfo);
+    if (error) throw error;
     return data;
   }
 
@@ -589,29 +485,29 @@ export class TransportLayer {
       .from("userInfo")
       .upsert(userInfo)
       .eq("id", userInfo.id);
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     return data;
   }
 
   async fetchAllProfiles() {
-    const { data, error } = await supabase
-      .from("Profile")
-      .select("*");
-    if (error) {
-      throw error;
-    }
+    const { data, error } = await supabase.from("Profile").select("*");
+    if (error) throw error;
     return data;
   }
 
   async fetchAllHospitals() {
+    const { data, error } = await supabase.from("hospital").select("*");
+    if (error) throw error;
+    return data;
+  }
+
+  async fetchAllDoctors() {
     const { data, error } = await supabase
-      .from("hospital")
-      .select("*");
-    if (error) {
-      throw error;
-    }
+      .from("userInfo")
+      .select("*")
+      .eq("role", "DOCTOR")
+      .eq("isDeleted", false);
+    if (error) throw error;
     return data;
   }
 }

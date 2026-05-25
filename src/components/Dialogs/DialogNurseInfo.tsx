@@ -20,13 +20,11 @@ import {
 } from "../../store/user/userInfoStore";
 import { Picker } from "@react-native-picker/picker";
 import { computed, makeAutoObservable, runInAction } from "mobx";
-import { userInfo } from "os";
 import { CheckBox } from "@rneui/themed";
 import ErrorDialog from "./ErrorDialog";
 
-let ToastAndroid: typeof RNToastAndroid;;
+let ToastAndroid: typeof RNToastAndroid;
 if (Platform.OS === "android") {
-  // Lazy import only on Android
   ToastAndroid = require("react-native").ToastAndroid;
 }
 
@@ -43,6 +41,7 @@ class UiState {
   hospitalSelectedValue: string = "";
   isErrorDialogVisible: boolean = false;
   errorMessage: string = "";
+
   constructor(userInfo: UserInfoStore) {
     makeAutoObservable(this, {
       doctorNamesPickerItems: computed,
@@ -68,31 +67,23 @@ class UiState {
 
   generateDoctorNameItem(doctorInfos: UserInfo["Row"][]) {
     const items: any[] = [];
-    // push the first item to the array to have a default value
     items.push(
       <Picker.Item
         key={0}
         label={"Sélectionnez un docteur"}
         value={""}
-        style={[
-          styles.pickerItems,
-          // { color: pickerDataNameOnFocus ? "white" : "black" },
-        ]}
-      />
+        style={[styles.pickerItems]}
+      />,
     );
-    // iterate trough the data array to get the data names
-    let i = 0;
-    doctorInfos.forEach((doctorInfos) => {
+    let i = 1;
+    doctorInfos.forEach((doctor) => {
       items.push(
         <Picker.Item
           key={i}
-          label={doctorInfos.firstName + " " + doctorInfos.lastName}
-          value={doctorInfos.id}
-          style={[
-            styles.pickerItems,
-            // { color: pickerDataNameOnFocus ? "white" : "black" },
-          ]}
-        />
+          label={doctor.firstName + " " + doctor.lastName}
+          value={doctor.profileId}
+          style={[styles.pickerItems]}
+        />,
       );
       i++;
     });
@@ -101,32 +92,23 @@ class UiState {
 
   generateHospitalNameItem(hospitalInfos: Hospital["Row"][]) {
     const items: any[] = [];
-
-    // push the first item of the picker (empty)
     items.push(
       <Picker.Item
         key={0}
         label={"Sélectionnez un hôpital"}
         value={""}
-        style={[
-          styles.pickerItems,
-          // { color: pickerDataNameOnFocus ? "white" : "black" },
-        ]}
-      />
+        style={[styles.pickerItems]}
+      />,
     );
-    // iterate trough the data array to get the data names
-    let i = 0;
-    hospitalInfos.forEach((hospitalInfos) => {
+    let i = 1;
+    hospitalInfos.forEach((hospital) => {
       items.push(
         <Picker.Item
           key={i}
-          label={hospitalInfos.name + ", " + hospitalInfos.city}
-          value={hospitalInfos.id}
-          style={[
-            styles.pickerItems,
-            // { color: pickerDataNameOnFocus ? "white" : "black" },
-          ]}
-        />
+          label={hospital.name + ", " + hospital.city}
+          value={hospital.id}
+          style={[styles.pickerItems]}
+        />,
       );
       i++;
     });
@@ -140,35 +122,14 @@ class UiState {
   }
 
   async fetchDoctorProfiles(userInfoStore: UserInfoStore) {
-    this.userInfoStore.doctorInfos = [];
-    await userInfoStore.transportLayer.fetchAllProfiles().then((data) => {
-      const doctorIds: string[] = [];
-      data.forEach((profile) => {
-        doctorIds.push(profile.id);
-      });
-      doctorIds.forEach(async (doctorId) => {
-        await this.fetchDoctorInfos(doctorId)
-          .then((data) => {
-          }
-          )
-          .catch((error) => {
-          });
-      });
-    });
-  }
-
-  async fetchDoctorInfos(doctorId: string) {
-    await this.userInfoStore.transportLayer
-      .fetchUserInfo(doctorId)
+    await userInfoStore.transportLayer
+      .fetchAllDoctors()
       .then((data) => {
         runInAction(() => {
-          this.userInfoStore.doctorInfos.push(data);
+          this.userInfoStore.doctorInfos = data;
         });
-        return Promise.resolve(this.userInfoStore.doctorInfos);
       })
-      .catch((error) => {
-        return Promise.reject(error);
-      });
+      .catch((error) => {});
   }
 
   set setIsDoctorChecked(value: boolean) {
@@ -180,12 +141,18 @@ class UiState {
   }
 
   checkInputs() {
-    if (this.userInfoStore.userInfo.firstName === "" || this.userInfoStore.userInfo.lastName === "") {
+    if (
+      this.userInfoStore.userInfo.firstName === "" ||
+      this.userInfoStore.userInfo.lastName === ""
+    ) {
       this.setErrorMessage = "Veuillez entrer votre nom et prénom";
       this.toggleErrorDialog();
       return false;
     }
-    if (!this.isDoctorChecked && this.userInfoStore.userInfo.refDoctorId === "") {
+    if (
+      !this.isDoctorChecked &&
+      this.userInfoStore.userInfo.refDoctorId === ""
+    ) {
       this.setErrorMessage = "Veuillez sélectionner un docteur";
       this.toggleErrorDialog();
       return false;
@@ -199,33 +166,18 @@ class UiState {
   }
 }
 
-/**
- * This components render a dialog allowing the user to enter his nurse info
- * @param isVisible - boolean that indicates if the dialog is visible or not
- * @param setIsVisible - function that allows to change the visibility of the dialog
- */
 export const DialogNurseInfo = observer(
   ({ isVisible, userInfo, setIsVisible }: IProps) => {
     const [uiState] = useState(() => new UiState(userInfo));
 
     useEffect(() => {
-      uiState
-        .fetchDoctorProfiles(userInfo)
-        .then((data) => {
-        })
-        .catch((error) => {
-        });
-      uiState
-        .fetchHospitalNames(userInfo)
-        .then((data) => {
-        })
-        .catch((error) => {
-        });
+      uiState.fetchDoctorProfiles(userInfo).catch((error) => {});
+      uiState.fetchHospitalNames(userInfo).catch((error) => {});
     }, []);
 
     const toggleErrorDialog = () => {
       uiState.toggleErrorDialog();
-    }
+    };
 
     const toggleDialog = () => {
       setIsVisible(!isVisible);
@@ -259,7 +211,7 @@ export const DialogNurseInfo = observer(
           if (Platform.OS === "android") {
             ToastAndroid.show(
               "Erreur lors de la mise à jour des informations",
-              ToastAndroid.SHORT
+              ToastAndroid.SHORT,
             );
           }
         });
@@ -350,7 +302,7 @@ export const DialogNurseInfo = observer(
         />
       </Dialog>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({

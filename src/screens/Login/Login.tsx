@@ -91,6 +91,22 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         style={{}}
         styleText={{}}
       />
+      <CustomButton
+        title="Login"
+        color="#403572"
+        disabled={false}
+        onPressFunction={LoginButtonPressed}
+        style={{}}
+        styleText={{}}
+      />
+      <CustomButton
+        title="Créer un compte"
+        color="#9F90D4"
+        disabled={false}
+        onPressFunction={() => navigation.navigate("Screen_Register")}
+        style={{ marginTop: 10 }}
+        styleText={{ fontSize: 14 }}
+      />
       {isLoadingDialogVisible && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Connexion en cours...</Text>
