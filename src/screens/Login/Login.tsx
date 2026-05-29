@@ -74,6 +74,7 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         placeholder="Email"
         value={rootStore.profileStore.email}
         keyboardType="email-address"
+        autoCapitalize="none"
         onChangeText={(value) => rootStore.profileStore.setProfileEmail(value)}
       />
       <Text style={styles.text}>Password:</Text>
@@ -83,13 +84,6 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         value={rootStore.profileStore.password}
         secureTextEntry={true}
         onChangeText={(value) => rootStore.profileStore.setPassword(value)}
-      />
-      <CustomButton
-        title="Login"
-        color="#403572"
-        onPressFunction={LoginButtonPressed}
-        style={{}}
-        styleText={{}}
       />
       <CustomButton
         title="Login"
