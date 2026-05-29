@@ -172,7 +172,9 @@ export class UserInfoStore {
   async saveUserInfo() {
     this.in_sync = false;
     this.userInfo.profileId = this.ProfileStore.profile.id;
-    this.userInfo.id = uuid.v4().toString();
+    if (!this.userInfo.id) {
+      this.userInfo.id = uuid.v4().toString();
+    }
     await this.transportLayer
       .saveUserInfo(this.userInfo)
       .then((data) => {

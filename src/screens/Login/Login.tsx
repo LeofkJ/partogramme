@@ -74,6 +74,7 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         placeholder="Email"
         value={rootStore.profileStore.email}
         keyboardType="email-address"
+        autoCapitalize="none"
         onChangeText={(value) => rootStore.profileStore.setProfileEmail(value)}
       />
       <Text style={styles.text}>Password:</Text>
