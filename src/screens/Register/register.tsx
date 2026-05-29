@@ -85,7 +85,7 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
         color="#403572"
         disabled={false}
         onPressFunction={RegisterButtonPressed}
-        style={{ marginTop: 20 }}
+        style={{ marginTop: 20, width: 344 }}
         styleText={{}}
       />
       <CustomButton
@@ -93,7 +93,7 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
         color="#9F90D4"
         disabled={false}
         onPressFunction={() => navigation.navigate("Screen_Login")}
-        style={{ marginTop: 10 }}
+        style={{ marginTop: 10, width: 344 }}
         styleText={{ fontSize: 14 }}
       />
       {isLoading && (
@@ -129,12 +129,12 @@ const styles = StyleSheet.create({
     width: 344,
   },
   titleText: {
-    textAlign: "left",
+    textAlign: "center",
     color: "#403572",
-    fontSize: 20,
-    margin: 2,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
+    alignSelf: "center",
   },
   loadingContainer: {
     marginTop: 20,

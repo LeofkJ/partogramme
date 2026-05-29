@@ -87,16 +87,9 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
       <CustomButton
         title="Login"
         color="#403572"
-        onPressFunction={LoginButtonPressed}
-        style={{}}
-        styleText={{}}
-      />
-      <CustomButton
-        title="Login"
-        color="#403572"
         disabled={false}
         onPressFunction={LoginButtonPressed}
-        style={{}}
+        style={{ width: 344, marginTop: 10 }}
         styleText={{}}
       />
       <CustomButton
@@ -104,7 +97,7 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         color="#9F90D4"
         disabled={false}
         onPressFunction={() => navigation.navigate("Screen_Register")}
-        style={{ marginTop: 10 }}
+        style={{ width: 344, marginTop: 10 }}
         styleText={{ fontSize: 14 }}
       />
       {isLoadingDialogVisible && (
@@ -140,7 +133,7 @@ const styles = StyleSheet.create({
     width: 344,
   },
   titleText: {
-    textAlign: "left",
+    textAlign: "center",
     color: "#403572",
     fontSize: 20,
     margin: 2,
