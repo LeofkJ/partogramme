@@ -199,6 +199,15 @@ export const DialogNurseInfo = observer(
       if (!uiState.checkInputs()) {
         return;
       }
+
+      // Ensure role is always explicitly set before saving
+      if (!uiState.isDoctorChecked) {
+        userInfo.userInfoRole = "NURSE";
+      } else {
+        userInfo.userInfoRole = "DOCTOR";
+        userInfo.userInfoRefDoctorId = rootStore.profileStore.profile.id;
+      }
+
       userInfo
         .saveUserInfo()
         .then((data) => {
