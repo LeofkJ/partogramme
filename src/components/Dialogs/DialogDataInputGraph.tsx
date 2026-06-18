@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { CheckBox } from "@rneui/themed";
@@ -20,27 +21,6 @@ interface Props {
   onCancel: () => void;
 }
 
-/**
- * @brief Dialog to input data for the graph
- * @param visible boolean to show or hide the dialog
- * @param dataName name of the data to input
- * @param startValue start value of the picker
- * @param endValue end value of the picker
- * @param step step of the picker
- * @param onClose function to call when the dialog is closed
- * @param onCancel function to call when the dialog is canceled
- * @returns a dialog to input data for the graph
- * @example
- * // returns a dialog to input data for the graph
- * <DialogDataInputGraph
- *  visible={dialogVisible}
- *  onClose={onDialogClose}
- *  onCancel={() => setDialogVisible(false)}
- *  startValue={120}
- *  endValue={180}
- *  step={10}
- * />
- */
 const DialogDataInputGraph: React.FC<Props> = ({
   visible,
   dataName,
@@ -50,6 +30,7 @@ const DialogDataInputGraph: React.FC<Props> = ({
   endValue,
   step,
 }) => {
+  const { width } = useWindowDimensions();
   const [selectedValue, setSelectedValue] = useState(startValue.toString());
   const [delta, onChangeDelta] = useState("");
   const [isManualInputOn, setManuelInputOn] = useState(false);
@@ -59,7 +40,12 @@ const DialogDataInputGraph: React.FC<Props> = ({
     const items = [];
     for (let i = startValue; i <= endValue; i += step) {
       items.push(
-        <Picker.Item key={i} label={i.toString()} value={i.toString()} />
+        <Picker.Item
+          key={i}
+          label={i.toString()}
+          value={i.toString()}
+          style={styles.pickerItem}
+        />
       );
     }
     return items;
@@ -68,100 +54,152 @@ const DialogDataInputGraph: React.FC<Props> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
-      style={{
-        flex: 1,
-        justifyContent: "center",
-      }}
     >
-      <View style={styles.modalView}>
-        <Text style={styles.modalText}>
-          Sélectionnez la valeur de {dataName}
-        </Text>
-        {isManualInputOn && (
-          <View
-            style={{
-              backgroundColor: "#D6A02A",
-              borderRadius: 10,
-              width: "100%",
-              paddingRight: 10,
-            }}
-          >
-            <TextInput
-              style={styles.input}
-              placeholder="Entrez un delta (facultatif/test)"
-              placeholderTextColor={"#FFFFFF"}
-              onChangeText={(text) => onChangeDelta(text)}
-              keyboardType="numeric"
-            />
+      <View style={styles.overlay}>
+        <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
+
+          <Text style={styles.sectionLabel}>
+            {dataName}
+          </Text>
+
+          <View style={styles.pickerContainer}>
+            <Picker
+              style={styles.picker}
+              mode="dropdown"
+              prompt="Sélectionnez un chiffre"
+              selectedValue={selectedValue}
+              onValueChange={(itemValue) => setSelectedValue(itemValue)}
+            >
+              {generatePickerItems()}
+            </Picker>
           </View>
-        )}
-        <Picker
-          style={{ height: 50, width: 120, marginBottom: 10 }}
-          prompt="Sélectionnez un chiffre"
-          selectedValue={selectedValue}
-          onValueChange={(itemValue) => setSelectedValue(itemValue)}
-        >
-          {generatePickerItems()}
-        </Picker>
-        <View style={{ flexDirection: "row" }}>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonValidate]}
-            onPress={() => {
-              onClose(selectedValue, delta);
-            }}
-          >
-            <Text style={{ color: "white" }}>Valider</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonCancel, { marginLeft: 50 }]}
-            onPress={() => {
-              onCancel();
-            }}
-          >
-            <Text style={{ color: "white" }}>Annuler</Text>
-          </TouchableOpacity>
+
+          {isManualInputOn && (
+            <>
+              <Text style={styles.sectionLabel}>
+                Delta (facultatif / test)
+              </Text>
+              <TextInput
+                style={styles.inputTextNumber}
+                placeholder="Entrez un delta"
+                placeholderTextColor={"#9F90D4"}
+                onChangeText={(text) => onChangeDelta(text)}
+                keyboardType="numeric"
+                value={delta}
+              />
+            </>
+          )}
+
+          <CheckBox
+            checked={isManualInputOn}
+            onPress={toggleCheckboxManualInput}
+            iconType="material-community"
+            checkedIcon="checkbox-marked"
+            uncheckedIcon="checkbox-blank-outline"
+            checkedColor="#403572"
+            checkedTitle="Saisie manuelle activée"
+            title="Saisie manuelle désactivée"
+            containerStyle={styles.checkboxContainer}
+            textStyle={styles.checkboxText}
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonCancel]}
+              onPress={onCancel}
+            >
+              <Text style={styles.buttonText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonValidate]}
+              onPress={() => onClose(selectedValue, delta)}
+            >
+              <Text style={styles.buttonText}>Valider</Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
-        <CheckBox
-          checked={isManualInputOn}
-          onPress={toggleCheckboxManualInput}
-          iconType="material-community"
-          checkedIcon="checkbox-marked"
-          uncheckedIcon="checkbox-blank-outline"
-          checkedColor="green"
-          checkedTitle="Saisie Manuelle activé"
-          title="Saisie Manuelle désactivé"
-          containerStyle={{
-            backgroundColor: "#F6F3F3",
-            marginTop: 10,
-          }}
-        />
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalView: {
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
-    width: "90%",
-    position: "absolute",
-    top: "30%",
-    left: "0%",
-    margin: 20,
-    backgroundColor: "#F6F3F3",
-    borderRadius: 20,
-    padding: 35,
     alignItems: "center",
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
     shadowColor: "#000",
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 10,
   },
-  button: {
-    borderRadius: 20,
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#403572",
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#9F90D4",
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#f5f3fc",
+    marginBottom: 4,
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    color: "#403572",
+  },
+  pickerItem: {
+    color: "#403572",
+    backgroundColor: "#ffffff",
+  },
+  inputTextNumber: {
+    borderColor: "#9F90D4",
+    borderWidth: 1,
+    borderRadius: 10,
+    textAlign: "center",
     padding: 10,
-    elevation: 2,
+    fontSize: 18,
+    color: "#403572",
+    backgroundColor: "#f5f3fc",
+    marginBottom: 4,
+  },
+  checkboxContainer: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    marginLeft: 0,
+    paddingLeft: 0,
+    marginTop: 8,
+  },
+  checkboxText: {
+    color: "#403572",
+    fontWeight: "normal",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+    gap: 12,
+  },
+  button: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
   },
   buttonValidate: {
     backgroundColor: "#403572",
@@ -169,27 +207,10 @@ const styles = StyleSheet.create({
   buttonCancel: {
     backgroundColor: "#DE2C1D",
   },
-  textStyle: {
+  buttonText: {
     color: "white",
     fontWeight: "bold",
-    textAlign: "center",
-  },
-  modalText: {
-    marginBottom: 15,
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  input: {
-    textAlign: "center",
-    borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 5,
-    fontSize: 18,
-    marginRight: 5,
-    marginLeft: 5,
-    margin: 10,
-    width: "100%",
+    fontSize: 15,
   },
 });
 

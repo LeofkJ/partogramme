@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import {
   Table,
   TableWrapper,
@@ -15,19 +15,27 @@ interface Props {
   tableData: any[][];
 }
 
+const LABEL_WIDTH = 100;
+const CONTAINER_PADDING = 32; // 16 * 2
+
 const DataTable: React.FC<Props> = ({
   maxHours,
   tableHead,
   tableTitle = tableTitles,
   tableData,
 }) => {
+  const { width } = useWindowDimensions();
   const heightArray = [40, 70, 70, 40, 40, 60, 40];
-  
-  // generate the header of the table
+
+  const colCount = maxHours + 1;
+  const colWidth = Math.floor((width - LABEL_WIDTH - CONTAINER_PADDING) / colCount);
+  const widthArr = Array(colCount).fill(colWidth);
+  const fontSize = width < 500 ? 8 : 10;
+
   const header = () => {
     if (!tableHead) {
       const headers = [];
-      for (let i = 0; i < maxHours+1; i++) {
+      for (let i = 0; i < colCount; i++) {
         headers.push(`${i}h`);
       }
       return headers;
@@ -35,59 +43,48 @@ const DataTable: React.FC<Props> = ({
     return tableHead;
   };
 
-  const renderCells = (data:string[], heightRow: number) => {
-    const cells = [];
-    for (let i = 0; i < maxHours+1; i++) {
-      cells.push(
-        <Cell
-          key={i}
-          data={data[i] ? data[i] : "_"}
-          textStyle={styles.text}
-          flex={1}
-          height={heightArray[heightRow]}
-        />
-      );
-    }
-    return cells;
+  const renderCells = (data: string[], heightRow: number) => {
+    return Array.from({ length: colCount }, (_, i) => (
+      <Cell
+        key={i}
+        data={data[i] ? data[i] : "_"}
+        textStyle={[styles.text, { fontSize }]}
+        width={colWidth}
+        height={heightArray[heightRow]}
+      />
+    ));
   };
 
   return (
     <View style={styles.container}>
-      <View style={{ width: 100}}>
+      <View style={{ width: LABEL_WIDTH }}>
         <Table borderStyle={{ borderWidth: 1 }}>
-          <Col 
-            data={["", ...tableTitle]} 
-            style={styles.title} 
-            width={100}
-            heightArr={[...[40], ...heightArray]}
-            textStyle={styles.text} 
-            />
+          <Col
+            data={["", ...tableTitle]}
+            style={styles.title}
+            width={LABEL_WIDTH}
+            heightArr={[40, ...heightArray]}
+            textStyle={[styles.text, { fontSize }]}
+          />
         </Table>
       </View>
-      <ScrollView horizontal={true}>
-        <View style={{ width: 1200}}>
-          <Table borderStyle={{ borderWidth: 1 }}>
-              <TableWrapper style={styles.wrapper_rows}>
-                <Row 
-                data={header()} 
-                style={styles.head} 
-                flexArr={[1, 1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1, 1]}
-                textStyle={styles.text} 
-                widthArr={[100]}
-                />
-                {
-                  tableData.map((rowData, index) => (
-                    <TableWrapper key={index} style={styles.rowWrapper}>
-                      {
-                        renderCells(rowData, index)
-                      }
-                    </TableWrapper>
-                  ))
-                }
+      <View style={{ flex: 1 }}>
+        <Table borderStyle={{ borderWidth: 1 }}>
+          <TableWrapper style={styles.wrapper_rows}>
+            <Row
+              data={header()}
+              style={styles.head}
+              widthArr={widthArr}
+              textStyle={[styles.text, { fontSize }]}
+            />
+            {tableData.map((rowData, index) => (
+              <TableWrapper key={index} style={styles.rowWrapper}>
+                {renderCells(rowData, index)}
               </TableWrapper>
-          </Table>
-        </View>
-      </ScrollView>
+            ))}
+          </TableWrapper>
+        </Table>
+      </View>
     </View>
   );
 };
@@ -102,13 +99,13 @@ const styles = StyleSheet.create({
     minHeight: 470,
     alignSelf: "center",
   },
-  head: { height: 40, backgroundColor: "#f1f8ff", width: "100%" },
-  wrapper: { flex: 1, flexDirection: "row" , width: "100%"},
-  wrapper_rows: { flex: 1, flexDirection: "column" , width: "100%"},
-  dataWrapper: { },
-  title: { backgroundColor: "#f6f8fa"},
-  row: {flex :1},
-  rowWrapper: {flexDirection :"row"},
+  head: { height: 40, backgroundColor: "#f1f8ff" },
+  wrapper: { flex: 1, flexDirection: "row", width: "100%" },
+  wrapper_rows: { flex: 1, flexDirection: "column", width: "100%" },
+  dataWrapper: {},
+  title: { backgroundColor: "#f6f8fa" },
+  row: { flex: 1 },
+  rowWrapper: { flexDirection: "row" },
   text: { textAlign: "center" },
 });
 

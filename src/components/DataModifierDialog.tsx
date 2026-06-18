@@ -1,6 +1,13 @@
 import React from "react";
 import { useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { Partogramme, data_t } from '../store/partogramme/partogrammeStore';
 import EditDataDialog from "./Dialogs/EditDataDialog";
 import { DataList } from "./DataList";
@@ -9,147 +16,106 @@ import { runInAction } from "mobx";
 import ErrorDialog from "./Dialogs/ErrorDialog";
 
 interface Props {
-  // Put props here
   visible: boolean;
   partogramme: Partogramme;
   onCancel: () => void;
 }
 
-const createTableData = (dataList: data_t[]) => {
-  const tableData = [];
-  var options = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-  };
-  for (const data of dataList) {
-    const dataRow = [] as string[];
-    dataRow.push(data.store.name); // data name
-    dataRow.push(data.data.value.toString() + " " + data.store.unit); // data value
-    let date = new Date(data.data.created_at).toLocaleDateString(
-      "fr-FR",
-      options
-    );
-    dataRow.push(date); // data timestamp
-    tableData.push(dataRow);
-  }
-  return tableData;
-};
-
-/**
- * @brief Dialog to
- */
 const DataModifierDialog: React.FC<Props> = observer(({
-  // Put props here
   visible,
   partogramme,
   onCancel,
 }) => {
-  // Put state variables here
+  const { width, height } = useWindowDimensions();
   const [isEditDialogVisible, setIsEditDialogVisible] = useState(false);
   const [isErrorDialogVisible, setIsErrorDialogVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [currentSelectedDataId, setCurrentSelectedDataId] = useState("");
-  const last10MinutesData = partogramme.Last10MinutesDataIds;
 
   return (
-    // Put JSX here
     <View>
       <Modal
         visible={visible}
-        animationType="slide"
-        transparent={false}
-        style={{
-          flex: 1,
-          justifyContent: "center",
-        }}
+        animationType="fade"
+        transparent={true}
       >
-        <View style={styles.modalView}>
-          <DataList
-            title={"Données des 10 dernières minutes"}
-            dataList={partogramme.Last10MinutesDataIds.slice()}
-            onEditButtonPress={(item) => {
-              runInAction(() => {
-                item.partogrammeStore.editedDataId = item.data.id;
-              });
-              setIsEditDialogVisible(true);
-            }}
-          />
-          <TouchableOpacity
-            style={[styles.button, styles.buttonCancel, { marginLeft: 50 }]}
-            onPress={() => {
-              onCancel();
-            }}
-          >
-            <Text style={{ color: "white" }}>Annuler</Text>
-          </TouchableOpacity>
+        <View style={styles.overlay}>
+          <View style={[
+            styles.card,
+            { width: Math.min(width * 0.92, 480), maxHeight: height * 0.8 }
+          ]}>
+            <DataList
+              title="Données des 10 dernières minutes"
+              dataList={partogramme.Last10MinutesDataIds.slice()}
+              onEditButtonPress={(item) => {
+                runInAction(() => {
+                  item.partogrammeStore.editedDataId = item.data.id;
+                });
+                setIsEditDialogVisible(true);
+              }}
+            />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onCancel}
+            >
+              <Text style={styles.closeButtonText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
-      {partogramme.dataToEdit && 
+
+      {partogramme.dataToEdit &&
         <EditDataDialog
           visible={isEditDialogVisible}
           data={partogramme.getDataById(partogramme.dataToEdit.data.id)!}
-          onCancel={() => {
-            setIsEditDialogVisible(false);
-          }}
+          onCancel={() => setIsEditDialogVisible(false)}
           onValidate={(data) => {
             partogramme.dataToEdit?.update(data.toString())
-            .then(() => {
-                setIsEditDialogVisible(false);
-            })
-            .catch((error:any) => {
+              .then(() => setIsEditDialogVisible(false))
+              .catch((error: any) => {
                 setErrorMessage(error.message);
                 setIsErrorDialogVisible(true);
-            });
-
+              });
           }}
         />
       }
       <ErrorDialog
         isVisible={isErrorDialogVisible}
-        errorCode={"Erreur"}
+        errorCode="Erreur"
         errorMsg={errorMessage}
-        toggleDialog={() => {
-          setIsErrorDialogVisible(false);
-        }}
+        toggleDialog={() => setIsErrorDialogVisible(false)}
       />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  // Put styles here
-  container: {
+  overlay: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
-  },
-  modalView: {
-    justifyContent: "center",
-    width: "90%",
-    height: "95%",
-    margin: 20,
-    backgroundColor: "#efedff",
-    borderRadius: 20,
-    padding: 10,
     alignItems: "center",
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
     shadowColor: "#000",
-    shadowRadius: 10,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
   },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-    marginTop: 10,
+  closeButton: {
+    backgroundColor: "#DE2C1D",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 12,
   },
-  buttonValidate: {
-    backgroundColor: "#403572",
-  },
-  buttonCancel: {
-    backgroundColor: "#C5613E",
-    alignSelf: "flex-end",
+  closeButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 15,
   },
 });
 

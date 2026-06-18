@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Modal,
   Text,
@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
 } from "react-native";
 
 export interface Props {
-  // Put props here
   visible: boolean;
   onClose: (data: string) => void;
   onCancel: () => void;
@@ -17,117 +17,113 @@ export interface Props {
   data?: string;
 }
 
-/**
- * @brief Dialog to edit data
- */
 export const DialogEditText: React.FC<Props> = ({
-  // Put props here
   visible,
   onClose,
   onCancel,
   data_name,
   data = "",
 }) => {
-  // Put state variables here
+  const { width } = useWindowDimensions();
   const [dataText, setDataText] = useState(data);
 
   return (
-    <View>
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={visible}
-        onRequestClose={() => {
-          onCancel();
-        }}
-      >
-        <View style={styles.centeredView}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalText}>Modifier {data_name}</Text>
-            <TextInput
-              style={styles.textInput}
-              onChangeText={(text) => setDataText(text)}
-              value={dataText}
-              multiline={true}
-            />
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => {
-                  onClose(dataText);
-                }}
-              >
-                <Text style={styles.buttonText}>Valider</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => {
-                  onCancel();
-                }}
-              >
-                <Text style={styles.buttonText}>Annuler</Text>
-              </TouchableOpacity>
-            </View>
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onCancel}
+    >
+      <View style={styles.overlay}>
+        <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
+
+          <Text style={styles.title}>{data_name}</Text>
+
+          <TextInput
+            style={styles.textInput}
+            onChangeText={(text) => setDataText(text)}
+            value={dataText}
+            multiline={true}
+            placeholder="Écrivez votre commentaire ici..."
+            placeholderTextColor="#9F90D4"
+            textAlignVertical="top"
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonCancel]}
+              onPress={onCancel}
+            >
+              <Text style={styles.buttonText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonValidate]}
+              onPress={() => onClose(dataText)}
+            >
+              <Text style={styles.buttonText}>Valider</Text>
+            </TouchableOpacity>
           </View>
+
         </View>
-      </Modal>
-    </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  centeredView: {
+  overlay: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 22,
-    backgroundColor: "#000000aa",
   },
-  modalView: {
-    margin: 20,
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
   },
-  modalText: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 20,
+  title: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#403572",
+    marginBottom: 16,
   },
   textInput: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 20,
     borderWidth: 1,
-    borderColor: "black",
-    borderRadius: 5,
-    width: 200,
-    height: 100,
-    alignContent: "flex-start",
+    borderColor: "#9F90D4",
+    borderRadius: 10,
+    backgroundColor: "#f5f3fc",
+    color: "#403572",
+    fontSize: 15,
+    padding: 12,
+    minHeight: 120,
+    marginBottom: 20,
+    textAlignVertical: "top",
   },
-  buttonContainer: {
+  buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 12,
   },
   button: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  buttonValidate: {
     backgroundColor: "#403572",
-    borderRadius: 5,
-    padding: 10,
-    elevation: 2,
-    margin: 10,
+  },
+  buttonCancel: {
+    backgroundColor: "#DE2C1D",
   },
   buttonText: {
     color: "white",
     fontWeight: "bold",
-    textAlign: "center",
+    fontSize: 15,
   },
 });

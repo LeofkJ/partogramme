@@ -1,15 +1,14 @@
-import * as React from "react";
-import { Dialog } from "@rneui/themed";
-import { View, StyleSheet, Text } from "react-native";
+import React from "react";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 
-/**
- * AppProps interface for the component props
- * @interface AppProps interface for the component props (see below)
- * @param isVisible boolean to show or hide the dialog
- * @param errorCode string to display the error code
- * @param errorMsg string to display the error message
- * @param toggleDialog function to toggle the dialog
- */
 export interface AppProps {
   isVisible: boolean;
   errorCode: string;
@@ -17,15 +16,8 @@ export interface AppProps {
   toggleDialog: () => void;
 }
 
-export interface AppState {
-  // empty
-}
+export interface AppState {}
 
-/**
- * ErrorDialog component
- * @param props @ref AppProps interface for the component props (see above)
- * @returns {JSX.Element}
- */
 export default class AppComponent extends React.Component<AppProps, AppState> {
   constructor(props: AppProps) {
     super(props);
@@ -34,37 +26,107 @@ export default class AppComponent extends React.Component<AppProps, AppState> {
 
   public render() {
     return (
-      <View>
-        <Dialog
-          isVisible={this.props.isVisible}
-          onBackdropPress={this.props.toggleDialog}
-        >
-          <Dialog.Title
-            title={"Erreur : " + this.props.errorCode}
-            titleStyle={styles.textTitle}
-          />
-          <Text>{this.props.errorMsg}</Text>
-          <Dialog.Actions>
-            <Dialog.Button
-              title="OK"
-              onPress={this.props.toggleDialog}
-            />
-          </Dialog.Actions>
-        </Dialog>
-      </View>
+      <ErrorDialogInner
+        isVisible={this.props.isVisible}
+        errorCode={this.props.errorCode}
+        errorMsg={this.props.errorMsg}
+        toggleDialog={this.props.toggleDialog}
+      />
     );
   }
 }
 
+const ErrorDialogInner: React.FC<AppProps> = ({
+  isVisible,
+  errorCode,
+  errorMsg,
+  toggleDialog,
+}) => {
+  const { width } = useWindowDimensions();
+
+  return (
+    <Modal
+      visible={isVisible}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={toggleDialog}
+    >
+      <View style={styles.overlay}>
+        <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
+
+          <View style={styles.iconRow}>
+            <View style={styles.iconCircle}>
+              <Icon name="exclamation" size={22} color="white" />
+            </View>
+            <Text style={styles.title}>
+              {errorCode ? `Erreur : ${errorCode}` : "Erreur"}
+            </Text>
+          </View>
+
+          <Text style={styles.errorMsg}>{errorMsg}</Text>
+
+          <TouchableOpacity style={styles.button} onPress={toggleDialog}>
+            <Text style={styles.buttonText}>OK</Text>
+          </TouchableOpacity>
+
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const styles = StyleSheet.create({
-  textTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    backgroundColor: "red",
-    paddingLeft:10,
-    borderRadius: 10,
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  textBody: {
-    fontSize: 16,
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 12,
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#DE2C1D",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#DE2C1D",
+    flex: 1,
+  },
+  errorMsg: {
+    fontSize: 14,
+    color: "#555",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  button: {
+    backgroundColor: "#403572",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 15,
   },
 });

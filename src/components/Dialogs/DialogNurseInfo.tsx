@@ -36,9 +36,7 @@ interface IProps {
 
 class UiState {
   pickerDataNameOnFocus: boolean = false;
-  isDoctorChecked: boolean = false;
   userInfoStore: UserInfoStore;
-  hospitalSelectedValue: string = "";
   isErrorDialogVisible: boolean = false;
   errorMessage: string = "";
 
@@ -117,7 +115,11 @@ class UiState {
 
   async fetchHospitalNames(userInfoStore: UserInfoStore) {
     await userInfoStore.transportLayer.fetchAllHospitals().then((data) => {
-      userInfoStore.setHospitals(data);
+      if (data) {
+        runInAction(() => {
+          userInfoStore.setHospitals(data);
+        });
+      }
     });
   }
 
@@ -132,15 +134,7 @@ class UiState {
       .catch((error) => {});
   }
 
-  set setIsDoctorChecked(value: boolean) {
-    this.isDoctorChecked = value;
-  }
-
-  set setHospitalSelectedValue(value: string) {
-    this.hospitalSelectedValue = value;
-  }
-
-  checkInputs() {
+  checkInputs(isDoctor: boolean) {
     if (
       this.userInfoStore.userInfo.firstName === "" ||
       this.userInfoStore.userInfo.lastName === ""
@@ -149,15 +143,12 @@ class UiState {
       this.toggleErrorDialog();
       return false;
     }
-    if (
-      !this.isDoctorChecked &&
-      this.userInfoStore.userInfo.refDoctorId === ""
-    ) {
+    if (!isDoctor && this.userInfoStore.userInfo.refDoctorId === "") {
       this.setErrorMessage = "Veuillez sélectionner un docteur";
       this.toggleErrorDialog();
       return false;
     }
-    if (this.hospitalSelectedValue === "") {
+    if (this.userInfoStore.userInfo.hospitalId === "") {
       this.setErrorMessage = "Veuillez sélectionner un hôpital";
       this.toggleErrorDialog();
       return false;
@@ -174,6 +165,8 @@ export const DialogNurseInfo = observer(
       uiState.fetchDoctorProfiles(userInfo).catch((error) => {});
       uiState.fetchHospitalNames(userInfo).catch((error) => {});
     }, []);
+
+    const isDoctor = userInfo.userInfo.role === "DOCTOR";
 
     const toggleErrorDialog = () => {
       uiState.toggleErrorDialog();
@@ -196,12 +189,11 @@ export const DialogNurseInfo = observer(
     };
 
     const handleValidate = () => {
-      if (!uiState.checkInputs()) {
+      if (!uiState.checkInputs(isDoctor)) {
         return;
       }
 
-      // Ensure role is always explicitly set before saving
-      if (!uiState.isDoctorChecked) {
+      if (!isDoctor) {
         userInfo.userInfoRole = "NURSE";
       } else {
         userInfo.userInfoRole = "DOCTOR";
@@ -210,7 +202,7 @@ export const DialogNurseInfo = observer(
 
       userInfo
         .saveUserInfo()
-        .then((data) => {
+        .then(() => {
           if (Platform.OS === "android") {
             ToastAndroid.show("Informations mises à jour", ToastAndroid.SHORT);
           }
@@ -244,6 +236,7 @@ export const DialogNurseInfo = observer(
         <TextInput
           style={styles.input}
           placeholder="Prénom"
+          value={userInfo.userInfo.firstName}
           placeholderTextColor={"#939F99"}
           onChangeText={(text) => (userInfo.userInfoFirstName = text)}
         />
@@ -251,25 +244,23 @@ export const DialogNurseInfo = observer(
           center
           title="Êtes-vous un docteur ?"
           iconRight
-          checked={uiState.isDoctorChecked}
+          checked={isDoctor}
           onPress={() => {
-            uiState.setIsDoctorChecked = !uiState.isDoctorChecked;
-            userInfo.userInfoRole = uiState.isDoctorChecked
-              ? "DOCTOR"
-              : "NURSE";
-            userInfo.userInfoRefDoctorId = uiState.isDoctorChecked
+            const nowDoctor = !isDoctor;
+            userInfo.userInfoRole = nowDoctor ? "DOCTOR" : "NURSE";
+            userInfo.userInfoRefDoctorId = nowDoctor
               ? rootStore.profileStore.profile.id
               : "";
           }}
         />
-        {!uiState.isDoctorChecked && (
+        {!isDoctor && (
           <Text>Sélectionnez votre docteur de référence</Text>
         )}
-        {!uiState.isDoctorChecked && (
+        {!isDoctor && (
           <Picker
             selectedValue={userInfo.userInfo.refDoctorId}
             style={styles.input}
-            onValueChange={(itemValue, itemIndex) => {
+            onValueChange={(itemValue) => {
               runInAction(() => {
                 userInfo.userInfo.refDoctorId = itemValue;
               });
@@ -280,10 +271,9 @@ export const DialogNurseInfo = observer(
         )}
         <Text>Sélectionnez votre hôpital de référence</Text>
         <Picker
-          selectedValue={uiState.hospitalSelectedValue}
+          selectedValue={userInfo.userInfo.hospitalId}
           style={styles.input}
-          onValueChange={(itemValue: string, itemIndex) => {
-            uiState.setHospitalSelectedValue = itemValue;
+          onValueChange={(itemValue: string) => {
             userInfo.setUserInfoHospitalId(itemValue);
           }}
         >

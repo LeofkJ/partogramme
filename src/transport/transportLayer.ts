@@ -29,6 +29,7 @@ export class TransportLayer {
       const { data, error } = await supabase
         .from("Partogramme")
         .select("*")
+        .eq("hospitalId", hospitalId)
         .eq("isDeleted", false);
       if (error) throw error;
       return data;
@@ -483,8 +484,7 @@ export class TransportLayer {
   async saveUserInfo(userInfo: UserInfo["Row"]) {
     const { data, error } = await supabase
       .from("userInfo")
-      .upsert(userInfo)
-      .eq("id", userInfo.id);
+      .upsert(userInfo, { onConflict: "id" });
     if (error) throw error;
     return data;
   }
@@ -496,7 +496,10 @@ export class TransportLayer {
   }
 
   async fetchAllHospitals() {
-    const { data, error } = await supabase.from("hospital").select("*");
+    const { data, error } = await supabase
+      .from("hospital")
+      .select("*")
+      .eq("isDeleted", false);
     if (error) throw error;
     return data;
   }

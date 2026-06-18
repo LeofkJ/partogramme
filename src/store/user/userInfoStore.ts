@@ -153,24 +153,30 @@ export class UserInfoStore {
   }
 
   async saveUserInfo() {
-    this.in_sync = false;
+    runInAction(() => {
+      this.in_sync = false;
+    });
     const { data: sessionData } = await supabase.auth.getSession();
-    this.userInfo.profileId =
-      sessionData?.session?.user?.id || this.ProfileStore.profile.id;
-    if (!this.userInfo.id) {
-      this.userInfo.id = uuid.v4().toString();
-    }
+    runInAction(() => {
+      this.userInfo.profileId =
+        sessionData?.session?.user?.id || this.ProfileStore.profile.id;
+      if (!this.userInfo.id) {
+        this.userInfo.id = uuid.v4().toString();
+      }
+    });
     await this.transportLayer
       .saveUserInfo(this.userInfo)
       .then((data) => {
         runInAction(() => {
           this.in_sync = true;
+          this.state = "done";
         });
-        this.state = "done";
         return Promise.resolve(data);
       })
       .catch((error) => {
-        this.state = "error";
+        runInAction(() => {
+          this.state = "error";
+        });
         if (Platform.OS === "android") {
           Alert.alert(error.message);
         }

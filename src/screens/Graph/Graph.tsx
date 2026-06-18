@@ -424,7 +424,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           />
           {canEdit && (
             <CustomButton
-              title="Ajouter FC bébé"
+              title="+ Ajouter FC bébé"
               color="#403572"
               disabled={false}
               style={styles.buttonStyle}
@@ -447,46 +447,35 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             step={1}
             dataName={"Dilatation du col de l'utérus"}
           />
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "center",
-              width: "100%",
-              paddingHorizontal: 20,
-              marginRight: 20,
-              marginLeft: 20,
-            }}
-          >
-            {canEdit && (
+          {canEdit && (
+            <View style={styles.buttonRow}>
               <CustomButton
-                title="Ajouter dilatation"
+                title="+ Dilatation"
                 color="#403572"
                 disabled={false}
                 style={styles.buttonStyle2}
                 onPressFunction={openDilationDialog}
-                styleText={{ fontSize: 15, fontWeight: "bold" }}
+                styleText={{ fontSize: 14, fontWeight: "bold" }}
               />
-            )}
-            {canEdit && (
               <CustomButton
-                title="Ajouter descente bébé"
-                color="#403572"
+                title="+ Descente bébé"
+                color="#9F90D4"
                 disabled={false}
                 style={styles.buttonStyle2}
                 onPressFunction={openDescentBabyDialog}
-                styleText={{ fontSize: 15, fontWeight: "bold" }}
+                styleText={{ fontSize: 14, fontWeight: "bold" }}
               />
-            )}
-            <DialogDataInputGraph
-              visible={isDescentBabyDialogVisible}
-              onClose={onDialogCloseAddDescentBaby}
-              onCancel={() => setDescentBabyDialogVisible(false)}
-              startValue={0}
-              endValue={10}
-              step={1}
-              dataName={"Descente du bébé"}
-            />
-          </View>
+            </View>
+          )}
+          <DialogDataInputGraph
+            visible={isDescentBabyDialogVisible}
+            onClose={onDialogCloseAddDescentBaby}
+            onCancel={() => setDescentBabyDialogVisible(false)}
+            startValue={0}
+            endValue={10}
+            step={1}
+            dataName={"Descente du bébé"}
+          />
 
           <DataTable
             maxHours={12}
@@ -506,10 +495,10 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           />
           {canEdit && (
             <CustomButton
-              title="Ajouter des données au tableau"
+              title="+ Ajouter des données au tableau"
               color="#403572"
               disabled={false}
-              style={styles.buttonStyle2}
+              style={styles.buttonStyle}
               onPressFunction={openAddDataTable}
               styleText={{ fontSize: 15, fontWeight: "bold" }}
             />
@@ -543,7 +532,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           />
           {canEdit && (
             <CustomButton
-              title="Ajouter un commentaire"
+              title="+ Ajouter un commentaire"
               color="#403572"
               disabled={false}
               style={styles.buttonAddCommentary}
@@ -615,23 +604,31 @@ const styles = StyleSheet.create({
     color: "#403572",
   },
   buttonStyle: {
-    alignItem: "center",
+    width: "90%",
+    height: 50,
+    borderRadius: 12,
     justifyContent: "center",
-    width: 200,
+    marginTop: 8,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    width: "90%",
+    gap: 10,
+    marginTop: 8,
   },
   buttonStyle2: {
-    alignItem: "center",
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
     justifyContent: "center",
-    width: "40%",
-    height: 70,
   },
   buttonAddCommentary: {
-    alignItem: "center",
+    width: "90%",
+    height: 50,
+    borderRadius: 12,
     justifyContent: "center",
-    width: "40%",
-    height: 70,
-    borderRadius: 35,
-    marginBottom: 50,
+    marginTop: 8,
+    marginBottom: 30,
   },
   overlayPenButton: {
     position: "absolute",

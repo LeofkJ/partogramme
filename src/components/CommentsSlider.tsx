@@ -1,56 +1,41 @@
 import { observer } from "mobx-react";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
-  Modal,
   Text,
   View,
-  TouchableOpacity,
   StyleSheet,
-  TextInput,
   FlatList,
+  useWindowDimensions,
 } from "react-native";
 
 export interface Props {
-  // Put props here
   data: any;
   title?: string;
 }
 
-/**
- * Component that displays comments in a lateral list slider
- */
 export const CommentsSlider: React.FC<Props> = ({
-  // Put props here
   data,
   title = "Comments",
 }) => {
-  // Put state variables here
   const renderItem = ({ item }: { item: any }) => {
-    return (
-      // Flat List Item
-      <Item
-        data={item}
-      />
-    );
+    return <Item data={item} />;
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.titleText}>{title}</Text>
-        <FlatList
-          style={styles.list}
-          horizontal={true}
-          data={data} // Use .slice() to subscribe to the partogramme store
-          renderItem={renderItem}
-          ListEmptyComponent={EmptyListMessage}
-        />
+      <FlatList
+        style={styles.list}
+        data={data}
+        renderItem={renderItem}
+        ListEmptyComponent={EmptyListMessage}
+      />
     </View>
   );
 };
 
-const EmptyListMessage = ({}) => {
+const EmptyListMessage = () => {
   return (
-    // Flat List Item
     <Text style={styles.emptyListStyle}>
       Aucun Commentaire ...
     </Text>
@@ -61,75 +46,53 @@ export interface ItemProps {
   data: any;
 }
 
-/**
- *  This function render each item depending of item object
- * @param item Partogramme item of the partogramme list
- * @param onPress function that is called when the item is pressed
- * @param backgroundColor background color of the item
- * @param textColor text color of the item
- * @returns the rendered item
- */
-const Item: React.FC<ItemProps> = observer( ({data}: ItemProps) => {
-  var options = {
+const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
+  const { width } = useWindowDimensions();
+  const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "long",
     day: "numeric",
     hour: "numeric",
     minute: "numeric",
   };
+
   return (
-    <View style={styles.itemView}>
-      <View style={{flexDirection: "row"}}>
-        <Text style={[{...styles.itemTextTitle}, {marginBottom: 5, width: 50}]}>
+    <View style={[styles.itemView, { width: width * 0.9 }]}>
+      <View style={{ flexDirection: "row" }}>
+        <Text style={[styles.itemTextTitle, { marginBottom: 5, width: 80 }]}>
           Date :
         </Text>
-        <Text style={[{...styles.itemText}, {marginBottom: 5}]}>
-          {new Date(data.created_at).toLocaleDateString(
-                "fr-FR",
-                options
-              )
-              }
+        <Text style={[styles.itemText, { marginBottom: 5, flex: 1 }]}>
+          {new Date(data.created_at).toLocaleDateString("fr-FR", options)}
         </Text>
       </View>
-      <Text style={styles.itemTextTitle}>
-        Commentaire :
-      </Text>
-      <Text style={styles.itemText}>
-        {data.value}
-      </Text>
+      <Text style={styles.itemTextTitle}>Commentaire :</Text>
+      <Text style={styles.itemText}>{data.value}</Text>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  // Put styles here
   container: {
     flexDirection: "column",
-    justifyContent: "center",
     alignItems: "center",
     width: "100%",
-    height: 200,
+    paddingBottom: 10,
   },
   list: {
     marginTop: 5,
-    alignContent: "center",
-    alignSelf: "center",
-    width: "90%",
-    height: 170,
+    width: "100%",
   },
   emptyListStyle: {
     padding: 10,
     marginVertical: 8,
     marginHorizontal: 16,
-    width: 344,
     alignSelf: "center",
-    borderRadius: 15,
   },
   itemView: {
-    width: 300,
     padding: 10,
-    marginBottom: 20,
-    marginHorizontal: 16,
+    marginBottom: 12,
+    marginHorizontal: "5%",
     borderWidth: 5,
     borderColor: "#9F90D4",
     alignSelf: "center",
@@ -142,7 +105,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 5,
     width: 105,
-    // backgroundColor : "#9F90D4",
     color: "#ffffff",
   },
   itemText: {
@@ -160,4 +122,3 @@ const styles = StyleSheet.create({
     color: "#403572",
   },
 });
-

@@ -146,16 +146,25 @@ export class PartogrammeStore {
         return Promise.reject(error);
       });
 
-    this.subscribeToRealtime();
+    this.subscribeToRealtime(nurseId);
   }
 
-  // Subscribe to real-time changes on the Partogramme table for the current hospital
-  private subscribeToRealtime() {
+  // Subscribe to real-time changes on the Partogramme table for the current hospital.
+  // When nurseId is provided (nurse role), only process events for that nurse's partogrammes.
+  private subscribeToRealtime(nurseId?: string) {
     if (this.realtimeChannel) {
       supabase.removeChannel(this.realtimeChannel);
     }
 
     const hospitalId = this.rootStore.userInfoStore.userInfo.hospitalId;
+
+    const handlePayload = (payload: any) => {
+      const row = payload.new as Partogramme_t["Row"];
+      if (nurseId && row.nurseId !== nurseId) return;
+      runInAction(() => {
+        this.updatePartogrammeFromServer(row);
+      });
+    };
 
     this.realtimeChannel = supabase
       .channel("partogramme-changes")
@@ -167,13 +176,7 @@ export class PartogrammeStore {
           table: "Partogramme",
           filter: `hospitalId=eq.${hospitalId}`,
         },
-        (payload) => {
-          runInAction(() => {
-            this.updatePartogrammeFromServer(
-              payload.new as Partogramme_t["Row"]
-            );
-          });
-        }
+        handlePayload
       )
       .on(
         "postgres_changes",
@@ -183,13 +186,7 @@ export class PartogrammeStore {
           table: "Partogramme",
           filter: `hospitalId=eq.${hospitalId}`,
         },
-        (payload) => {
-          runInAction(() => {
-            this.updatePartogrammeFromServer(
-              payload.new as Partogramme_t["Row"]
-            );
-          });
-        }
+        handlePayload
       )
       .subscribe();
   }

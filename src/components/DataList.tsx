@@ -1,18 +1,15 @@
-/**
- * This components is responsible of displaying partogramme list
- */
 import { observer } from "mobx-react";
-import React, { useState } from "react";
+import React from "react";
 import {
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { data_t } from "../store/partogramme/partogrammeStore";
-import { FAB } from "@rneui/themed";
-import Icon from "react-native-vector-icons/FontAwesome"; // Assuming you want to use the FontAwesome icon library
+import Icon from "react-native-vector-icons/FontAwesome";
 
 export interface DataListProps {
   title?: string;
@@ -23,145 +20,70 @@ export interface DataListProps {
 export interface ItemProps {
   item: data_t;
   onEditButtonPress: (data: data_t) => void;
-  backgroundColor: string;
 }
 
-/**
- *  This function render each item depending of item object
- * @param item Partogramme item of the partogramme list
- * @param onPress function that is called when the item is pressed
- * @param backgroundColor background color of the item
- * @param textColor text color of the item
- * @returns the rendered item
- */
-const Item: React.FC<ItemProps> = observer(
-  ({ item, onEditButtonPress, backgroundColor }: ItemProps) => {
-    var options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-    };
+const Item: React.FC<ItemProps> = observer(({ item, onEditButtonPress }) => {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+  };
 
-    return (
-      <View style={styles.itemView}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <View style={{ flexDirection: "column" }}>
-            <View style={{ flexDirection: "row" }}>
-              <Text style={[styles.infoFont, { width: 250 }]}>
-                {" "}
-                {"Type : " + item.store.name}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  item.delete();
-                }}
-                style={styles.deleteButton}
-              >
-                <Icon name="trash-o" size={20} color="white" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.infoFont}>
-              {" "}
-              {"Valeur : " + item.data.value + " " + item.store.unit}
-            </Text>
-            <Text style={[styles.infoFont, {}]}>
-              {" "}
-              {"Date : " +
-                new Date(item.data.created_at).toLocaleDateString(
-                  "fr-FR",
-                  options
-                )}
-            </Text>
-          </View>
-        </View>
-        <FAB
-          size="small"
-          title=""
-          color="#9F90D4"
-          icon={{
-            name: "pen",
-            color: "white",
-            type: "font-awesome-5",
-          }}
-          style={styles.btn}
-          onPress={() => {
-            onEditButtonPress(item);
-          }}
-        />
-        {/* <FAB
-          size="small"
-          title=""
-          color="#b9121b"
-          icon={{
-            name: "trash",
-            color: "white",
-            type: "font-awesome-5",
-          }}
-          style={[
-            styles.btn,
-            {
-              bottom: "70%",
-              right: "2%",
-            },
-          ]}
-          onPress={() => {
-            onEditButtonPress(item);
-          }}
-        /> */}
+  return (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemType}>{item.store.name}</Text>
+        <Text style={styles.itemValue}>
+          {item.data.value} {item.store.unit}
+        </Text>
+        <Text style={styles.itemDate}>
+          {new Date(item.data.created_at).toLocaleDateString("fr-FR", options)}
+        </Text>
       </View>
-    );
-  }
+      <View style={styles.itemActions}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => onEditButtonPress(item)}
+        >
+          <Icon name="pencil" size={16} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => item.delete()}
+        >
+          <Icon name="trash-o" size={16} color="white" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+const EmptyListMessage = () => (
+  <Text style={styles.emptyText}>
+    Aucune donnée modifiée dans les 10 dernières minutes
+  </Text>
 );
 
-const EmptyListMessage = ({}) => {
-  return (
-    // Flat List Item
-    <Text style={styles.emptyListStyle}>
-      Aucune données modifiée dans les dernière 10 minutes ...
-    </Text>
-  );
-};
-
-/**
- * This components is responsible of displaying a dataList
- * @param title title of the dataList
- * @param dataList list of the dataList
- * @param onEditButtonPress function that is called when the edit button is pressed for each item
- */
 export const DataList: React.FC<DataListProps> = observer(
-  ({ title, dataList, onEditButtonPress }: DataListProps) => {
-    const [selectedId, setSelectedId] = useState<string>();
-    const [isDeleteConfirmDialogVisible, setDeleteConfirmDialogVisible] =
-      useState(false);
-
-    /**
-     * This function render each item depending of item object
-     * @param item Partogramme item of the partogramme list
-     * @returns the rendered item
-     */
-    const renderItem = ({ item }: { item: data_t }) => {
-      return (
-        // Flat List Item
-        <Item
-          item={item}
-          onEditButtonPress={(data: data_t) => onEditButtonPress(data)}
-          backgroundColor={"#403572"}
-        />
-      );
-    };
+  ({ title, dataList, onEditButtonPress }) => {
+    const renderItem = ({ item }: { item: data_t }) => (
+      <Item
+        item={item}
+        onEditButtonPress={onEditButtonPress}
+      />
+    );
 
     return (
       <View style={styles.container}>
-        <Text style={styles.titleText}>{title}</Text>
+        {title && <Text style={styles.titleText}>{title}</Text>}
         <FlatList
           style={styles.list}
-          data={dataList} // Use .slice() to subscribe to the partogramme store
+          data={dataList}
           renderItem={renderItem}
           keyExtractor={(data) => data.data.id}
           ListEmptyComponent={EmptyListMessage}
-          // extraData={}
         />
       </View>
     );
@@ -169,67 +91,72 @@ export const DataList: React.FC<DataListProps> = observer(
 );
 
 const styles = StyleSheet.create({
-  list: {
-    marginTop: 20,
-    alignContent: "center",
-    alignSelf: "center",
-    width: "90%",
-    height: "100%",
-  },
   container: {
-    // marginTop: "6%",
     flex: 1,
-    alignItems: "center",
+    width: "100%",
   },
-  itemView: {
-    width: 300,
-    padding: 10,
-    marginBottom: 20,
-    alignSelf: "center",
-    borderRadius: 15,
-    backgroundColor: "#403572",
-  },
-  patientNameFont: {
-    marginLeft: 10,
+  titleText: {
     color: "#403572",
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 12,
   },
-  infoFont: {
-    marginLeft: 0,
-    marginTop: 0,
-    borderRadius: 10,
-    padding: 5,
+  list: {
+    width: "100%",
+  },
+  itemCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#403572",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    width: "100%",
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemType: {
     color: "#ffffff",
-    // backgroundColor: "#b0a8d8",
+    fontWeight: "bold",
+    fontSize: 14,
+    marginBottom: 2,
   },
-  emptyListStyle: {
-    padding: 10,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    width: 344,
-    alignSelf: "center",
-    borderRadius: 15,
+  itemValue: {
+    color: "#d5d0e9",
+    fontSize: 14,
+    marginBottom: 2,
   },
-  icon: {
+  itemDate: {
+    color: "#9F90D4",
+    fontSize: 12,
+  },
+  itemActions: {
+    flexDirection: "row",
+    gap: 8,
     marginLeft: 10,
   },
-  deleteButton: {
-    backgroundColor: "red",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  editButton: {
+    backgroundColor: "#9F90D4",
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
   },
-  titleText: {
-    textAlign: "left",
-    color: "#403572",
-    fontSize: 20,
-    margin: 10,
+  deleteButton: {
+    backgroundColor: "#DE2C1D",
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  btn: {
-    position: "absolute",
-    bottom: "5%",
-    right: "2%",
-    borderRadius: 0,
+  emptyText: {
+    color: "#403572",
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 14,
+    fontStyle: "italic",
   },
 });
