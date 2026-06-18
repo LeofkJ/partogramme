@@ -126,7 +126,7 @@ export class PartogrammeStore {
   async fetchFromServer(nurseId?: string) {
     this.state = "pending";
     await this.transportLayer
-      .fetchPartogrammes(this.rootStore.userInfoStore.userInfo.hospitalId)
+      .fetchPartogrammes(this.rootStore.userInfoStore.userInfo.hospitalId, nurseId)
       .then((fetchedPartogrammes) => {
         runInAction(() => {
           if (fetchedPartogrammes) {

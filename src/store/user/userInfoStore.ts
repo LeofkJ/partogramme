@@ -3,7 +3,7 @@ import { makePersistable } from "mobx-persist-store";
 import { Database } from "../../../types/supabase";
 import { supabase } from "../../initSupabase";
 import { RootStore } from "../rootStore";
-import { Alert, Platform} from "react-native";
+import { Alert, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Profile, ProfileStore } from "./profileStore";
 import { TransportLayer } from "../../transport/transportLayer";
@@ -13,12 +13,8 @@ import uuid from "react-native-uuid";
 export type UserInfo = Database["public"]["Tables"]["userInfo"];
 export type Role = Database["public"]["Enums"]["Role"];
 export type Hospital = Database["public"]["Tables"]["hospital"];
-/**
- * userInfoStore is a MobX store that contains the user's userInfo information.
- * It is used to store the user's userInfo information and to fetch it from the database.
- */
+
 export class UserInfoStore {
-  // Declare data of the store and their initial values
   userInfo: UserInfo["Row"] = {
     firstName: "",
     id: "",
@@ -34,35 +30,24 @@ export class UserInfoStore {
   hospitals: Hospital["Row"][] = [];
   doctorInfos: UserInfo["Row"][] = [];
 
-  state = "pending"; // "pending", "done" or "error"
+  state = "pending";
   rootStore: RootStore;
   transportLayer: TransportLayer;
   ProfileStore: ProfileStore;
   in_sync = false;
   saveHandler: any;
 
-  /**
-   * This is the constructor of the UserStore class, it make it observable.
-   * this is used to make the store reactive.
-   */
   constructor(rootStore: RootStore) {
     makeAutoObservable(this);
     this.rootStore = rootStore;
     this.ProfileStore = rootStore.profileStore;
     this.transportLayer = rootStore.transportLayer;
 
-    // this.saveHandler = reaction(
-    //   () => this.asJson, // Observe everything that is used in the JSON.
-    //   (json) => {
-    //     this.transportLayer.saveUserInfo(json);
-    //   }
-    // );
-
     makePersistable(this, {
       name: "UserStore",
       properties: ["userInfo"],
       storage: AsyncStorage,
-      expireIn: 86400000, // 1 day in ms
+      expireIn: 86400000,
       removeOnExpiration: true,
     });
   }
@@ -70,7 +55,7 @@ export class UserInfoStore {
   get hospitalName() {
     if (this.userInfo.hospitalId) {
       const hospital = this.hospitals.find(
-        (hospital) => hospital.id === this.userInfo.hospitalId
+        (hospital) => hospital.id === this.userInfo.hospitalId,
       );
       if (hospital) {
         return hospital.name;
@@ -119,19 +104,25 @@ export class UserInfoStore {
     this.hospitals = hospitals;
   }
 
-  /**
-   * This method is used to fetch the user's userInfo information from the database.
-   * It is called when the user logs in.
-   */
   async fetchUserInfo() {
     let isLoggedIn = false;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const profileId =
+      sessionData?.session?.user?.id || this.ProfileStore.profile.id;
+    if (!profileId) {
+      return Promise.reject({
+        code: "PGRST116",
+        message: "No profile ID found",
+      });
+    }
     await this.transportLayer
-      .fetchUserInfo(this.ProfileStore.profile.id)
+      .fetchUserInfo(profileId)
       .then((data) => {
         isLoggedIn = true;
         runInAction(() => {
           this.userInfo = data;
         });
+        this.ProfileStore.setProfileId(profileId);
         this.state = "done";
       })
       .catch((error: PostgrestError) => {
@@ -145,10 +136,6 @@ export class UserInfoStore {
       });
   }
 
-  /**
-   * This method is used to create the user's userInfo information in the database.
-   * It is called when the user signs up.
-   */
   async createUserInfo() {
     this.in_sync = false;
     await this.transportLayer
@@ -165,13 +152,11 @@ export class UserInfoStore {
       });
   }
 
-  /**
-   * This method is used to save the user's userInfo information in the database.
-   * It is called when the user updates his profile.
-   */
   async saveUserInfo() {
     this.in_sync = false;
-    this.userInfo.profileId = this.ProfileStore.profile.id;
+    const { data: sessionData } = await supabase.auth.getSession();
+    this.userInfo.profileId =
+      sessionData?.session?.user?.id || this.ProfileStore.profile.id;
     if (!this.userInfo.id) {
       this.userInfo.id = uuid.v4().toString();
     }
@@ -197,9 +182,6 @@ export class UserInfoStore {
     return this.userInfo;
   }
 
-  /**
-   * This function Clean Up every partogramme.
-   */
   cleanUp() {
     this.userInfo = {
       firstName: "",
