@@ -4,6 +4,7 @@ import { BabyDescent_t } from "../store/GraphData/BabyDescent/babyDescentStore";
 import { BabyHeartFrequency_t } from "../store/GraphData/BabyHeartFrequency/babyHeartFrequencyStore";
 import { Dilation_t } from "../store/GraphData/Dilatation/dilatationStore";
 import { MotherSystolicBloodPressure_t } from "../store/TableData/MotherSystolicBloodPressure/motherSystolicBloodPressureStore";
+import { MotherDiastolicBloodPressure_t } from "../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
 import { MotherContractionsFrequency_t } from "../store/TableData/MotherContractionsFrequency/motherContractionsFrequencyStore";
 import { MotherHeartFrequency_t } from "../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore";
 import { MotherTemperature_t } from "../store/TableData/MotherTemperature/motherTemperatureStore";
@@ -251,7 +252,7 @@ export class TransportLayer {
   }
 
   async createDiastolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Insert"],
+    motherBloodPressure: MotherDiastolicBloodPressure_t["Insert"],
   ) {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
@@ -261,7 +262,7 @@ export class TransportLayer {
   }
 
   async updateDiastolicMotherBloodPressure(
-    motherBloodPressure: MotherSystolicBloodPressure_t["Update"],
+    motherBloodPressure: MotherDiastolicBloodPressure_t["Update"],
   ) {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")

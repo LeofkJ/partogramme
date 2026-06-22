@@ -29,7 +29,8 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         if (
           rootStore.userInfoStore.userInfo.firstName === "" ||
           rootStore.userInfoStore.userInfo.lastName === "" ||
-          rootStore.userInfoStore.userInfo.refDoctorId === ""
+          rootStore.userInfoStore.userInfo.refDoctorId === "" ||
+          rootStore.userInfoStore.userInfo.hospitalId === ""
         ) {
           setNurseInfoDialogVisible(true);
         } else {
