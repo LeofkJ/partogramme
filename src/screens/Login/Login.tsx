@@ -4,7 +4,6 @@ import {
   Text,
   View,
   TextInput,
-  Alert,
   AppStateStatus,
   AppState,
 } from "react-native";
@@ -20,6 +19,7 @@ export type Props = {
 
 export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -48,6 +48,7 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
 
   const LoginButtonPressed = () => {
     setIsLoadingDialogVisible(true);
+    setErrorMessage(null);
     rootStore.profileStore
       .signInWithEmail(
         rootStore.profileStore.email,
@@ -61,7 +62,23 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
       })
       .catch((error) => {
         setIsLoadingDialogVisible(false);
-        Alert.alert("Login error : " + error.message);
+        const msg = (error?.message || "").toLowerCase();
+        const raw = error?.message || JSON.stringify(error);
+        let friendly = "";
+        if (msg.includes("invalid login credentials") || msg.includes("user not found") || msg.includes("invalid email")) {
+          friendly = "Email introuvable ou mot de passe incorrect.";
+        } else if (msg.includes("email not confirmed")) {
+          friendly = "Veuillez confirmer votre email avant de vous connecter.";
+        } else if (msg.includes("too many requests") || msg.includes("rate limit") || error?.status === 429) {
+          friendly = "Trop de tentatives. Veuillez réessayer dans quelques minutes.";
+        } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch")) {
+          friendly = "Pas de connexion internet. Vérifiez votre réseau.";
+        } else if (msg.includes("disabled") || msg.includes("not enabled")) {
+          friendly = "Ce compte a été désactivé. Contactez l'administrateur.";
+        } else {
+          friendly = "Erreur de connexion. Veuillez réessayer.";
+        }
+        setErrorMessage(`${friendly}\n[${raw}]`);
       });
   };
 
@@ -101,6 +118,9 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         style={{ width: 344, marginTop: 10 }}
         styleText={{ fontSize: 14 }}
       />
+      {errorMessage && (
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      )}
       {isLoadingDialogVisible && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Connexion en cours...</Text>
@@ -147,5 +167,13 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#403572",
     fontSize: 16,
+  },
+  errorText: {
+    color: "#DE2C1D",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+    width: 344,
   },
 });

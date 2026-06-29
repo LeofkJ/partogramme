@@ -67,7 +67,6 @@ export class ProfileStore {
     });
     if (error) {
       this.state = "error";
-      Alert.alert(error.message);
       return Promise.reject(error);
     }
     if (data) {

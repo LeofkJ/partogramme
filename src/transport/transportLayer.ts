@@ -485,7 +485,7 @@ export class TransportLayer {
   async saveUserInfo(userInfo: UserInfo["Row"]) {
     const { data, error } = await supabase
       .from("userInfo")
-      .upsert(userInfo, { onConflict: "id" });
+      .upsert(userInfo, { onConflict: "profileId" });
     if (error) throw error;
     return data;
   }
@@ -500,7 +500,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("hospital")
       .select("*")
-      .eq("isDeleted", false);
+      .neq("isDeleted", true);
     if (error) throw error;
     return data;
   }
@@ -510,7 +510,7 @@ export class TransportLayer {
       .from("userInfo")
       .select("*")
       .eq("role", "DOCTOR")
-      .eq("isDeleted", false);
+      .neq("isDeleted", true);
     if (error) throw error;
     return data;
   }

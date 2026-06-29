@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, TextInput, Alert } from "react-native";
+import { StyleSheet, Text, View, TextInput } from "react-native";
 import "react-native-url-polyfill/auto";
 import CustomButton from "../../components/CustomButton";
 import { supabase } from "../../initSupabase";
@@ -14,21 +14,21 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const RegisterButtonPressed = async () => {
+    setErrorMessage(null);
+
     if (email === "" || password === "" || confirmPassword === "") {
-      Alert.alert("Erreur", "Veuillez remplir tous les champs.");
+      setErrorMessage("Veuillez remplir tous les champs.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Erreur", "Les mots de passe ne correspondent pas.");
+      setErrorMessage("Les mots de passe ne correspondent pas.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert(
-        "Erreur",
-        "Le mot de passe doit contenir au moins 6 caractères.",
-      );
+      setErrorMessage("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
 
@@ -40,15 +40,47 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
 
     if (error) {
       setIsLoading(false);
-      Alert.alert("Erreur", error.message);
+      const msg = error.message.toLowerCase();
+      const raw = error.message || JSON.stringify(error);
+      let friendly = "";
+      if (msg.includes("already registered") || msg.includes("user already exists") || msg.includes("already exists")) {
+        friendly = "Un compte existe déjà avec cet email.";
+      } else if (msg.includes("invalid email") || msg.includes("unable to validate email")) {
+        friendly = "Adresse email invalide.";
+      } else if (msg.includes("password") || msg.includes("weak password")) {
+        friendly = "Le mot de passe ne respecte pas les critères requis (minimum 6 caractères).";
+      } else if (msg.includes("too many requests") || msg.includes("rate limit") || (error as any)?.status === 429) {
+        friendly = "Trop de tentatives. Veuillez réessayer dans quelques minutes.";
+      } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch")) {
+        friendly = "Pas de connexion internet. Vérifiez votre réseau.";
+      } else if (msg.includes("signup") && msg.includes("disabled")) {
+        friendly = "La création de compte est temporairement désactivée.";
+      } else {
+        friendly = "Erreur lors de la création du compte. Veuillez réessayer.";
+      }
+      setErrorMessage(`${friendly}\n[${raw}]`);
       return;
     }
 
-    if (data.user) {
+    if (data.session) {
+      const { error: profileError } = await supabase
+        .from("Profile")
+        .upsert({ id: data.user!.id, email: email, isDeleted: false });
+      if (profileError) {
+        setIsLoading(false);
+        setErrorMessage("Compte créé mais erreur lors de la configuration du profil. Veuillez réessayer.");
+        return;
+      }
       rootStore.profileStore.setProfileEmail(email);
-      rootStore.profileStore.setProfileId(data.user.id);
+      rootStore.profileStore.setProfileId(data.user!.id);
       setIsLoading(false);
       navigation.navigate("Screen_Menu");
+    } else if (data.user && !data.session) {
+      setIsLoading(false);
+      setErrorMessage("Un lien de confirmation a été envoyé à " + email + ". Veuillez confirmer votre email avant de vous connecter.");
+    } else {
+      setIsLoading(false);
+      setErrorMessage("Impossible de créer le compte. Veuillez réessayer.");
     }
   };
 
@@ -96,6 +128,9 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
         style={{ marginTop: 10, width: 344 }}
         styleText={{ fontSize: 14 }}
       />
+      {errorMessage && (
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      )}
       {isLoading && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Création du compte...</Text>
@@ -143,5 +178,13 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#403572",
     fontSize: 16,
+  },
+  errorText: {
+    color: "#DE2C1D",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+    width: 344,
   },
 });
