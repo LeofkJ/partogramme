@@ -7,7 +7,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Icon from "react-native-vector-icons/FontAwesome";
+import { IconExclamation } from "../Icons";
 
 export interface AppProps {
   isVisible: boolean;
@@ -56,7 +56,7 @@ const ErrorDialogInner: React.FC<AppProps> = ({
 
           <View style={styles.iconRow}>
             <View style={styles.iconCircle}>
-              <Icon name="exclamation" size={22} color="white" />
+              <IconExclamation size={22} color="white" />
             </View>
             <Text style={styles.title}>
               {errorCode ? `Erreur : ${errorCode}` : "Erreur"}

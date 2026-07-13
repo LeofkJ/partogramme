@@ -5,6 +5,7 @@ import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { Alert, Platform } from "react-native";
+import { logger } from "../../../lib/logger";
 
 export type MotherHeartFrequency_t =
   Database["public"]["Tables"]["MotherHeartFrequency"];
@@ -215,6 +216,7 @@ export class MotherHeartFrequency {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherHeartFrequency.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

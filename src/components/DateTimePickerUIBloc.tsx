@@ -1,17 +1,6 @@
-/**
- * @brief  DateTimePickerUIBloc Component.
- * @description This component provide a UI block for date and time picker.
- */
-
 import * as React from "react";
-import { View, StyleSheet, Text, Platform } from 'react-native';
-import {
-  fr,
-  registerTranslation,
-  DatePickerInput,
-  TimePickerModal,
-} from "react-native-paper-dates";
-import { Button } from "@rneui/themed";
+import { View, StyleSheet, Text, Pressable } from "react-native";
+import { fr, registerTranslation, DatePickerInput, TimePickerModal } from "react-native-paper-dates";
 registerTranslation("fr", fr);
 
 export interface AppProps {
@@ -22,16 +11,16 @@ export interface AppProps {
 
 export interface AppState {
   inputDate: Date | undefined;
-  inputTime: Date | undefined;
-  isTimePickerVisible: boolean;
+  inputTime: Date;
+  showTimePicker: boolean;
 }
 
-/**
- * @brief  DateTimePickerUIBloc Component.
- * @description This component provide a UI block for date and time picker.
- * @param  {AppProps} props : props of the component
- * @returns JSX.Element
- */
+function formatTime(date: Date): string {
+  const h = date.getHours().toString().padStart(2, "0");
+  const m = date.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
+
 export default class DateTimePickerUIBloc extends React.Component<
   AppProps,
   AppState
@@ -41,90 +30,59 @@ export default class DateTimePickerUIBloc extends React.Component<
     this.state = {
       inputDate: new Date(),
       inputTime: new Date(),
-      isTimePickerVisible: false,
+      showTimePicker: false,
     };
   }
 
-  setInputDate(d: Date | undefined) {
-    this.setState({ inputDate: d });
-  }
-
-  setIsTimePickerVisible(b: boolean) {
-    this.setState({ isTimePickerVisible: b });
-  }
-
-  // useEffect on InputDate change
-  componentDidUpdate(prevProps: AppProps, prevState: AppState) {
-    // If inputDate changed, call onDateChange callback
+  componentDidUpdate(_prevProps: AppProps, prevState: AppState) {
     if (prevState.inputDate !== this.state.inputDate) {
       this.props.onDateChange(this.state.inputDate);
     }
   }
 
-  onDismiss = () => {
-    this.setIsTimePickerVisible(false);
-  };
-
-  onConfirm = (hoursAndMinutes: { hours: number; minutes: number }) => {
-    this.setIsTimePickerVisible(false);
-    let date = new Date(
-      0,
-      0,
-      0,
-      hoursAndMinutes.hours,
-      hoursAndMinutes.minutes
-    );
-    this.setState({
-      inputTime: date,
-    });
+  onConfirmTime = ({ hours, minutes }: { hours: number; minutes: number }) => {
+    const date = new Date(0, 0, 0, hours, minutes);
+    this.setState({ inputTime: date, showTimePicker: false });
     this.props.onTimeChange(date);
   };
 
   public render() {
+    const { inputDate, inputTime, showTimePicker } = this.state;
+
     return (
       <View style={styles.container}>
-        {/* Date Picker */}
         <Text style={styles.titleText}>{this.props.title}</Text>
-        <View style={{ flex: 1 }}>
-          <DatePickerInput
-            locale="fr"
-            label="Date"
-            value={this.state.inputDate}
-            onChange={(d) => this.setInputDate(d)}
-            inputMode="start"
-            style={{ width: 350 }}
-          />
-          {/* Time Picker */}
-          <View style={styles.timeContainer}>
-          {/* Time text view */}
-            <View style={{ flex: 2 }}>
-              <Text style={styles.text}>Heure</Text>
-              <Text style={(Platform.OS === "web") ? styles.textSmallPC: styles.textSmall}>
-                {(this.state.inputTime
-                  ? this.state.inputTime.getHours() +
-                    ":" +
-                    this.state.inputTime.getMinutes()
-                  : "Pas d'heures sélectionnée."
-                ).toString()}
-              </Text>
-            </View>
-            {/* Picker button on the right */}
-            <Button
-              title="Choisir une heure"
-              titleStyle={{ fontSize: 12 }}
-              onPress={() => this.setIsTimePickerVisible(true)}
-              buttonStyle={styles.validateButton}
-              type="solid"
-            />
-            <TimePickerModal
-              visible={this.state.isTimePickerVisible}
-              onDismiss={this.onDismiss}
-              onConfirm={this.onConfirm}
-              hours={12}
-              minutes={14}
-            />
-          </View>
-        </View>
+
+        <Text style={styles.fieldLabel}>Date</Text>
+        <DatePickerInput
+          locale="fr"
+          label=""
+          value={inputDate}
+          onChange={(d) => this.setState({ inputDate: d })}
+          inputMode="start"
+          style={styles.dateInput}
+        />
+
+        <Text style={styles.fieldLabel}>Heure</Text>
+        <Pressable
+          onPress={() => this.setState({ showTimePicker: true })}
+          android_ripple={{ color: "#40357215" }}
+          style={({ pressed }) => [
+            styles.timeRow,
+            pressed && { backgroundColor: "#f0eef8" },
+          ]}
+        >
+          <Text style={styles.timeValue}>{formatTime(inputTime)}</Text>
+          <Text style={styles.timeChevron}>›</Text>
+        </Pressable>
+
+        <TimePickerModal
+          visible={showTimePicker}
+          onDismiss={() => this.setState({ showTimePicker: false })}
+          onConfirm={this.onConfirmTime}
+          hours={inputTime.getHours()}
+          minutes={inputTime.getMinutes()}
+        />
       </View>
     );
   }
@@ -132,46 +90,44 @@ export default class DateTimePickerUIBloc extends React.Component<
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     width: "100%",
-    padding: 10,
+    paddingVertical: 6,
   },
   titleText: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#403572",
+    marginBottom: 8,
   },
-  text: {
-    fontSize: 16,
-  },
-  textSmall: {
+  fieldLabel: {
     fontSize: 12,
+    color: "#888",
+    marginBottom: 4,
+    marginLeft: 2,
   },
-  textSmallPC: {
-    fontSize: 12,
-    marginBottom: 30,
+  dateInput: {
+    marginBottom: 10,
   },
-  validateButton: {
-    width: 100,
-    flex: 1,
-    height: 45,
-    borderRadius: 20,
-    backgroundColor: "#403572",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "flex-end",
-    padding: 0,
-    elevation: 0,
-  },
-  timeContainer: {
+  timeRow: {
     flexDirection: "row",
-    flex: 1,
-    width: "100%",
-    marginTop: 10,
-    marginBottom:10,
-    paddingRight: 20,
-    paddingStart: 10,
-    paddingBottom: 10,
-    backgroundColor: "",
-    borderBottomWidth: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    marginBottom: 4,
+  },
+  timeValue: {
+    fontSize: 15,
+    color: "#222",
+    fontWeight: "500",
+  },
+  timeChevron: {
+    fontSize: 20,
+    color: "#aaa",
+    lineHeight: 22,
   },
 });

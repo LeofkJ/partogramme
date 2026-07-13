@@ -12,6 +12,7 @@ import { RootStore } from "../rootStore";
 import { TransportLayer } from "../../transport/transportLayer";
 import { Alert, Platform } from "react-native";
 import uuid from 'react-native-uuid';
+import { logger } from "../../lib/logger";
 
 export type Comment_t =
   Database["public"]["Tables"]["Comment"];
@@ -64,6 +65,7 @@ export class CommentStore extends DataStore {
         });
       })
       .catch((error: any) => {
+        logger.warn("CommentStore.createData failed", { id: data.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -87,6 +89,7 @@ export class CommentStore extends DataStore {
         });
       })
       .catch((error: any) => {
+        logger.warn("CommentStore.remove failed", { id: comment.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -210,6 +213,7 @@ export class Comment {
         });
       })
       .catch((error: any) => {
+        logger.warn("Comment.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

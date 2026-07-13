@@ -6,6 +6,7 @@ import uuid from 'react-native-uuid';
 import { Partogramme, data_t } from '../../partogramme/partogrammeStore';
 import { Alert, Platform } from "react-native";
 import { GraphData } from "../GraphData";
+import { logger } from "../../../lib/logger";
 
 export type BabyHeartFrequency_t = Database["public"]["Tables"]["BabyHeartFrequency"];
 
@@ -51,6 +52,7 @@ export class BabyHeartFrequencyStore {
         });
       })
        .catch((error:any) => {
+        logger.warn("loadBabyHeartFrequencies failed", { partogrammeId, error: error?.message });
         runInAction(() => {
           this.isLoading = false;
           Alert.alert("Erreur", "Impossible de charger les fréquences cardiaques du bébé");
@@ -113,7 +115,8 @@ export class BabyHeartFrequencyStore {
         });
       })
       .catch((error:any) => {
-        Alert.alert("Erreur", 
+        logger.warn("createBabyHeartFrequency failed", { id: frequency.data.id, error: error?.message });
+        Alert.alert("Erreur",
         "Impossible d'ajouter la fréquence cardiaque du bébé. \n Veuillez réessayer plus tard.");
         runInAction(() => {
           this.isLoading = false;
@@ -237,6 +240,7 @@ export class BabyHeartFrequency {
         });
       })
       .catch((error: any) => {
+        logger.warn("BabyHeartFrequency.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

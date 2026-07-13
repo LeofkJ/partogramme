@@ -1,10 +1,12 @@
 /**
  * This components render a dialog allowing the user to enter his nurse info
  */
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,9 +23,10 @@ import {
   UserInfo,
   UserInfoStore,
 } from "../../store/user/userInfoStore";
-import { Picker } from "@react-native-picker/picker";
 import { computed, makeAutoObservable, runInAction } from "mobx";
 import { CheckBox } from "@rneui/themed";
+import { CustomDropdown } from "./CustomDropdown";
+import { logger } from "../../lib/logger";
 
 let ToastAndroid: typeof RNToastAndroid;
 if (Platform.OS === "android") {
@@ -39,91 +42,68 @@ interface IProps {
 class UiState {
   pickerDataNameOnFocus: boolean = false;
   userInfoStore: UserInfoStore;
+  isLoading: boolean = false;
+  fetchError: string | null = null;
 
   constructor(userInfo: UserInfoStore) {
     makeAutoObservable(this, {
-      doctorNamesPickerItems: computed,
+      doctorNamesDropdownItems: computed,
+      hospitalNamesDropdownItems: computed,
     });
     this.userInfoStore = userInfo;
   }
 
-  get doctorNamesPickerItems() {
-    return this.generateDoctorNameItem(this.userInfoStore.doctorInfos);
+  get doctorNamesDropdownItems() {
+    return this.generateDoctorNameItems(this.userInfoStore.doctorInfos);
   }
 
-  get hospitalNamesPickerItems() {
-    return this.generateHospitalNameItem(this.userInfoStore.hospitals);
+  get hospitalNamesDropdownItems() {
+    return this.generateHospitalNameItems(this.userInfoStore.hospitals);
   }
 
-  generateDoctorNameItem(doctorInfos: UserInfo["Row"][]) {
-    const items: any[] = [];
-    items.push(
-      <Picker.Item
-        key={0}
-        label={"Sélectionnez un docteur"}
-        value={""}
-        style={styles.pickerItems}
-      />,
-    );
-    let i = 1;
-    doctorInfos.forEach((doctor) => {
-      items.push(
-        <Picker.Item
-          key={i}
-          label={doctor.firstName + " " + doctor.lastName}
-          value={doctor.profileId}
-          style={styles.pickerItems}
-        />,
-      );
-      i++;
+  generateDoctorNameItems(doctorInfos: UserInfo["Row"][]) {
+    if (doctorInfos.length === 0) {
+      return [{ label: "Aucun docteur disponible", value: "" }];
+    }
+    return doctorInfos.map((doctor) => ({
+      label: doctor.firstName + " " + doctor.lastName,
+      value: doctor.profileId,
+    }));
+  }
+
+  generateHospitalNameItems(hospitalInfos: Hospital["Row"][]) {
+    if (hospitalInfos.length === 0) {
+      return [{ label: "Aucun hôpital disponible", value: "" }];
+    }
+    return hospitalInfos.map((hospital) => ({
+      label: hospital.name + ", " + hospital.city,
+      value: hospital.id,
+    }));
+  }
+
+  async fetchData(userInfoStore: UserInfoStore) {
+    runInAction(() => {
+      this.isLoading = true;
+      this.fetchError = null;
     });
-    return items;
-  }
-
-  generateHospitalNameItem(hospitalInfos: Hospital["Row"][]) {
-    const items: any[] = [];
-    items.push(
-      <Picker.Item
-        key={0}
-        label={"Sélectionnez un hôpital"}
-        value={""}
-        style={styles.pickerItems}
-      />,
-    );
-    let i = 1;
-    hospitalInfos.forEach((hospital) => {
-      items.push(
-        <Picker.Item
-          key={i}
-          label={hospital.name + ", " + hospital.city}
-          value={hospital.id}
-          style={styles.pickerItems}
-        />,
-      );
-      i++;
-    });
-    return items;
-  }
-
-  async fetchHospitalNames(userInfoStore: UserInfoStore) {
-    await userInfoStore.transportLayer.fetchAllHospitals().then((data) => {
-      if (data) {
-        runInAction(() => {
-          userInfoStore.setHospitals(data);
-        });
-      }
-    });
-  }
-
-  async fetchDoctorProfiles(userInfoStore: UserInfoStore) {
-    await userInfoStore.transportLayer
-      .fetchAllDoctors()
-      .then((data) => {
-        runInAction(() => {
-          this.userInfoStore.doctorInfos = data;
-        });
-      })
-      .catch((error) => {});
+    try {
+      const [doctors, hospitals] = await Promise.all([
+        userInfoStore.transportLayer.fetchAllDoctors(),
+        userInfoStore.transportLayer.fetchAllHospitals(),
+      ]);
+      runInAction(() => {
+        this.userInfoStore.doctorInfos = doctors;
+        userInfoStore.setHospitals(hospitals);
+        this.isLoading = false;
+      });
+    } catch (error: any) {
+      logger.warn("DialogNurseInfo: fetchData failed", { error: error?.message });
+      runInAction(() => {
+        this.isLoading = false;
+        this.fetchError =
+          error?.message || "Erreur lors du chargement des données";
+      });
+    }
   }
 
   checkInputs(isDoctor: boolean): string | null {
@@ -147,11 +127,10 @@ export const DialogNurseInfo = observer(
   ({ isVisible, userInfo, setIsVisible }: IProps) => {
     const [uiState] = useState(() => new UiState(userInfo));
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { width } = useWindowDimensions();
+    const { width, height } = useWindowDimensions();
 
     useEffect(() => {
-      uiState.fetchDoctorProfiles(userInfo).catch((error) => {});
-      uiState.fetchHospitalNames(userInfo).catch((error) => {});
+      uiState.fetchData(userInfo);
     }, []);
 
     const isDoctor = userInfo.userInfo.role === "DOCTOR";
@@ -191,11 +170,10 @@ export const DialogNurseInfo = observer(
           }
           setIsVisible(false);
         })
-        .catch((error) => {
-          setErrorMessage("Erreur lors de la mise à jour des informations. Veuillez réessayer.");
-          if (Platform.OS === "android") {
-            ToastAndroid.show("Erreur lors de la mise à jour des informations. Veuillez réessayer.", ToastAndroid.SHORT);
-          }
+        .catch((err: any) => {
+          const msg = err?.message || JSON.stringify(err) || "Unknown error";
+          logger.warn("DialogNurseInfo: saveUserInfo failed", { error: msg });
+          setErrorMessage("Save failed: " + msg);
         });
     };
 
@@ -207,7 +185,8 @@ export const DialogNurseInfo = observer(
         onRequestClose={handleCancel}
       >
         <View style={styles.overlay}>
-          <View style={[styles.card, { width: Math.min(width * 0.92, 440) }]}>
+          <View style={[styles.card, { width: Math.min(width * 0.92, 440), maxHeight: height * 0.8 }]}>
+            <ScrollView showsVerticalScrollIndicator={true}>
 
             <Text style={styles.title}>Entrez vos informations</Text>
             <Text style={styles.subtitle}>
@@ -257,43 +236,57 @@ export const DialogNurseInfo = observer(
               }}
             />
 
-            {!isDoctor && (
-              <Text style={styles.label}>
-                Sélectionnez votre docteur de référence
-              </Text>
-            )}
-            {!isDoctor && (
-              <View style={styles.pickerWrapper}>
-                <Picker
-                  selectedValue={userInfo.userInfo.refDoctorId}
-                  style={styles.picker}
-                  dropdownIconColor="#403572"
-                  onValueChange={(itemValue) => {
-                    runInAction(() => {
-                      userInfo.userInfo.refDoctorId = itemValue;
-                    });
-                  }}
-                >
-                  {uiState.doctorNamesPickerItems}
-                </Picker>
+            {uiState.isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#403572" />
+                <Text style={styles.loadingText}>Chargement...</Text>
               </View>
-            )}
+            ) : uiState.fetchError ? (
+              <View style={styles.fetchErrorContainer}>
+                <Text style={styles.fetchErrorText}>
+                  Impossible de charger les données : {uiState.fetchError}
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => uiState.fetchData(userInfo)}
+                >
+                  <Text style={styles.retryButtonText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {!isDoctor && (
+                  <Text style={styles.label}>
+                    Sélectionnez votre docteur de référence
+                  </Text>
+                )}
+                {!isDoctor && (
+                  <CustomDropdown
+                    items={uiState.doctorNamesDropdownItems}
+                    selectedValue={userInfo.userInfo.refDoctorId}
+                    onValueChange={(itemValue) => {
+                      runInAction(() => {
+                        userInfo.userInfo.refDoctorId = itemValue;
+                      });
+                    }}
+                    placeholder="Sélectionnez un docteur"
+                  />
+                )}
 
-            <Text style={styles.label}>
-              Sélectionnez votre hôpital de référence
-            </Text>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={userInfo.userInfo.hospitalId}
-                style={styles.picker}
-                dropdownIconColor="#403572"
-                onValueChange={(itemValue: string) => {
-                  userInfo.setUserInfoHospitalId(itemValue);
-                }}
-              >
-                {uiState.hospitalNamesPickerItems}
-              </Picker>
-            </View>
+                <Text style={styles.label}>
+                  Sélectionnez votre hôpital de référence
+                </Text>
+                <CustomDropdown
+                  items={uiState.hospitalNamesDropdownItems}
+                  selectedValue={userInfo.userInfo.hospitalId}
+                  onValueChange={(itemValue: string) => {
+                    userInfo.setUserInfoHospitalId(itemValue);
+                  }}
+                  placeholder="Sélectionnez un hôpital"
+                />
+              </>
+            )}
+            </ScrollView>
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
@@ -406,24 +399,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
   },
-  pickerWrapper: {
-    borderWidth: 2,
-    borderColor: "#403572",
-    borderRadius: 12,
-    backgroundColor: "#f5f3fc",
-    marginBottom: 10,
-    overflow: "hidden",
-  },
-  picker: {
-    width: "100%",
-    color: "#403572",
-    height: 38,
-  },
-  pickerItems: {
-    fontSize: 16,
-    color: "#403572",
-    backgroundColor: "#f5f3fc",
-  },
   errorText: {
     color: "#DE2C1D",
     fontSize: 13,
@@ -452,5 +427,37 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 15,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loadingText: {
+    color: "#403572",
+    fontSize: 14,
+  },
+  fetchErrorContainer: {
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 8,
+  },
+  fetchErrorText: {
+    color: "#DE2C1D",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#403572",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  retryButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });

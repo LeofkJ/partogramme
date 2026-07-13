@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { data_t } from "../store/partogramme/partogrammeStore";
-import Icon from "react-native-vector-icons/FontAwesome";
+import { IconPencil, IconTrash } from "./Icons";
 
 export interface DataListProps {
   title?: string;
@@ -47,13 +47,13 @@ const Item: React.FC<ItemProps> = observer(({ item, onEditButtonPress }) => {
           style={styles.editButton}
           onPress={() => onEditButtonPress(item)}
         >
-          <Icon name="pencil" size={16} color="white" />
+          <IconPencil size={16} color="white" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => item.delete()}
         >
-          <Icon name="trash-o" size={16} color="white" />
+          <IconTrash size={16} color="white" />
         </TouchableOpacity>
       </View>
     </View>

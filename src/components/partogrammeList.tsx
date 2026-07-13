@@ -1,6 +1,3 @@
-/**
- * This components is responsible of displaying partogramme list
- */
 import { faUser } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { observer } from "mobx-react";
@@ -9,13 +6,13 @@ import {
   Alert,
   FlatList,
   Platform,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { TapGestureHandler } from "react-native-gesture-handler";
-import Icon from "react-native-vector-icons/FontAwesome";
+import { IconTrash } from "./Icons";
 import { rootStore } from "../store/rootStore";
 import {
   Partogramme,
@@ -23,7 +20,7 @@ import {
   getStatusBackgroundColor,
 } from "../store/partogramme/partogrammeStore";
 import { getStringByEnum, partogrammeStates } from "../../types/constants";
-import { Database } from "../../types/supabase";
+import { logger } from "../lib/logger";
 
 declare const window: any;
 
@@ -35,7 +32,6 @@ export interface PartogrammeListProps {
 export interface ItemProps {
   item: Partogramme;
   onPress: () => void;
-  onDoublePress: () => void;
   onDeleteButtonPress: () => void;
   backgroundColor: string;
   patientNameTextColor: string;
@@ -63,28 +59,21 @@ const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
 };
 
 const renderDateTextElement = (itemDate: string | null): string => {
-  let retDate = "";
-  if (itemDate !== null) {
-    let dateFmt = new Date(itemDate);
-    retDate = dateFmt.getDate().toString() + "/";
-    retDate += (dateFmt.getMonth() + 1).toString() + "/";
-    retDate +=
-      dateFmt.getFullYear().toString() +
-      "-" +
-      dateFmt.getHours().toString() +
-      ":" +
-      dateFmt.getMinutes().toString();
-  } else {
-    retDate = "Aucune date";
-  }
-  return retDate;
+  if (itemDate === null) return "Aucune date";
+  const d = new Date(itemDate);
+  return (
+    d.getDate() + "/" +
+    (d.getMonth() + 1) + "/" +
+    d.getFullYear() + "-" +
+    d.getHours() + ":" +
+    d.getMinutes()
+  );
 };
 
 const Item = observer(
   ({
     item,
     onPress,
-    onDoublePress,
     onDeleteButtonPress,
     backgroundColor,
     patientNameTextColor,
@@ -95,79 +84,88 @@ const Item = observer(
         onPress={onDeleteButtonPress}
         style={styles.deleteButton}
       >
-        <Icon name="trash-o" size={20} color="white" />
+        <IconTrash size={16} color="white" />
       </TouchableOpacity>
       <TouchableOpacity
         onPress={onPress}
-        style={[styles.itemTouchable, { backgroundColor }]}
+        style={styles.itemTouchable}
       >
-        <TapGestureHandler numberOfTaps={2} onActivated={() => onDoublePress()}>
-          <View style={{ flexDirection: "column", margin: 10 }}>
-            <View style={{ flexDirection: "row" }}>
-              <FontAwesomeIcon
-                style={styles.icon}
-                color={patientNameTextColor}
-                icon={faUser}
-              />
-              <Text
-                style={[
-                  styles.patientNameFont,
-                  { color: patientNameTextColor },
-                ]}
-              >
+        <View style={styles.cardContent}>
+          <View style={styles.nameRow}>
+            <View style={styles.avatarCircle}>
+              <FontAwesomeIcon icon={faUser} size={14} color="#ffffff" style={{}} />
+            </View>
+            <View style={styles.nameBlock}>
+              <Text style={styles.patientNameFont} numberOfLines={1}>
                 {renderPatientTextElement(item.partogramme)}
               </Text>
-            </View>
-            <Text style={[styles.infoFont, { color: infoTextColor }]}>
-              Date d'admission {"\t\t"}
-              {renderDateTextElement(item.partogramme.admissionDateTime)}
-              {"\n"}
-              Date de début du travail {"\t"}
-              {renderDateTextElement(item.partogramme.workStartDateTime)}
-            </Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={[
-                  styles.infoFont,
-                  { color: patientNameTextColor, opacity: 1 },
-                ]}
-              >
-                Statut Patient :
-              </Text>
-              <Text
-                style={[
-                  styles.infoFont,
-                  styles.statusTextStyle,
-                  {
-                    color: "#403572",
-                    opacity: 1,
-                    marginLeft: 10,
-                    backgroundColor: getStatusBackgroundColor(
-                      item.partogramme.state,
-                    ),
-                    textAlign: "left",
-                  },
-                ]}
-              >
-                {getStringByEnum(partogrammeStates, item.partogramme.state)}
+              <Text style={styles.fileNumber}>
+                Dossier #{Number(item.partogramme.noFile)}
               </Text>
             </View>
           </View>
-        </TapGestureHandler>
+          <View style={styles.datesContainer}>
+            <View style={styles.dateRow}>
+              <Text style={styles.dateLabel}>Admission</Text>
+              <Text style={styles.dateValue}>
+                {renderDateTextElement(item.partogramme.admissionDateTime)}
+              </Text>
+            </View>
+            <View style={styles.dateRow}>
+              <Text style={styles.dateLabel}>Début travail</Text>
+              <Text style={styles.dateValue}>
+                {renderDateTextElement(item.partogramme.workStartDateTime)}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row" }}>
+            <Text style={[styles.infoFont, { color: patientNameTextColor, opacity: 1 }]}>
+              Statut Patient :
+            </Text>
+            <Text
+              style={[
+                styles.infoFont,
+                styles.statusTextStyle,
+                {
+                  color: "#403572",
+                  opacity: 1,
+                  marginLeft: 10,
+                  backgroundColor: getStatusBackgroundColor(item.partogramme.state) ?? "#8c8c8c",
+                  textAlign: "left",
+                },
+              ]}
+            >
+              {getStringByEnum(partogrammeStates, item.partogramme.state)}
+            </Text>
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   ),
 );
 
-const EmptyListMessage = ({}) => {
-  return (
-    <Text style={styles.emptyListStyle}>Aucun partogramme disponible !</Text>
-  );
-};
+const EmptyListMessage = () => (
+  <Text style={styles.emptyListStyle}>Aucun partogramme disponible !</Text>
+);
 
 export const PartogrammeList = observer(
   ({ title, navigation }: PartogrammeListProps) => {
-    const [selectedId, setSelectedId] = useState<string>();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+      setRefreshing(true);
+      try {
+        if (rootStore.userInfoStore.userInfo.role === "NURSE") {
+          await rootStore.partogrammeStore.fetchFromServer(rootStore.profileStore.profile.id);
+        } else {
+          await rootStore.partogrammeStore.fetchFromServer();
+        }
+      } catch (error: any) {
+        logger.warn("PartogrammeList: refresh failed", { error: error?.message });
+      } finally {
+        setRefreshing(false);
+      }
+    };
 
     const partogrammeSelected = (id: string) => {
       rootStore.partogrammeStore.updateSelectedPartogramme(id);
@@ -176,9 +174,7 @@ export const PartogrammeList = observer(
 
     const handleDeletePress = (item: Partogramme) => {
       if (Platform.OS === "web") {
-        if (
-          window.confirm("Êtes-vous sûre de vouloir supprimer ce partogramme?")
-        ) {
+        if (window.confirm("Êtes-vous sûre de vouloir supprimer ce partogramme?")) {
           rootStore.partogrammeStore.removePartogramme(item);
         }
       } else {
@@ -186,10 +182,7 @@ export const PartogrammeList = observer(
           "Confirmation",
           "Êtes-vous sûre de vouloir supprimer ce partogramme?",
           [
-            {
-              text: "Annuler",
-              style: "cancel",
-            },
+            { text: "Annuler", style: "cancel" },
             {
               text: "Supprimer",
               style: "destructive",
@@ -201,26 +194,16 @@ export const PartogrammeList = observer(
       }
     };
 
-    const renderItem = ({ item }: { item: Partogramme }) => {
-      const backgroundColor =
-        item.partogramme.id === selectedId ? "#403572" : "#F6F5Ff";
-      const patientNameColor =
-        item.partogramme.id === selectedId ? "white" : "#403572";
-      const infoTextColor =
-        item.partogramme.id === selectedId ? "white" : "#403572";
-
-      return (
-        <Item
-          item={item}
-          onPress={() => setSelectedId(item.partogramme.id)}
-          onDoublePress={() => partogrammeSelected(item.partogramme.id)}
-          onDeleteButtonPress={() => handleDeletePress(item)}
-          backgroundColor={backgroundColor}
-          patientNameTextColor={patientNameColor}
-          infoTextColor={infoTextColor}
-        />
-      );
-    };
+    const renderItem = ({ item }: { item: Partogramme }) => (
+      <Item
+        item={item}
+        onPress={() => partogrammeSelected(item.partogramme.id)}
+        onDeleteButtonPress={() => handleDeletePress(item)}
+        backgroundColor="#ffffff"
+        patientNameTextColor="#403572"
+        infoTextColor="#9090A0"
+      />
+    );
 
     return (
       <FlatList
@@ -229,9 +212,15 @@ export const PartogrammeList = observer(
         renderItem={renderItem}
         keyExtractor={(item) => item.partogramme.id}
         ListEmptyComponent={EmptyListMessage}
-        contentContainerStyle={{
-          flexGrow: 1,
-        }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#403572"]}
+            tintColor="#403572"
+          />
+        }
       />
     );
   },
@@ -239,64 +228,110 @@ export const PartogrammeList = observer(
 
 const styles = StyleSheet.create({
   list: {
-    marginTop: 20,
-    alignContent: "center",
-    width: 344,
-    height: "100%",
-  },
-  container: {
-    marginTop: "6%",
-    alignItems: "center",
+    flex: 1,
+    width: "100%",
+    paddingTop: 4,
+    paddingHorizontal: 16,
   },
   itemView: {
-    marginVertical: 1,
+    marginBottom: 10,
     width: "100%",
-    alignSelf: "center",
   },
   itemTouchable: {
-    marginVertical: 8,
-    marginHorizontal: 8,
     width: "100%",
-    alignSelf: "center",
-    borderRadius: 15,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  avatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#9F90D4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    shadowColor: "#9F90D4",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  nameBlock: {
+    flex: 1,
   },
   patientNameFont: {
-    marginLeft: 10,
+    fontSize: 18,
+    fontWeight: "800",
     color: "#403572",
+    letterSpacing: 0.3,
+  },
+  fileNumber: {
+    fontSize: 12,
+    color: "#9F90D4",
+    marginTop: 4,
+    fontWeight: "500",
   },
   infoFont: {
     marginLeft: 0,
     marginTop: 5,
     color: "#403572",
     opacity: 0.5,
+    fontSize: 13,
+  },
+  datesContainer: {
+    marginTop: 8,
+    gap: 4,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: "#9F90D4",
+    fontWeight: "600",
+    width: 100,
+  },
+  dateValue: {
+    fontSize: 12,
+    color: "#403572",
+    opacity: 0.7,
+    flex: 1,
   },
   statusTextStyle: {
     opacity: 1,
     borderRadius: 5,
-    paddingRight: 5,
-    paddingLeft: 5,
+    paddingHorizontal: 6,
   },
   emptyListStyle: {
     padding: 10,
     marginVertical: 8,
-    marginHorizontal: 16,
-    width: 344,
     alignSelf: "center",
-    borderRadius: 15,
-  },
-  icon: {
-    marginLeft: 10,
+    textAlign: "center",
+    color: "#9F90D4",
   },
   deleteButton: {
-    backgroundColor: "red",
+    backgroundColor: "#e74c3c",
     width: 30,
     height: 30,
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     position: "absolute",
-    right: "2%",
-    top: "15%",
+    right: 12,
+    top: 12,
     zIndex: 1,
   },
 });

@@ -1,220 +1,141 @@
 import React from "react";
-import { View } from "react-native";
-import {
-  VictoryChart,
-  VictoryLine,
-  VictoryAxis,
-  VictoryTheme,
-  VictoryScatter,
-  VictoryArea,
-  VictoryLegend,
-} from "victory-native";
+import { View, useWindowDimensions } from "react-native";
+import Svg, {
+  Line,
+  Circle,
+  Polyline,
+  Rect,
+  Path,
+  G,
+  Text as SvgText,
+} from "react-native-svg";
 import { observer } from "mobx-react";
-import {
-  Dilation,
-  DilationStore,
-} from "../../store/GraphData/Dilatation/dilatationStore";
-import { BabyDescentStore } from "../../store/BabyDescent/babyDescentStore";
+import { Dilation, DilationStore } from "../../store/GraphData/Dilatation/dilatationStore";
+import { BabyDescent, BabyDescentStore } from "../../store/GraphData/BabyDescent/babyDescentStore";
 
 interface DilationGraphProps {
   dilationStore?: DilationStore;
   babyDescentStore?: BabyDescentStore;
 }
 
-/**
- * @brief Component to display the dilation graph
- * @param dilationStore  - dilation store
- * @returns  - dilation graph component
- * @note  - The graph is based on the data points from the dilation store
- *
- *
- * @example
- * ```tsx
- * <DilationGraph dilationStore={dilationStore} />
- * ```
- * @
- * @see dilationStore
- * @see Dilation
- * @see DilationStore
- * @see DilationGraphProps
- * @see DilationGraph
- */
 export const DilationGraph: React.FC<DilationGraphProps> = observer(
   ({ dilationStore, babyDescentStore }) => {
-    const alertLineArea = [
-      { x: 0, y: 10, y0: 4 },
-      { x: 6, y: 10, y0: 10 },
-    ];
+    const { width: windowWidth } = useWindowDimensions();
 
-    const actionLineArea = [
-      { x: 4, y: 4, y0: 4 },
-      { x: 12, y: 12, y0: 4 },
-    ];
+    const svgWidth = Math.max(windowWidth - 32, 200);
+    const svgHeight = 340;
+    const padL = 38, padR = 16, padT = 16, padB = 60;
+    const cW = svgWidth - padL - padR;
+    const cH = svgHeight - padT - padB;
 
-    const normalLineArea = [
+    const xMin = 0, xMax = 12;
+    const yMin = 0, yMax = 10;
+
+    const toX = (v: number) => padL + ((Math.max(xMin, Math.min(xMax, v)) - xMin) / (xMax - xMin)) * cW;
+    const toY = (v: number) => padT + (1 - (Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * cH;
+
+    const areaPath = (pts: { x: number; y: number; y0: number }[]) => {
+      if (pts.length === 0) return "";
+      const top = pts.map(p => `${toX(p.x)},${toY(p.y)}`).join(" L ");
+      const bot = [...pts].reverse().map(p => `${toX(p.x)},${toY(p.y0)}`).join(" L ");
+      return `M ${top} L ${bot} Z`;
+    };
+
+    // Zone areas — same data as original victory code
+    const alertArea = [{ x: 0, y: 10, y0: 4 }, { x: 6, y: 10, y0: 10 }];
+    const normalArea = [
       { x: 0, y: 4, y0: 4 },
       { x: 4, y: 8, y0: 4 },
       { x: 6, y: 10, y0: 6 },
       { x: 10, y: 10, y0: 10 },
     ];
+    // action line clipped to yMax=10: y=x, so y reaches 10 at x=10
+    const actionArea = [{ x: 4, y: 4, y0: 4 }, { x: 10, y: 10, y0: 4 }];
 
-    const legendData = [
-      { name: "Dilatation", symbol: { fill: "red" } },
-      { name: "Descente du bébé", symbol: { fill: "blue" } },
-    ];
-
-    const yStartValue = 0;
-    const yEndValue = 10;
-    const step = 1;
-    const yTickValues = Array.from(
-      { length: Math.floor((yEndValue - yStartValue) / step) + 1 },
-      (_, index) => yStartValue + index * step
-    );
-
-    // Get the sorted list of data points from dilation store
-    const sortedData = dilationStore?.sortedDilationList;
-    // Get the sorted list of data points from baby descent store
-    const sortedBabyDescentData = babyDescentStore?.sortedBabyDescentList;
-
-    /**
-     * @brief Get the current relative X value for the Graph (0 to 12) base on the created date
-     * @param createdDate  - date of the data point
-     * @returns  - current relative X value
-     */
-    const getCurrentRelativeX = (createdDate: string): number => {
-      const now = new Date();
-      const createdTime = new Date(createdDate);
-      const deltaTime = now.getTime() - createdTime.getTime();
-      const hours = deltaTime / (1000 * 60 * 60); // Calculate hours difference
-      const normalizedHours = hours % 12; // Normalize hours to 12
-      return normalizedHours;
+    const getRelativeX = (dateStr: string | null): number => {
+      if (!dateStr) return 0;
+      const delta = new Date().getTime() - new Date(dateStr).getTime();
+      return (delta / (1000 * 60 * 60)) % 12;
     };
 
-    // Create an array of data points based on the dilation store
-    const dataDilation = sortedData?.map((point: Dilation) => {
-      return {
-        x:
-          point.data.Rank === 0
-            ? getCurrentRelativeX(
-                point.partogrammeStore.partogramme.workStartDateTime
-              )
-            : point.data.Rank,
-        y: point.data.value,
-      };
-    });
+    const dilationPts = (dilationStore?.sortedDilationList ?? []).map((p: Dilation) => ({
+      x: p.data.Rank === 0 ? getRelativeX(p.partogrammeStore.partogramme.workStartDateTime) : (p.data.Rank ?? 0),
+      y: p.data.value,
+    }));
 
-    // Create an array of data points based on the baby descent store
-    const dataBabyDescent = sortedBabyDescentData?.map((point) => {
-      return {
-        x:
-          point.data.Rank === 0
-            ? getCurrentRelativeX(
-                point.partogrammeStore.partogramme.workStartDateTime
-              )
-            : point.data.Rank,
-        y: point.data.value,
-      };
-    });
+    const descentPts = (babyDescentStore?.sortedBabyDescentList ?? []).map((p: BabyDescent) => ({
+      x: p.data.Rank === 0 ? getRelativeX(p.partogrammeStore.partogramme.workStartDateTime) : (p.data.Rank ?? 0),
+      y: p.data.value,
+    }));
 
-    // Create an array of tick values [0, 1, 2, ..., 12] for the X-axis
-    const xTickValues = Array.from({ length: 13 }, (_, index) => index);
+    const yTicks = [0, 2, 4, 6, 8, 10];
+    const xTicks = [0, 2, 4, 6, 8, 10, 12];
 
-    /**
-     * @brief Format the tick label for the X-axis
-     * @param tick  - tick value
-     * @returns  - formatted tick label
-     */
-    const formatTickx = (tick: number) => {
-      return `${tick}h`; // Format tick label with hours
-    };
-
-    /**
-     * @brief Format the tick label for the X-axis
-     * @param tick  - tick value
-     * @returns  - formatted tick label
-     */
-    const formatTicky = (tick: number) => {
-      return `${tick}cm`; // Format tick label with hours
-    };
+    const dilPoly = dilationPts.map(d => `${toX(d.x)},${toY(d.y)}`).join(" ");
+    const desPoly = descentPts.map(d => `${toX(d.x)},${toY(d.y)}`).join(" ");
 
     return (
-      <View>
-        <VictoryChart
-          theme={VictoryTheme.material}
-          domain={{ x: [0, 12], y: [0, 10] }}
-          padding={{ top: 20, bottom: 100, left: 60, right: 20 }}
-          height={400}
-        >
-          <VictoryAxis
-            // Customize the X-axis as needed
-            tickValues={xTickValues}
-            tickFormat={formatTickx}
-            // domain={[0, 12]}
-          />
-          <VictoryAxis
-            dependentAxis
-            tickValues={yTickValues}
-            tickFormat={formatTicky}
-            // Customize the Y-axis as needed
-          />
-          {/* Line for dilation data */}
-          <VictoryArea
-            data={alertLineArea}
-            style={{
-              data: {
-                fill: "rgba(6, 189, 37, 0.3)",
-              },
-            }}
-          />
-          <VictoryArea
-            data={normalLineArea}
-            style={{
-              data: {
-                fill: "rgba(255, 255, 51, 0.3)",
-              },
-            }}
-          />
-          <VictoryArea
-            data={actionLineArea}
-            style={{
-              data: {
-                fill: "rgba(255, 0, 0, 0.3)",
-              },
-            }}
-          />
-          <VictoryLine
-            data={dataDilation}
-            // Customize the line for data as needed
-          />
-          <VictoryScatter
-            style={{ data: { fill: "#c43a31" } }}
-            size={4}
-            data={dataDilation}
-          />
-          {/* Line for baby descent data */}
-          <VictoryLine
-            data={dataBabyDescent}
-            // Customize the line for data as needed
-          />
-          <VictoryScatter
-            style={{ data: { fill: "blue" } }}
-            size={4}
-            data={dataBabyDescent}
-          />
-          <VictoryLegend
-            x={20}
-            y={335}
-            title="Légende"
-            centerTitle
-            orientation="horizontal"
-            gutter={20}
-            style={{
-              border: { stroke: "black" },
-              title: { fontSize: 12, fontWeight: "bold" },
-            }}
-            data={legendData}
-          />
-        </VictoryChart>
+      <View style={{ alignSelf: "stretch" }}>
+        <Svg width={svgWidth} height={svgHeight}>
+          <Rect x={padL} y={padT} width={cW} height={cH} fill="#fafafa" stroke="#e0e0e0" strokeWidth={1} />
+
+          {/* Zone fills */}
+          <Path d={areaPath(alertArea)} fill="rgba(6,189,37,0.2)" />
+          <Path d={areaPath(normalArea)} fill="rgba(255,220,0,0.2)" />
+          <Path d={areaPath(actionArea)} fill="rgba(255,0,0,0.18)" />
+
+          {/* Grid */}
+          {yTicks.map(y => (
+            <G key={`y${y}`}>
+              <Line x1={padL} y1={toY(y)} x2={padL + cW} y2={toY(y)} stroke="#e8e8e8" strokeWidth={0.7} />
+              <SvgText x={padL - 4} y={toY(y) + 3.5} textAnchor="end" fontSize={9} fill="#777">{y}</SvgText>
+            </G>
+          ))}
+
+          {xTicks.map(x => (
+            <G key={`x${x}`}>
+              <Line x1={toX(x)} y1={padT} x2={toX(x)} y2={padT + cH} stroke="#e8e8e8" strokeWidth={0.7} />
+              <SvgText x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{x}h</SvgText>
+            </G>
+          ))}
+
+          {/* Dilation data */}
+          {dilationPts.length > 1 && (
+            <Polyline points={dilPoly} fill="none" stroke="#c43a31" strokeWidth={2} />
+          )}
+          {dilationPts.map((d, i) => (
+            <Circle key={`d${i}`} cx={toX(d.x)} cy={toY(d.y)} r={4} fill="#c43a31" />
+          ))}
+
+          {/* Baby descent data */}
+          {descentPts.length > 1 && (
+            <Polyline points={desPoly} fill="none" stroke="#3a6bc4" strokeWidth={2} />
+          )}
+          {descentPts.map((d, i) => (
+            <Circle key={`b${i}`} cx={toX(d.x)} cy={toY(d.y)} r={4} fill="#3a6bc4" />
+          ))}
+
+          {/* Axis labels */}
+          <SvgText x={padL + cW / 2} y={svgHeight - 10} textAnchor="middle" fontSize={9} fill="#555">
+            Temps (heures)
+          </SvgText>
+          <SvgText
+            x={10}
+            y={padT + cH / 2}
+            textAnchor="middle"
+            fontSize={9}
+            fill="#555"
+            transform={`rotate(-90, 10, ${padT + cH / 2})`}
+          >
+            cm
+          </SvgText>
+
+          {/* Legend */}
+          <Circle cx={padL + 8} cy={svgHeight - 36} r={4} fill="#c43a31" />
+          <SvgText x={padL + 17} y={svgHeight - 32} fontSize={9} fill="#333">Dilatation</SvgText>
+          <Circle cx={padL + 80} cy={svgHeight - 36} r={4} fill="#3a6bc4" />
+          <SvgText x={padL + 89} y={svgHeight - 32} fontSize={9} fill="#333">Descente du bébé</SvgText>
+        </Svg>
       </View>
     );
   }

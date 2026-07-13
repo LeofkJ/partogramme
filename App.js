@@ -1,15 +1,23 @@
+import "react-native-url-polyfill/auto";
+import "react-native-get-random-values";
+import { useEffect } from "react";
+import { AppState } from "react-native";
+import * as Sentry from "./src/lib/sentry";
+import { logger } from "./src/lib/logger";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import "react-native-url-polyfill/auto";
-
-// Screen Importation
 import { ScreenLogin } from "./src/screens/Login/Login";
 import { ScreenRegister } from "./src/screens/Register/register";
 import { ScreenMenu } from "./src/screens/Menu/Menu";
 import { ScreenAddPartogramme } from "./src/screens/AddPartogramme/AddPartogramme";
 import { ScreenGraph } from "./src/screens/Graph/Graph";
+
+Sentry.init({
+  dsn: "https://e271b157764ea5f872c2b1dc71bddbef@o4511666575441920.ingest.us.sentry.io/4511666598641664",
+  enableInExpoDevelopment: true,
+});
 
 const Stack = createNativeStackNavigator();
 
@@ -26,7 +34,14 @@ const linking = {
   },
 };
 
-export default function App() {
+function App() {
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      logger.info(`App state: ${state}`);
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -82,3 +97,5 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(App);

@@ -4,9 +4,8 @@ import {
   Text,
   View,
   StyleSheet,
-  FlatList,
-  useWindowDimensions,
 } from "react-native";
+import { IconMessage } from "./Icons";
 
 export interface Props {
   data: any;
@@ -17,28 +16,26 @@ export const CommentsSlider: React.FC<Props> = ({
   data,
   title = "Comments",
 }) => {
-  const renderItem = ({ item }: { item: any }) => {
-    return <Item data={item} />;
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.titleText}>{title}</Text>
-      <FlatList
-        style={styles.list}
-        data={data}
-        renderItem={renderItem}
-        ListEmptyComponent={EmptyListMessage}
-      />
+      <View style={styles.list}>
+        {data && data.length > 0
+          ? data.map((item: any, index: number) => (
+              <Item key={index} data={item} />
+            ))
+          : <EmptyListMessage />}
+      </View>
     </View>
   );
 };
 
 const EmptyListMessage = () => {
   return (
-    <Text style={styles.emptyListStyle}>
-      Aucun Commentaire ...
-    </Text>
+    <View style={styles.emptyListContainer}>
+      <IconMessage size={18} color="#b0b0b8" />
+      <Text style={styles.emptyListStyle}>Aucun commentaire pour le moment.</Text>
+    </View>
   );
 };
 
@@ -47,7 +44,6 @@ export interface ItemProps {
 }
 
 const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
-  const { width } = useWindowDimensions();
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "long",
@@ -57,16 +53,16 @@ const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
   };
 
   return (
-    <View style={[styles.itemView, { width: width * 0.9 }]}>
-      <View style={{ flexDirection: "row" }}>
-        <Text style={[styles.itemTextTitle, { marginBottom: 5, width: 80 }]}>
-          Date :
-        </Text>
-        <Text style={[styles.itemText, { marginBottom: 5, flex: 1 }]}>
+    <View style={styles.itemView}>
+      <View style={styles.itemHeader}>
+        <View style={styles.itemHeaderLeft}>
+          <IconMessage size={14} color="#6b7280" />
+          <Text style={styles.itemLabel}>Commentaire</Text>
+        </View>
+        <Text style={styles.itemDate}>
           {new Date(data.created_at).toLocaleDateString("fr-FR", options)}
         </Text>
       </View>
-      <Text style={styles.itemTextTitle}>Commentaire :</Text>
       <Text style={styles.itemText}>{data.value}</Text>
     </View>
   );
@@ -74,51 +70,74 @@ const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "column",
-    alignItems: "center",
-    width: "100%",
-    paddingBottom: 10,
+    width: "95%",
+    alignSelf: "center",
+    marginTop: 10,
   },
   list: {
-    marginTop: 5,
+    marginTop: 8,
     width: "100%",
   },
+  emptyListContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 14,
+    backgroundColor: "#fafafa",
+    borderWidth: 1,
+    borderColor: "#ececec",
+    borderRadius: 10,
+  },
   emptyListStyle: {
-    padding: 10,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    alignSelf: "center",
+    color: "#9a9a9a",
+    fontSize: 14,
   },
   itemView: {
-    padding: 10,
-    marginBottom: 12,
-    marginHorizontal: "5%",
-    borderWidth: 5,
-    borderColor: "#9F90D4",
-    alignSelf: "center",
-    borderRadius: 15,
-    backgroundColor: "#403572",
-  },
-  itemTextTitle: {
-    marginLeft: 0,
-    marginTop: 0,
+    padding: 12,
+    marginBottom: 8,
     borderRadius: 10,
-    padding: 5,
-    width: 105,
-    color: "#ffffff",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e8e8ec",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  itemHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  itemHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  itemLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  itemDate: {
+    fontSize: 11,
+    color: "#a0a0a8",
+    textTransform: "capitalize",
   },
   itemText: {
-    marginLeft: 0,
-    marginTop: 0,
-    borderRadius: 10,
-    padding: 5,
-    color: "#ffffff",
+    fontSize: 15,
+    color: "#2d2d33",
+    lineHeight: 20,
   },
   titleText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
-    alignSelf: "flex-start",
-    marginLeft: 10,
     color: "#403572",
+    marginBottom: 2,
   },
 });

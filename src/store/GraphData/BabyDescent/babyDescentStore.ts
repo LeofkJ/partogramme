@@ -7,6 +7,7 @@ import { Partogramme } from "../../partogramme/partogrammeStore";
 import { Float } from "react-native/Libraries/Types/CodegenTypes";
 import { Alert, Platform } from "react-native";
 import { GraphData } from "../GraphData";
+import { logger } from "../../../lib/logger";
 
 export type BabyDescent_t = Database["public"]["Tables"]["BabyDescent"];
 
@@ -199,6 +200,7 @@ export class BabyDescent {
         })
       })
       .catch((error) => {
+        logger.warn("BabyDescent.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

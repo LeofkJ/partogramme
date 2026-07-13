@@ -12,6 +12,7 @@ import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { Alert, Platform } from "react-native";
 import { DataStore } from "../../DataStore";
+import { logger } from "../../../lib/logger";
 
 export type MotherContractionDuration_t =
   Database["public"]["Tables"]["MotherContractionDuration"];
@@ -66,6 +67,7 @@ export class MotherContractionDurationStore extends DataStore {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherContractionDurationStore.createData failed", { id: data.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -89,6 +91,7 @@ export class MotherContractionDurationStore extends DataStore {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherContractionDurationStore.remove failed", { id: data.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -231,6 +234,7 @@ export class MotherContractionDuration {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherContractionDuration.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

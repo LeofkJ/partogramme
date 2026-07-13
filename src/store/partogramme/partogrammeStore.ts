@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction, computed, observable } from "mobx";
 import uuid from "react-native-uuid";
+import { logger } from "../../lib/logger";
 import { Database } from "../../../types/supabase";
 import { TransportLayer } from "../../transport/transportLayer";
 import { RootStore } from "../rootStore";
@@ -132,6 +133,7 @@ export class PartogrammeStore {
           if (fetchedPartogrammes) {
             fetchedPartogrammes.forEach((json: Partogramme_t["Row"]) =>
               this.updatePartogrammeFromServer(json).catch((error) => {
+                logger.warn("fetchFromServer: updatePartogrammeFromServer failed", { id: json.id, error: error?.message });
                 return Promise.reject(error);
               })
             );
@@ -143,6 +145,7 @@ export class PartogrammeStore {
         runInAction(() => {
           this.state = "error";
         });
+        logger.warn("fetchFromServer failed", { nurseId, error: error?.message });
         return Promise.reject(error);
       });
 
@@ -228,6 +231,7 @@ export class PartogrammeStore {
           runInAction(() => {
             this.state = "error";
           });
+          logger.warn("updatePartogrammeFromServer: removePartogramme failed", { id: json.id, error: error?.message });
           return Promise.reject(error);
         });
     } else {
@@ -270,12 +274,14 @@ export class PartogrammeStore {
           this.partogrammeList.push(partogramme);
           this.state = "done";
         });
+        logger.info("Partogramme created", { id: partogramme.partogramme.id, noFile: Number(partogramme.partogramme.noFile) });
         return Promise.resolve(partogramme);
       })
       .catch((error) => {
         runInAction(() => {
           this.state = "error";
         });
+        logger.error("Partogramme creation failed", { error: error?.message });
         return Promise.reject(error);
       });
     return partogramme;
@@ -283,26 +289,25 @@ export class PartogrammeStore {
 
   // Delete a partogramme from the store
   async removePartogramme(partogramme: Partogramme) {
-    partogramme.partogramme.isDeleted = true;  // ← add this line
+    partogramme.partogramme.isDeleted = true;
     await this.transportLayer
       .updatePartogramme(partogramme.partogramme)
       .then(() => {
         runInAction(() => {
           this.state = "done";
-          this.partogrammeList.splice(
-            this.partogrammeList.indexOf(partogramme),
-            1
-          );
+          this.partogrammeList.splice(this.partogrammeList.indexOf(partogramme), 1);
         });
+        logger.info("Partogramme deleted", { id: partogramme.partogramme.id, noFile: Number(partogramme.partogramme.noFile) });
         return Promise.resolve(partogramme);
       })
-    .catch((error) => {
-      runInAction(() => {
-        this.state = "error";
+      .catch((error) => {
+        runInAction(() => {
+          this.state = "error";
+        });
+        logger.error("Partogramme deletion failed", { error: error?.message });
+        return Promise.reject(error);
       });
-      return Promise.reject(error);
-    });
-}
+  }
 
   // Update the focused partogramme
   updateSelectedPartogramme(id: string) {
@@ -614,6 +619,7 @@ export class Partogramme {
         runInAction(() => {
           this.store.state = "error";
         });
+        logger.warn("changeState: updatePartogramme failed", { id: data.id, state, error: error?.message });
         return Promise.reject(error);
       });
   }

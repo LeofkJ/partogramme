@@ -59,7 +59,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
       {data instanceof BabyHeartFrequency && (
         <DialogDataInputGraph
           visible={visible}
-          onClose={(data: String, delta: string) => onValidate(data)}
+          onClose={(data: string) => onValidate(data)}
           onCancel={() => onCancel()}
           startValue={120}
           endValue={180}
@@ -70,7 +70,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
       {data instanceof Dilation && (
         <DialogDataInputGraph
           visible={visible}
-          onClose={(data: String, delta: string) => onValidate(data)}
+          onClose={(data: string) => onValidate(data)}
           onCancel={() => onCancel()}
           startValue={4}
           endValue={10}
@@ -81,7 +81,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
       {data instanceof BabyDescent && (
         <DialogDataInputGraph
           visible={visible}
-          onClose={(data: String, delta: string) => onValidate(data)}
+          onClose={(data: string) => onValidate(data)}
           onCancel={() => onCancel()}
           startValue={0}
           endValue={10}

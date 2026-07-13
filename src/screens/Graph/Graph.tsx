@@ -1,6 +1,7 @@
 import {
   Alert,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -12,7 +13,6 @@ import { observer } from "mobx-react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DialogDataInputGraph from "../../components/Dialogs/DialogDataInputGraph";
 import { useEffect, useState } from "react";
-import CustomButton from "../../components/CustomButton";
 import BabyGraph from "../../components/Graphs/BabyGraph";
 import { rootStore } from "../../store/rootStore";
 import DilationGraph from "../../components/Graphs/DilationGraph";
@@ -28,7 +28,8 @@ import { MotherContractionsFrequencyStore } from "../../store/TableData/MotherCo
 import { MotherHeartFrequencyStore } from "../../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore";
 import { MotherTemperatureStore } from "../../store/TableData/MotherTemperature/motherTemperatureStore";
 import ErrorDialog from "../../components/Dialogs/ErrorDialog";
-import { FAB } from "@rneui/themed";
+import { IconPencil } from "../../components/Icons";
+import CustomButton from "../../components/CustomButton";
 import DataModifierDialog from "../../components/DataModifierDialog";
 import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
 import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
@@ -38,6 +39,7 @@ import { formatDateString } from "../../tools/StringUtilitary";
 import { getStatusBackgroundColor } from "../../store/partogramme/partogrammeStore";
 import { getStringByEnum, partogrammeStates } from "../../../types/constants";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
+import { logger } from "../../lib/logger";
 
 export type Props = {
   navigation: any;
@@ -64,9 +66,12 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [newState, setNewState] = useState("");
 
   const partogramme = rootStore.partogrammeStore.selectedPartogramme;
-  if (partogramme === undefined) {
-    navigation.goBack();
-  }
+
+  useEffect(() => {
+    if (partogramme === undefined) {
+      navigation.goBack();
+    }
+  }, [partogramme, navigation]);
 
   // Role and status helpers
   const userRole = rootStore.userInfoStore.userInfo.role;
@@ -95,37 +100,34 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     };
   }, [navigation]);
 
-  const onDialogCloseAddFcBaby = (data: string, delta: string | null) => {
+  const onDialogCloseAddFcBaby = (data: string) => {
     if (partogramme === null) return;
-    if (delta === "") delta = null;
     partogramme?.babyHeartFrequencyStore
       .createBabyHeartFrequency(
         Number(data),
         new Date().toISOString(),
-        Number(delta),
+        0,
       )
       .then(() => {});
     setFcDialogVisible(false);
   };
 
-  const onDialogCloseAddDilation = (data: string, delta: string | null) => {
+  const onDialogCloseAddDilation = (data: string) => {
     if (partogramme === null) return;
-    if (delta === "") delta = null;
     partogramme?.dilationStore.createDilation(
       new Date().toISOString(),
       Number(data),
-      Number(delta),
+      0,
     );
     setDilationDialogVisible(false);
   };
 
-  const onDialogCloseAddDescentBaby = (data: string, delta: string | null) => {
+  const onDialogCloseAddDescentBaby = (data: string) => {
     if (partogramme === null) return;
-    if (delta === "") delta = null;
     partogramme?.babyDescentStore.createBabyDescent(
       Number(data),
       new Date().toISOString(),
-      Number(delta),
+      0,
     );
     setDescentBabyDialogVisible(false);
   };
@@ -148,6 +150,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           data as Database["public"]["Enums"]["LiquidState"],
         )
         .catch((error) => {
+          logger.warn("Graph: createAmnioticLiquid failed", { error: error?.message });
           Platform.OS === "web" ? null : Alert.alert(error.message);
         });
     } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
@@ -204,6 +207,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         created_at: new Date().toISOString(),
       })
       .catch((error) => {
+        logger.warn("Graph: createData (comment) failed", { error: error?.message });
         setErrorMsg(error.message);
         setErrorCode(error.code);
         setIsErrorDialogVisible(true);
@@ -232,6 +236,10 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     partogramme?.commentStore.load();
   };
 
+  if (partogramme === undefined) {
+    return null;
+  }
+
   if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center" }}>
@@ -240,7 +248,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     );
   } else {
     return (
-      <View style={{ flexGrow: 1 }}>
+      <View style={{ flex: 1 }}>
         <ScrollView
           style={styles.body}
           contentContainerStyle={styles.scrollViewContentStyle}
@@ -397,6 +405,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   newState as Database["public"]["Enums"]["PartogrammeState"],
                 )
                 .catch((error) => {
+                  logger.warn("Graph: changeState failed", { newState, error: error?.message });
                   setErrorMsg(error.message);
                   setErrorCode(error.code);
                   setIsErrorDialogVisible(true);
@@ -503,22 +512,6 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               styleText={{ fontSize: 15, fontWeight: "bold" }}
             />
           )}
-          {partogramme && (
-            <DialogDataInputTable
-              visible={isAddTableDataDialogVisible}
-              onClose={onDialogCloseAddDataTable}
-              onCancel={() => setAddTableDataDialogVisible(false)}
-              data={[
-                partogramme.amnioticLiquidStore,
-                partogramme.motherSystolicBloodPressureStore,
-                partogramme.motherDiastolicBloodPressureStore,
-                partogramme.motherHeartRateFrequencyStore,
-                partogramme.motherTemperatureStore,
-                partogramme.motherContractionFrequencyStore,
-                partogramme.motherContractionDurationStore,
-              ]}
-            />
-          )}
 
           <CommentsSlider
             data={partogramme!.commentStore.DataListAsJson}
@@ -543,13 +536,28 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         </ScrollView>
 
         {canEdit && (
-          <FAB
-            size="large"
-            title=""
-            color="#9F90D4"
-            icon={{ name: "pen", color: "white", type: "font-awesome-5" }}
-            style={[styles.overlayPenButton, { bottom: 20 + insets.bottom, right: 20 + insets.right }]}
+          <TouchableOpacity
+            style={[styles.overlayPenButton, styles.fabButton, { bottom: 20 + insets.bottom, right: 20 + insets.right }]}
             onPress={() => setDataModifierDialogVisible(true)}
+          >
+            <IconPencil size={24} color="white" />
+          </TouchableOpacity>
+        )}
+
+        {partogramme && (
+          <DialogDataInputTable
+            visible={isAddTableDataDialogVisible}
+            onClose={onDialogCloseAddDataTable}
+            onCancel={() => setAddTableDataDialogVisible(false)}
+            data={[
+              partogramme.amnioticLiquidStore,
+              partogramme.motherSystolicBloodPressureStore,
+              partogramme.motherDiastolicBloodPressureStore,
+              partogramme.motherHeartRateFrequencyStore,
+              partogramme.motherTemperatureStore,
+              partogramme.motherContractionFrequencyStore,
+              partogramme.motherContractionDurationStore,
+            ]}
           />
         )}
 
@@ -632,6 +640,19 @@ const styles = StyleSheet.create({
   },
   overlayPenButton: {
     position: "absolute",
+  },
+  fabButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#9F90D4",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   titleText: {
     textAlign: "left",

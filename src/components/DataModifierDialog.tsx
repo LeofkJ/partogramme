@@ -14,6 +14,7 @@ import { DataList } from "./DataList";
 import { observer } from "mobx-react";
 import { runInAction } from "mobx";
 import ErrorDialog from "./Dialogs/ErrorDialog";
+import { logger } from "../lib/logger";
 
 interface Props {
   visible: boolean;
@@ -72,6 +73,7 @@ const DataModifierDialog: React.FC<Props> = observer(({
             partogramme.dataToEdit?.update(data.toString())
               .then(() => setIsEditDialogVisible(false))
               .catch((error: any) => {
+                logger.warn("DataModifierDialog: data update failed", { error: error?.message });
                 setErrorMessage(error.message);
                 setIsErrorDialogVisible(true);
               });

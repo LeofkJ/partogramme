@@ -9,6 +9,7 @@ import { Profile, ProfileStore } from "./profileStore";
 import { TransportLayer } from "../../transport/transportLayer";
 import { PostgrestError } from "@supabase/supabase-js";
 import uuid from "react-native-uuid";
+import { logger } from "../../lib/logger";
 
 export type UserInfo = Database["public"]["Tables"]["userInfo"];
 export type Role = Database["public"]["Enums"]["Role"];
@@ -127,6 +128,7 @@ export class UserInfoStore {
       })
       .catch((error: PostgrestError) => {
         this.state = "error";
+        logger.warn("fetchUserInfo failed", { profileId, code: error.code, message: error.message });
         if (Platform.OS === "android") {
           if (error.code !== "PGRST116") {
             Alert.alert(error.code, error.message);
@@ -148,6 +150,7 @@ export class UserInfoStore {
       })
       .catch((error) => {
         this.state = "error";
+        logger.warn("createUserInfo failed", { error: error?.message });
         Alert.alert(error.message);
       });
   }
@@ -157,9 +160,14 @@ export class UserInfoStore {
       this.in_sync = false;
     });
     const { data: sessionData } = await supabase.auth.getSession();
+    const currentUserId =
+      sessionData?.session?.user?.id || this.ProfileStore.profile.id;
     runInAction(() => {
-      this.userInfo.profileId =
-        sessionData?.session?.user?.id || this.ProfileStore.profile.id;
+      // If the persisted id belongs to a different user, discard it so we INSERT fresh
+      if (this.userInfo.profileId && this.userInfo.profileId !== currentUserId) {
+        this.userInfo.id = "";
+      }
+      this.userInfo.profileId = currentUserId;
       if (!this.userInfo.id) {
         this.userInfo.id = uuid.v4().toString();
       }
@@ -177,6 +185,7 @@ export class UserInfoStore {
         runInAction(() => {
           this.state = "error";
         });
+        logger.warn("saveUserInfo failed", { id: this.userInfo.id, error: error?.message });
         if (Platform.OS === "android") {
           Alert.alert(error.message);
         }

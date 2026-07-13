@@ -6,6 +6,7 @@ import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { TableData } from "../TableData";
 import { Alert, Platform } from "react-native";
+import { logger } from "../../../lib/logger";
 
 export type MotherTemperature_t =
   Database["public"]["Tables"]["MotherTemperature"];
@@ -219,6 +220,7 @@ export class MotherTemperature {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherTemperature.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

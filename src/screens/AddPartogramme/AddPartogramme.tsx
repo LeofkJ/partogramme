@@ -1,20 +1,13 @@
-import { StyleSheet, View, TextInput, ScrollView, Text } from "react-native";
-import { useEffect, useState } from "react";
+import { StyleSheet, View, TextInput, ScrollView, Text, Pressable } from "react-native";
+import { useState } from "react";
 import { observer } from "mobx-react";
-import CustomButton from "../../components/CustomButton";
 import { rootStore } from "../../store/rootStore";
 import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
-import { makeAutoObservable } from "mobx";
+import { logger } from "../../lib/logger";
 
 export type Props = {
   navigation: any;
 };
-
-class UiState {
-  constructor() {
-    makeAutoObservable(this);
-  }
-}
 
 export const ScreenAddPartogramme: React.FC<Props> = observer(
   ({ navigation }) => {
@@ -22,11 +15,11 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     const [commentary, onChangeCommentary] = useState("");
     const [patientFirstName, onChangePatientFirstName] = useState("");
     const [patientLastName, onChangePatientLastName] = useState("");
-    const [hospitalName, onChangeHospitalName] = useState("");
     const [noFile, onChangeNoFile] = useState("");
     const [admissionDateTime, onChangeAdmissionDateTime] = useState(new Date());
     const [workStartDateTime, onChangeWorkStartDate] = useState(new Date());
-    const [dateTimeUpdated, setDateTimeUpdated] = useState("");
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleTimeAdmissionChanged = (time: Date | undefined) => {
       if (time !== undefined) {
@@ -63,129 +56,132 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     };
 
     const createButtonPressed = () => {
+      const trimmedNoFile = noFile.trim();
+      const parsedNoFile = Number(trimmedNoFile);
+      if (trimmedNoFile === "" || Number.isNaN(parsedNoFile)) {
+        setErrorMessage("Le numéro de dossier doit être un nombre valide.");
+        return;
+      }
+      setErrorMessage(null);
+      setIsSubmitting(true);
       rootStore.partogrammeStore
         .createPartogramme(
           admissionDateTime.toISOString(),
           commentary,
           patientFirstName,
           patientLastName,
-          Number(noFile),
+          parsedNoFile,
           "ADMITTED",
           workStartDateTime.toISOString(),
         )
-        .then(() => {})
-        .catch((error) => {});
-      navigation.navigate("Screen_Menu");
+        .then(() => {
+          setIsSubmitting(false);
+          navigation.navigate("Screen_Menu");
+        })
+        .catch((error) => {
+          logger.warn("createPartogramme failed", { noFile: trimmedNoFile, error: error?.message });
+          setIsSubmitting(false);
+          setErrorMessage("Impossible de créer le partogramme. Veuillez réessayer.");
+        });
     };
 
     return (
       <View style={styles.body}>
         <ScrollView
-          contentContainerStyle={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           automaticallyAdjustKeyboardInsets={true}
+          showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[
-              styles.backGroundInfo,
-              { alignContent: "center", justifyContent: "center" },
-            ]}
-          >
-            <Text style={styles.infoTitleText}>Prénom du patient :</Text>
+          <View style={styles.section}>
+            <Text style={styles.label}>Prénom du patient</Text>
             <TextInput
               style={styles.input}
-              placeholder="Prénom du patient"
-              placeholderTextColor={"#939F99"}
-              textAlign="left"
-              onChangeText={(text) => onChangePatientFirstName(text)}
+              placeholder="Prénom"
+              placeholderTextColor="#aaa"
+              onChangeText={onChangePatientFirstName}
             />
           </View>
-          <View
-            style={[
-              styles.backGroundInfo,
-              { alignContent: "center", justifyContent: "center" },
-            ]}
-          >
-            <Text style={styles.infoTitleText}>
-              Nom de famille du patient :
-            </Text>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Nom de famille</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nom de famille du patient"
-              textAlign="left"
-              placeholderTextColor={"#939F99"}
-              onChangeText={(text) => onChangePatientLastName(text)}
+              placeholder="Nom de famille"
+              placeholderTextColor="#aaa"
+              onChangeText={onChangePatientLastName}
             />
           </View>
-          <View
-            style={[
-              styles.backGroundInfo,
-              { alignContent: "center", justifyContent: "center" },
-            ]}
-          >
-            <Text style={styles.infoTitleText}>Nom de l'hôpital :</Text>
-            <Text style={styles.input}>{userInfoStore.hospitalName}</Text>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Hôpital</Text>
+            <View style={styles.readonlyInput}>
+              <Text style={styles.readonlyText}>
+                {userInfoStore.hospitalName || "—"}
+              </Text>
+            </View>
           </View>
-          <View
-            style={[
-              styles.backGroundInfo,
-              { alignContent: "center", justifyContent: "center" },
-            ]}
-          >
-            <Text style={styles.infoTitleText}>Numéro de dossier :</Text>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Numéro de dossier</Text>
             <TextInput
               style={styles.input}
               placeholder="Numéro de dossier"
-              textAlign="left"
-              placeholderTextColor={"#939F99"}
+              placeholderTextColor="#aaa"
               keyboardType="numeric"
-              onChangeText={(text) => onChangeNoFile(text)}
+              onChangeText={onChangeNoFile}
             />
           </View>
+
+          <View style={styles.divider} />
+
           <DateTimePickerUIBloc
-            title="Date et heure d'admission"
+            title="Admission"
             onDateChange={handleDateAdmissionChanged}
             onTimeChange={handleTimeAdmissionChanged}
           />
+
+          <View style={styles.divider} />
+
           <DateTimePickerUIBloc
-            title="Date et heure de début du travail"
+            title="Début du travail"
             onDateChange={handleDateWorkStartChanged}
             onTimeChange={handleTimeWorkStartChanged}
           />
-          <View
-            style={[
-              styles.backGroundInfo,
-              { alignContent: "center", justifyContent: "center" },
-            ]}
-          >
-            <Text style={styles.infoTitleText}>Commentaire :</Text>
+
+          <View style={styles.divider} />
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Commentaire</Text>
             <TextInput
-              editable={true}
-              multiline={true}
-              onChangeText={(text) => onChangeCommentary(text)}
-              placeholder="Commentaire"
-              placeholderTextColor={"#939F99"}
-              textAlign="left"
+              editable
+              multiline
+              numberOfLines={4}
+              onChangeText={onChangeCommentary}
+              placeholder="Commentaire (optionnel)"
+              placeholderTextColor="#aaa"
               textAlignVertical="top"
-              style={{
-                padding: 10,
-                borderWidth: 1,
-                borderColor: "black",
-                borderRadius: 5,
-                width: "95%",
-                alignSelf: "center",
-                marginVertical: 5,
-                height: 150,
-              }}
+              style={styles.textArea}
             />
           </View>
-          <CustomButton
-            title="Valider"
-            color="#403572"
-            style={{ width: 100, height: 50, margin: 10, borderRadius: 5 }}
-            onPressFunction={createButtonPressed}
-            styleText={{}}
-            disabled={false}
-          />
+
+          {errorMessage && (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          )}
+
+          <Pressable
+            onPress={createButtonPressed}
+            disabled={isSubmitting}
+            android_ripple={{ color: "#ffffff30" }}
+            style={({ pressed }) => [
+              styles.btn,
+              pressed && { opacity: 0.85 },
+              isSubmitting && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={styles.btnText}>
+              {isSubmitting ? "Création…" : "Valider"}
+            </Text>
+          </Pressable>
         </ScrollView>
       </View>
     );
@@ -195,56 +191,77 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#ffffff",
-    alignItems: "center",
+    backgroundColor: "#f7f7f9",
   },
-  scrollView: {
-    alignItems: "center",
-    width: "100%",
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
-  text: {
-    color: "#000000",
-    fontSize: 20,
-    margin: 5,
-    marginLeft: 15,
-    textAlign: "center",
+  section: {
+    marginBottom: 14,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#403572",
+    marginBottom: 5,
   },
   input: {
-    textAlign: "center",
     borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 5,
-    backgroundColor: "#ffffff",
-    fontSize: 20,
-    margin: 10,
-    width: 300,
-    color: "#403572",
-  },
-  button: {
-    width: 30,
-    height: 30,
-    borderRadius: 5,
-    backgroundColor: "#403572",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    top: 10,
-    elevation: 5,
-    marginLeft: 10,
-  },
-  backGroundInfo: {
-    backgroundColor: "#d5d0e9",
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
-    borderBottomWidth: 1,
-    marginTop: 5,
-    marginBottom: 5,
-    width: 350,
-  },
-  infoTitleText: {
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
     fontSize: 15,
-    fontWeight: "bold",
-    color: "#403572",
-    marginLeft: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#fff",
+    color: "#222",
+  },
+  readonlyInput: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#f0f0f5",
+  },
+  readonlyText: {
+    fontSize: 15,
+    color: "#666",
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    backgroundColor: "#fff",
+    color: "#222",
+    height: 110,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#e8e8e8",
+    marginVertical: 10,
+  },
+  btn: {
+    backgroundColor: "#403572",
+    borderRadius: 8,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  btnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  errorText: {
+    color: "#c0392b",
+    fontSize: 13,
+    marginBottom: 10,
+    lineHeight: 18,
   },
 });

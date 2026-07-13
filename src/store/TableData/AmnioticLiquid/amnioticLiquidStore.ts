@@ -8,6 +8,7 @@ import { Alert, Platform } from "react-native";
 import { throws } from "assert";
 import { liquidStates, getStringByEnum } from '../../../../types/constants';
 import { isLiquidState } from "../../../misc/CheckTypes";
+import { logger } from "../../../lib/logger";
 
 export type AmnioticLiquid_t =
   Database["public"]["Tables"]["amnioticLiquid"];
@@ -55,6 +56,7 @@ export class AmnioticLiquidStore {
             fetchedLiquids.forEach((json: AmnioticLiquid_t["Row"]) =>
               this.updateAmnioticLiquidFromServer(json)
                 .catch((error) => {
+                  logger.warn("loadAmnioticLiquids: updateAmnioticLiquidFromServer failed", { id: json.id, error: error?.message });
                   Platform.OS === "web"
                     ? null
                     : Alert.alert(
@@ -70,6 +72,7 @@ export class AmnioticLiquidStore {
       })
       .catch((error:any) => {
         this.state = "error";
+        logger.warn("loadAmnioticLiquids failed", { partogrammeId, error: error?.message });
         Platform.OS !== "web"
           ? null
           : Alert.alert(
@@ -110,6 +113,7 @@ export class AmnioticLiquidStore {
           runInAction(() => {
             this.state = "error";
           });
+          logger.warn("updateAmnioticLiquidFromServer: updateAmnioticLiquid failed", { id: json.id, error: error?.message });
           return Promise.reject(error);
         });
     }
@@ -117,6 +121,7 @@ export class AmnioticLiquidStore {
       this.removeAmnioticLiquid(liquid)
         .then(() => { })
         .catch((error) => {
+          logger.warn("updateAmnioticLiquidFromServer: removeAmnioticLiquid failed", { id: json.id, error: error?.message });
           Platform.OS === "web"
             ? null
             : Alert.alert(
@@ -160,6 +165,7 @@ export class AmnioticLiquidStore {
         runInAction(() => {
           this.state = "error";
         });
+        logger.warn("createAmnioticLiquid failed", { id: liquid.data.id, error: error?.message });
         return Promise.reject(error);
       });
     return liquid;
@@ -184,6 +190,7 @@ export class AmnioticLiquidStore {
           liquid.data.isDeleted = false;
           this.state = "error";
         });
+        logger.warn("removeAmnioticLiquid failed", { id: liquid.data.id, error: error?.message });
         return Promise.reject(error);
       });
   }
@@ -285,6 +292,7 @@ export class AmnioticLiquid {
       .then(() => {
       })
       .catch((error) => {
+        logger.warn("AmnioticLiquid.delete failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -305,6 +313,7 @@ export class AmnioticLiquid {
         })
       })
       .catch((error:any) => {
+        logger.warn("AmnioticLiquid.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

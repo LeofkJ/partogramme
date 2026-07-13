@@ -7,8 +7,10 @@ import {
   StyleSheet,
   TextInput,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+import { CustomDropdown } from "./CustomDropdown";
 import { AmnioticLiquidStore } from "../../store/TableData/AmnioticLiquid/amnioticLiquidStore";
 import { MotherSystolicBloodPressureStore } from "../../store/TableData/MotherSystolicBloodPressure/motherSystolicBloodPressureStore";
 import { MotherContractionsFrequencyStore } from "../../store/TableData/MotherContractionsFrequency/motherContractionsFrequencyStore";
@@ -17,7 +19,7 @@ import { MotherTemperatureStore } from "../../store/TableData/MotherTemperature/
 import { getEnumByString, getValueByRank, liquidStates } from "../../../types/constants";
 import { rootStore } from "../../store/rootStore";
 import { observer } from "mobx-react";
-import { MotherDiastolicBloodPressureStore } from "../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
+import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
 import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
 
 export type DataInputTable_t =
@@ -84,6 +86,10 @@ const DialogDataInputTable: React.FC<Props> = observer(({
     ));
   };
 
+  const dataNamesDropdownItems = () => {
+    return data.map((item) => ({ label: item.name, value: item.name }));
+  };
+
   const generateAmnioticLiquidItems = () => {
     return Array.from({ length: Object.keys(liquidStates).length }, (_, i) => (
       <Picker.Item
@@ -95,9 +101,16 @@ const DialogDataInputTable: React.FC<Props> = observer(({
     ));
   };
 
+  const amnioticLiquidDropdownItems = () => {
+    return Array.from({ length: Object.keys(liquidStates).length }, (_, i) => {
+      const value = getValueByRank(liquidStates, i) as string;
+      return { label: value, value };
+    });
+  };
+
   const renderDataPicker = () => {
     if (selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name) {
-      return (
+      return Platform.OS === "web" ? (
         <View style={styles.pickerContainer}>
           <Picker
             style={styles.picker}
@@ -108,6 +121,14 @@ const DialogDataInputTable: React.FC<Props> = observer(({
             {generateAmnioticLiquidItems()}
           </Picker>
         </View>
+      ) : (
+        <CustomDropdown
+          items={amnioticLiquidDropdownItems()}
+          selectedValue={selectedAmnioticLiquidState}
+          onValueChange={setSelectedAmnioticLiquidState}
+          buttonStyle={styles.dropdownButton}
+          textStyle={styles.dropdownButtonText}
+        />
       );
     } else {
       return (
@@ -145,8 +166,8 @@ const DialogDataInputTable: React.FC<Props> = observer(({
                 {preSelectedDataChoice.name}
               </Text>
             </View>
-          ) : (
-            <View style={styles.pickerContainer}>
+          ) : Platform.OS === "web" ? (
+            <View style={styles.pickerContainer} pointerEvents="auto">
               <Picker
                 style={styles.picker}
                 mode="dropdown"
@@ -155,10 +176,24 @@ const DialogDataInputTable: React.FC<Props> = observer(({
                   setSelectedDataName(itemValue);
                   setSelectedDataNameIndex(itemIndex);
                 }}
+                enabled={true}
+                itemStyle={styles.pickerItem}
+                prompt="Sélectionner un type de données"
               >
                 {generateDataNamesItem()}
               </Picker>
             </View>
+          ) : (
+            <CustomDropdown
+              items={dataNamesDropdownItems()}
+              selectedValue={selectedDataName}
+              onValueChange={(itemValue) => {
+                setSelectedDataName(itemValue);
+                setSelectedDataNameIndex(data.findIndex((item) => item.name === itemValue));
+              }}
+              buttonStyle={styles.dropdownButton}
+              textStyle={styles.dropdownButtonText}
+            />
           )}
 
           <Text style={styles.sectionLabel}>
@@ -176,14 +211,17 @@ const DialogDataInputTable: React.FC<Props> = observer(({
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
               onPress={() => {
-                onClose(
-                  rootStore.partogrammeStore.selectedPartogramme
-                    ? rootStore.partogrammeStore.selectedPartogramme.getDataStore(selectedDataName)
-                    : undefined,
-                  selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name
-                    ? getEnumByString(liquidStates, selectedAmnioticLiquidState)
-                    : inputDataNumber
-                );
+                if (rootStore.partogrammeStore.selectedPartogramme) {
+                  const dataStore = rootStore.partogrammeStore.selectedPartogramme.getDataStore(selectedDataName);
+                  if (dataStore) {
+                    onClose(
+                      dataStore,
+                      selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name
+                        ? (getEnumByString(liquidStates, selectedAmnioticLiquidState) || selectedAmnioticLiquidState)
+                        : inputDataNumber
+                    );
+                  }
+                }
               }}
             >
               <Text style={styles.buttonText}>Valider</Text>
@@ -232,10 +270,29 @@ const styles = StyleSheet.create({
     height: 50,
     width: "100%",
     color: "#403572",
+    backgroundColor: "#f5f3fc",
   },
   pickerItem: {
     color: "#403572",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f5f3fc",
+    fontSize: 16,
+  },
+  dropdownButton: {
+    borderWidth: 1,
+    borderColor: "#9F90D4",
+    borderRadius: 10,
+    backgroundColor: "#f5f3fc",
+    height: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
+    marginBottom: 4,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  dropdownButtonText: {
+    color: "#403572",
+    fontWeight: "normal",
+    fontSize: 16,
   },
   preselectedBox: {
     borderWidth: 1,

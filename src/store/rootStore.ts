@@ -17,4 +17,12 @@ export class RootStore {
   }
 }
 
-export const rootStore = new RootStore();
+declare global {
+  var __rootStore: RootStore | undefined;
+}
+
+if (!global.__rootStore) {
+  global.__rootStore = new RootStore();
+}
+
+export const rootStore = global.__rootStore;

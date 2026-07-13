@@ -13,6 +13,7 @@ import {
 import { RootStore } from "./rootStore";
 import { Partogramme } from "./partogramme/partogrammeStore";
 import { TransportLayer } from "../transport/transportLayer";
+import { logger } from "../lib/logger";
 
 export abstract class DataStore {
   rootStore: RootStore;
@@ -58,6 +59,7 @@ export abstract class DataStore {
     })
     .catch((error: any) => {
       this.isLoading = false;
+      logger.warn(`${this.name}: load failed`, { partogrammeId, error: error?.message });
       return Promise.reject(error);
     });
     return Promise.resolve();

@@ -5,6 +5,7 @@ import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { Alert, Platform } from "react-native";
+import { logger } from "../../../lib/logger";
 
 export type MotherDiastolicBloodPressure_t =
   Database["public"]["Tables"]["MotherDiastolicBloodPressure"];
@@ -113,6 +114,7 @@ export class MotherDiastolicBloodPressureStore {
         });
       })
       .catch((error: any) => {
+        logger.warn("createDiastolicMotherBloodPressure failed", { id: pressure.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -237,6 +239,7 @@ export class MotherDiastolicBloodPressure {
         });
       })
       .catch((error: any) => {
+        logger.warn("MotherDiastolicBloodPressure.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(

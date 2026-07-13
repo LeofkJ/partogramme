@@ -4,14 +4,15 @@ import {
   Text,
   View,
   TextInput,
+  Pressable,
   AppStateStatus,
   AppState,
 } from "react-native";
 import "react-native-url-polyfill/auto";
-import CustomButton from "../../components/CustomButton";
 import { rootStore } from "../../store/rootStore";
 import { supabase } from "../../initSupabase";
 import { observer } from "mobx-react";
+import { logger } from "../../lib/logger";
 
 export type Props = {
   navigation: any;
@@ -49,6 +50,7 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
   const LoginButtonPressed = () => {
     setIsLoadingDialogVisible(true);
     setErrorMessage(null);
+    logger.info("Login attempt", { email: rootStore.profileStore.email });
     rootStore.profileStore
       .signInWithEmail(
         rootStore.profileStore.email,
@@ -56,14 +58,15 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
       )
       .then((result) => {
         if (result) {
+          logger.info("Login success", { email: rootStore.profileStore.email });
           navigation.navigate("Screen_Menu");
           setIsLoadingDialogVisible(false);
         }
       })
       .catch((error) => {
+        logger.warn("Login failed", { email: rootStore.profileStore.email, reason: error?.message });
         setIsLoadingDialogVisible(false);
         const msg = (error?.message || "").toLowerCase();
-        const raw = error?.message || JSON.stringify(error);
         let friendly = "";
         if (msg.includes("invalid login credentials") || msg.includes("user not found") || msg.includes("invalid email")) {
           friendly = "Email introuvable ou mot de passe incorrect.";
@@ -78,54 +81,68 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         } else {
           friendly = "Erreur de connexion. Veuillez réessayer.";
         }
-        setErrorMessage(`${friendly}\n[${raw}]`);
+        setErrorMessage(friendly);
       });
   };
 
   return (
     <View style={styles.body}>
-      <Text style={styles.titleText}>Bienvenue dans le PartoGraph !</Text>
-      <Text style={styles.text}>Login:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={rootStore.profileStore.email}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        onChangeText={(value) => rootStore.profileStore.setProfileEmail(value)}
-      />
-      <Text style={styles.text}>Password:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={rootStore.profileStore.password}
-        secureTextEntry={true}
-        onChangeText={(value) => rootStore.profileStore.setPassword(value)}
-      />
-      <CustomButton
-        title="Login"
-        color="#403572"
-        disabled={false}
-        onPressFunction={LoginButtonPressed}
-        style={{ width: 344, marginTop: 10 }}
-        styleText={{}}
-      />
-      <CustomButton
-        title="Créer un compte"
-        color="#9F90D4"
-        disabled={false}
-        onPressFunction={() => navigation.navigate("Screen_Register")}
-        style={{ width: 344, marginTop: 10 }}
-        styleText={{ fontSize: 14 }}
-      />
-      {errorMessage && (
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      )}
-      {isLoadingDialogVisible && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Connexion en cours...</Text>
-        </View>
-      )}
+      <View style={styles.header}>
+        <Text style={styles.titleText}>Bienvenue dans le PartoGraph !</Text>
+        <Text style={styles.subtitleText}>Connectez-vous pour continuer</Text>
+      </View>
+
+      <View>
+        <TextInput
+          style={styles.input}
+          placeholder="Adresse email"
+          placeholderTextColor="#aaa"
+          value={rootStore.profileStore.email}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={(value) => rootStore.profileStore.setProfileEmail(value)}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Mot de passe"
+          placeholderTextColor="#aaa"
+          value={rootStore.profileStore.password}
+          secureTextEntry={true}
+          onChangeText={(value) => rootStore.profileStore.setPassword(value)}
+        />
+
+        {errorMessage && (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        )}
+
+        <Pressable
+          onPress={LoginButtonPressed}
+          disabled={isLoadingDialogVisible}
+          android_ripple={{ color: "#ffffff30" }}
+          style={({ pressed }) => [
+            styles.btnPrimary,
+            pressed && { opacity: 0.85 },
+            isLoadingDialogVisible && { opacity: 0.6 },
+          ]}
+        >
+          <Text style={styles.btnPrimaryText}>
+            {isLoadingDialogVisible ? "Connexion…" : "Se connecter"}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate("Screen_Register")}
+          android_ripple={{ color: "#40357220" }}
+          style={({ pressed }) => [
+            styles.btnSecondary,
+            pressed && { opacity: 0.75 },
+          ]}
+        >
+          <Text style={styles.btnSecondaryText}>Créer un compte</Text>
+        </Pressable>
+
+      </View>
     </View>
   );
 });
@@ -133,47 +150,74 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f7f7f9",
     justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  header: {
     alignItems: "center",
-  },
-  text: {
-    color: "#000000",
-    fontSize: 20,
-    margin: 10,
-    textAlign: "center",
-  },
-  input: {
-    textAlign: "center",
-    borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 5,
-    fontSize: 20,
-    marginRight: 50,
-    marginLeft: 50,
-    width: 344,
+    marginBottom: 40,
   },
   titleText: {
-    textAlign: "center",
     color: "#403572",
-    fontSize: 20,
-    margin: 2,
+    fontSize: 24,
     fontWeight: "bold",
+    marginBottom: 8,
+    textAlign: "center",
   },
-  loadingContainer: {
-    marginTop: 20,
+  titleAccent: {
+    width: 40,
+    height: 3,
+    backgroundColor: "#9F90D4",
+    borderRadius: 2,
+    marginBottom: 10,
+  },
+  subtitleText: {
+    color: "#999",
+    fontSize: 13,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+    color: "#222",
+  },
+  btnPrimary: {
+    backgroundColor: "#403572",
+    borderRadius: 8,
+    height: 48,
     alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
   },
-  loadingText: {
-    color: "#403572",
-    fontSize: 16,
+  btnPrimaryText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  btnSecondary: {
+    borderRadius: 8,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#9F90D4",
+  },
+  btnSecondaryText: {
+    color: "#9F90D4",
+    fontSize: 15,
+    fontWeight: "500",
   },
   errorText: {
-    color: "#DE2C1D",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 12,
-    textAlign: "center",
-    width: 344,
+    color: "#c0392b",
+    fontSize: 13,
+    marginBottom: 10,
+    lineHeight: 18,
   },
 });

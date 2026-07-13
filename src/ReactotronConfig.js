@@ -1,5 +1,16 @@
 import Reactotron, { networking } from "reactotron-react-native";
-Reactotron.configure({ host: '192.168.0.17', port: 9090 }) // controls connection & communication settings
-  .useReactNative() // add all built-in react native plugins
-  .use(networking())
-  .connect(); // let's connect!
+import { NativeModules } from "react-native";
+import url from "url";
+
+if (__DEV__) {
+  const { hostname: host } = url.parse(NativeModules.SourceCode.scriptURL);
+
+  Reactotron.configure({ host, port: 9090 })
+    .useReactNative()
+    .use(networking())
+    .connect();
+
+  Reactotron.clear();
+}
+
+export default Reactotron;

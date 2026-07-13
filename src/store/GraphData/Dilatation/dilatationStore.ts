@@ -6,6 +6,7 @@ import uuid from 'react-native-uuid';
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { GraphData } from "../GraphData";
 import { Alert, Platform } from "react-native";
+import { logger } from "../../../lib/logger";
 
 export type Dilation_t = Database["public"]["Tables"]["Dilation"];
 
@@ -188,6 +189,7 @@ export class Dilation {
         });
       })
       .catch((error: any) => {
+        logger.warn("Dilation.update failed", { id: this.data.id, error: error?.message });
         Platform.OS === "web"
           ? null
           : Alert.alert(
@@ -200,7 +202,7 @@ export class Dilation {
         return Promise.reject(error);
       });
   }
-  
+
   delete() {
     this.store.removeDilation(this);
   }

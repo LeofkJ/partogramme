@@ -1,160 +1,90 @@
-import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
-import {
-  VictoryChart,
-  VictoryLine,
-  VictoryAxis,
-  VictoryTheme,
-  VictoryScatter,
-  Text,
-  VictoryLegend,
-} from "victory-native";
+import React from "react";
+import { View, useWindowDimensions } from "react-native";
+import Svg, {
+  Line,
+  Circle,
+  Polyline,
+  Rect,
+  G,
+  Text as SvgText,
+} from "react-native-svg";
 import { observer } from "mobx-react";
-import { rootStore } from '../../store/rootStore';
-import {
-  BabyHeartFrequencyStore,
-  BabyHeartFrequency,
-} from "../../store/GraphData/BabyHeartFrequency/babyHeartFrequencyStore";
 
 interface BabyGraphProps {
-  babyHeartFrequencyList?: BabyHeartFrequencyStore;
-  data: any;
+  data?: Array<{ x: number; y: number }>;
 }
 
-/**
- * @brief Graph component for the baby heart frequency
- * @param babyHeartFrequencyStore - store for the baby heart frequency
- */
-export const BabyGraph: React.FC<BabyGraphProps> = observer(
-  ({ babyHeartFrequencyList, data }) => {
+export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data }) => {
+  const { width: windowWidth } = useWindowDimensions();
 
-    const legendData = [
-      { name: 'Fréquence Cardiaque du bébé', symbol: { fill: 'red' } },
-    ];
+  const svgWidth = Math.max(windowWidth - 32, 200);
+  const svgHeight = 280;
+  const padL = 46, padR = 16, padT = 16, padB = 52;
+  const cW = svgWidth - padL - padR;
+  const cH = svgHeight - padT - padB;
 
-    const yStartValue = 120;
-    const yEndValue = 180;
-    const step = 10;
-    const yTickValues = Array.from(
-      { length: Math.floor((yEndValue - yStartValue) / step) + 1 },
-      (_, index) => yStartValue + index * step
-    );
+  const xMin = 0, xMax = 12;
+  const yMin = 120, yMax = 180;
 
-    // const sortedData = babyHeartFrequencyList?.sortedBabyHeartFrequencyList;
+  const toX = (v: number) => padL + ((Math.max(xMin, Math.min(xMax, v)) - xMin) / (xMax - xMin)) * cW;
+  const toY = (v: number) => padT + (1 - (Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * cH;
 
-    /**
-     * @brief Get the current relative X value for the Graph (0 to 12) base on the created date
-     * @param createdDate  - date of the data point
-     * @returns  - current relative X value
-     */
-    const getCurrentRelativeX = (createdDate: string): number => {
-      const now = new Date();
-      const createdTime = new Date(createdDate);
-      const deltaTime = now.getTime() - createdTime.getTime();
-      const hours = deltaTime / (1000 * 60 * 60); // Calculate hours difference
-      const normalizedHours = hours % 12; // Normalize hours to 12
-      return normalizedHours;
-    };
+  const yTicks = [120, 130, 140, 150, 160, 170, 180];
+  const xTicks = [0, 2, 4, 6, 8, 10, 12];
 
-    // // // Create an array of data points based on the baby heart frequency store
-    // const data = sortedData?.map((point: BabyHeartFrequency) => {
-    //   return {
-    //     x:
-    //       point.data.Rank === 0
-    //         ? getCurrentRelativeX(
-    //             point.partogrammeStore.partogramme.workStartDateTime
-    //           )
-    //         : point.data.Rank,
-    //     y: point.data.value,
-    //   };
-    // });
+  const pts = (data ?? []).filter(d => d != null && isFinite(d.x) && isFinite(d.y));
+  const polyPts = pts.map(d => `${toX(d.x)},${toY(d.y)}`).join(" ");
 
-    // Create an array of tick values [0, 1, 2, ..., 12] for the X-axis
-    const xTickValues = Array.from({ length: 13 }, (_, index) => index);
+  return (
+    <View style={{ alignSelf: "stretch" }}>
+      <Svg width={svgWidth} height={svgHeight}>
+        <Rect x={padL} y={padT} width={cW} height={cH} fill="#fafafa" stroke="#e0e0e0" strokeWidth={1} />
 
-    /**
-     * @brief Format the tick label for the X-axis
-     * @param tick  - tick value
-     * @returns  - formatted tick label
-     */
-    const formatTickx = (tick: number) => {
-      return `${tick}h`; // Format tick label with hours
-    };
+        {yTicks.map(y => (
+          <G key={`y${y}`}>
+            <Line x1={padL} y1={toY(y)} x2={padL + cW} y2={toY(y)} stroke="#e8e8e8" strokeWidth={0.7} />
+            <SvgText x={padL - 4} y={toY(y) + 3.5} textAnchor="end" fontSize={9} fill="#777">{y}</SvgText>
+          </G>
+        ))}
 
-    /**
-     * @brief Format the tick label for the Y-axis
-     * @param tick  - tick value
-     * @returns  - formatted tick label
-     */
-    const formatTicky = (tick: number) => {
-      return `${tick}bpm`; // Format tick label with hours
-    };
+        {xTicks.map(x => (
+          <G key={`x${x}`}>
+            <Line x1={toX(x)} y1={padT} x2={toX(x)} y2={padT + cH} stroke="#e8e8e8" strokeWidth={0.7} />
+            <SvgText x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{x}h</SvgText>
+          </G>
+        ))}
 
-    return (
-      <View>
-        <VictoryChart
-          theme={VictoryTheme.material}
-          domain={{ x: [0, 12], y: [120, 180] }}
-          padding={{ top: 20, bottom: 100, left: 70, right: 30 }}
-          height={300}
-          style={
-            {
-              // parent: {
-              //   border: "1px solid #ccc",
-              // },
-            }
-          }
+        {pts.length > 1 && (
+          <Polyline points={polyPts} fill="none" stroke="#c43a31" strokeWidth={2} />
+        )}
+
+        {pts.map((d, i) => (
+          <Circle key={i} cx={toX(d.x)} cy={toY(d.y)} r={4} fill="#c43a31" />
+        ))}
+
+        <SvgText x={padL + cW / 2} y={svgHeight - 8} textAnchor="middle" fontSize={9} fill="#555">
+          Temps (heures)
+        </SvgText>
+        <SvgText
+          x={10}
+          y={padT + cH / 2}
+          textAnchor="middle"
+          fontSize={9}
+          fill="#555"
+          transform={`rotate(-90, 10, ${padT + cH / 2})`}
         >
-          <VictoryAxis
-            // Customize the X-axis as needed
-            tickValues={xTickValues}
-            tickFormat={formatTickx}
+          bpm
+        </SvgText>
 
-            // domain={[0, 12]}
-          />
-          <VictoryAxis
-            dependentAxis
-            tickValues={yTickValues}
-            // Customize the Y-axis as needed
-            tickFormat={formatTicky}
-          />
-          <VictoryLine
-            data={data}
-            // data={rootStore.partogrammeStore.selectedPartogramme?.babyHeartFrequencyStore?.babyHeartFrequencyGraphData}
-            // Customize the line for data as needed
-
-          />
-          <VictoryScatter
-            style={{ data: { fill: "#c43a31" } }}
-            size={4}
-            data={data}
-            
-          />
-          <VictoryLegend
-            x={20}
-            y={230}
-            title="Légende"
-            centerTitle
-            orientation="horizontal"
-            gutter={20}
-            style={{
-              border: { stroke: "black" },
-              title: { fontSize: 12, fontWeight: "bold" },
-            }}
-            data={legendData}
-          />
-        </VictoryChart>
-      </View>
-    );
-  }
-);
-
-const styles = StyleSheet.create({
-  graphStyle: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+        <G>
+          <Circle cx={padL + 8} cy={svgHeight - 32} r={4} fill="#c43a31" />
+          <SvgText x={padL + 17} y={svgHeight - 28} fontSize={9} fill="#333">
+            Fréquence cardiaque du bébé
+          </SvgText>
+        </G>
+      </Svg>
+    </View>
+  );
 });
 
 export default BabyGraph;

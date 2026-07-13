@@ -1,7 +1,12 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, TextInput } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+} from "react-native";
 import "react-native-url-polyfill/auto";
-import CustomButton from "../../components/CustomButton";
 import { supabase } from "../../initSupabase";
 import { rootStore } from "../../store/rootStore";
 
@@ -41,7 +46,6 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
     if (error) {
       setIsLoading(false);
       const msg = error.message.toLowerCase();
-      const raw = error.message || JSON.stringify(error);
       let friendly = "";
       if (msg.includes("already registered") || msg.includes("user already exists") || msg.includes("already exists")) {
         friendly = "Un compte existe déjà avec cet email.";
@@ -58,7 +62,7 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
       } else {
         friendly = "Erreur lors de la création du compte. Veuillez réessayer.";
       }
-      setErrorMessage(`${friendly}\n[${raw}]`);
+      setErrorMessage(friendly);
       return;
     }
 
@@ -86,56 +90,69 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.body}>
-      <Text style={styles.titleText}>Créer un compte</Text>
-      <Text style={styles.text}>Email :</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        onChangeText={(value) => setEmail(value)}
-      />
-      <Text style={styles.text}>Mot de passe :</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Mot de passe"
-        value={password}
-        secureTextEntry={true}
-        onChangeText={(value) => setPassword(value)}
-      />
-      <Text style={styles.text}>Confirmer le mot de passe :</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Confirmer le mot de passe"
-        value={confirmPassword}
-        secureTextEntry={true}
-        onChangeText={(value) => setConfirmPassword(value)}
-      />
-      <CustomButton
-        title="Créer un compte"
-        color="#403572"
-        disabled={false}
-        onPressFunction={RegisterButtonPressed}
-        style={{ marginTop: 20, width: 344 }}
-        styleText={{}}
-      />
-      <CustomButton
-        title="Déjà un compte ? Se connecter"
-        color="#9F90D4"
-        disabled={false}
-        onPressFunction={() => navigation.navigate("Screen_Login")}
-        style={{ marginTop: 10, width: 344 }}
-        styleText={{ fontSize: 14 }}
-      />
-      {errorMessage && (
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      )}
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Création du compte...</Text>
-        </View>
-      )}
+      <View style={styles.header}>
+        <Text style={styles.titleText}>Créer un compte</Text>
+        <Text style={styles.subtitleText}>Rejoignez PartoGraph pour commencer</Text>
+      </View>
+
+      <View>
+        <TextInput
+          style={styles.input}
+          placeholder="Adresse email"
+          placeholderTextColor="#aaa"
+          value={email}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={(value) => setEmail(value)}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Mot de passe"
+          placeholderTextColor="#aaa"
+          value={password}
+          secureTextEntry={true}
+          onChangeText={(value) => setPassword(value)}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirmer le mot de passe"
+          placeholderTextColor="#aaa"
+          value={confirmPassword}
+          secureTextEntry={true}
+          onChangeText={(value) => setConfirmPassword(value)}
+        />
+
+        {errorMessage && (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        )}
+
+        <Pressable
+          onPress={RegisterButtonPressed}
+          disabled={isLoading}
+          android_ripple={{ color: "#ffffff30" }}
+          style={({ pressed }) => [
+            styles.btnPrimary,
+            pressed && { opacity: 0.85 },
+            isLoading && { opacity: 0.6 },
+          ]}
+        >
+          <Text style={styles.btnPrimaryText}>
+            {isLoading ? "Création en cours…" : "Créer un compte"}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate("Screen_Login")}
+          android_ripple={{ color: "#40357220" }}
+          style={({ pressed }) => [
+            styles.btnSecondary,
+            pressed && { opacity: 0.75 },
+          ]}
+        >
+          <Text style={styles.btnSecondaryText}>Déjà un compte ? Se connecter</Text>
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -143,48 +160,67 @@ export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f7f7f9",
     justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  header: {
     alignItems: "center",
-  },
-  text: {
-    color: "#000000",
-    fontSize: 20,
-    margin: 10,
-    textAlign: "center",
-  },
-  input: {
-    textAlign: "center",
-    borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 5,
-    fontSize: 20,
-    marginRight: 50,
-    marginLeft: 50,
-    width: 344,
+    marginBottom: 40,
   },
   titleText: {
-    textAlign: "center",
     color: "#403572",
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 20,
-    alignSelf: "center",
+    marginBottom: 8,
+    textAlign: "center",
   },
-  loadingContainer: {
-    marginTop: 20,
+  subtitleText: {
+    color: "#999",
+    fontSize: 13,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+    color: "#222",
+  },
+  btnPrimary: {
+    backgroundColor: "#403572",
+    borderRadius: 8,
+    height: 48,
     alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
   },
-  loadingText: {
-    color: "#403572",
-    fontSize: 16,
+  btnPrimaryText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  btnSecondary: {
+    borderRadius: 8,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#9F90D4",
+  },
+  btnSecondaryText: {
+    color: "#9F90D4",
+    fontSize: 15,
+    fontWeight: "500",
   },
   errorText: {
-    color: "#DE2C1D",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 12,
-    textAlign: "center",
-    width: 344,
+    color: "#c0392b",
+    fontSize: 13,
+    marginBottom: 10,
+    lineHeight: 18,
   },
 });

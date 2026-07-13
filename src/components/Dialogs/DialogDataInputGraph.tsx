@@ -5,11 +5,11 @@ import {
   View,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { CheckBox } from "@rneui/themed";
+import { CustomDropdown } from "./CustomDropdown";
 
 interface Props {
   visible: boolean;
@@ -17,7 +17,7 @@ interface Props {
   startValue: number;
   endValue: number;
   step: number;
-  onClose: (data: string, delta: string) => void;
+  onClose: (data: string) => void;
   onCancel: () => void;
 }
 
@@ -32,9 +32,6 @@ const DialogDataInputGraph: React.FC<Props> = ({
 }) => {
   const { width } = useWindowDimensions();
   const [selectedValue, setSelectedValue] = useState(startValue.toString());
-  const [delta, onChangeDelta] = useState("");
-  const [isManualInputOn, setManuelInputOn] = useState(false);
-  const toggleCheckboxManualInput = () => setManuelInputOn(!isManualInputOn);
 
   const generatePickerItems = () => {
     const items = [];
@@ -47,6 +44,14 @@ const DialogDataInputGraph: React.FC<Props> = ({
           style={styles.pickerItem}
         />
       );
+    }
+    return items;
+  };
+
+  const dropdownItems = () => {
+    const items = [];
+    for (let i = startValue; i <= endValue; i += step) {
+      items.push({ label: i.toString(), value: i.toString() });
     }
     return items;
   };
@@ -64,46 +69,27 @@ const DialogDataInputGraph: React.FC<Props> = ({
             {dataName}
           </Text>
 
-          <View style={styles.pickerContainer}>
-            <Picker
-              style={styles.picker}
-              mode="dropdown"
-              prompt="Sélectionnez un chiffre"
+          {Platform.OS === "web" ? (
+            <View style={styles.pickerContainer}>
+              <Picker
+                style={styles.picker}
+                mode="dropdown"
+                prompt="Sélectionnez un chiffre"
+                selectedValue={selectedValue}
+                onValueChange={(itemValue) => setSelectedValue(itemValue)}
+              >
+                {generatePickerItems()}
+              </Picker>
+            </View>
+          ) : (
+            <CustomDropdown
+              items={dropdownItems()}
               selectedValue={selectedValue}
-              onValueChange={(itemValue) => setSelectedValue(itemValue)}
-            >
-              {generatePickerItems()}
-            </Picker>
-          </View>
-
-          {isManualInputOn && (
-            <>
-              <Text style={styles.sectionLabel}>
-                Delta (facultatif / test)
-              </Text>
-              <TextInput
-                style={styles.inputTextNumber}
-                placeholder="Entrez un delta"
-                placeholderTextColor={"#9F90D4"}
-                onChangeText={(text) => onChangeDelta(text)}
-                keyboardType="numeric"
-                value={delta}
-              />
-            </>
+              onValueChange={setSelectedValue}
+              buttonStyle={styles.dropdownButton}
+              textStyle={styles.dropdownButtonText}
+            />
           )}
-
-          <CheckBox
-            checked={isManualInputOn}
-            onPress={toggleCheckboxManualInput}
-            iconType="material-community"
-            checkedIcon="checkbox-marked"
-            uncheckedIcon="checkbox-blank-outline"
-            checkedColor="#403572"
-            checkedTitle="Saisie manuelle activée"
-            title="Saisie manuelle désactivée"
-            containerStyle={styles.checkboxContainer}
-            textStyle={styles.checkboxText}
-          />
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
@@ -114,7 +100,7 @@ const DialogDataInputGraph: React.FC<Props> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
-              onPress={() => onClose(selectedValue, delta)}
+              onPress={() => onClose(selectedValue)}
             >
               <Text style={styles.buttonText}>Valider</Text>
             </TouchableOpacity>
@@ -167,25 +153,19 @@ const styles = StyleSheet.create({
     color: "#403572",
     backgroundColor: "#ffffff",
   },
-  inputTextNumber: {
-    borderColor: "#9F90D4",
+  dropdownButton: {
     borderWidth: 1,
+    borderColor: "#9F90D4",
     borderRadius: 10,
-    textAlign: "center",
-    padding: 10,
-    fontSize: 18,
-    color: "#403572",
     backgroundColor: "#f5f3fc",
+    height: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
     marginBottom: 4,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  checkboxContainer: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    marginLeft: 0,
-    paddingLeft: 0,
-    marginTop: 8,
-  },
-  checkboxText: {
+  dropdownButtonText: {
     color: "#403572",
     fontWeight: "normal",
   },
