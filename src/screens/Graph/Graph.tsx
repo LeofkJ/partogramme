@@ -1,6 +1,4 @@
 import {
-  Alert,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -16,7 +14,7 @@ import { useEffect, useState } from "react";
 import BabyGraph from "../../components/Graphs/BabyGraph";
 import { rootStore } from "../../store/rootStore";
 import DilationGraph from "../../components/Graphs/DilationGraph";
-import { ScrollView } from "react-native-gesture-handler";
+import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import DataTable from "../../components/Tables/DataTable";
 import DialogDataInputTable, {
   DataInputTable_t,
@@ -34,13 +32,15 @@ import DataModifierDialog from "../../components/DataModifierDialog";
 import EditDataDialog from "../../components/Dialogs/EditDataDialog";
 import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
 import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
+import { dataStore_t } from "../../store/partogramme/partogrammeStore";
 import { CommentsSlider } from "../../components/CommentsSlider";
 import { DialogEditText } from "../../components/Dialogs/DialogEditText";
-import { formatDateString } from "../../tools/StringUtilitary";
-import { getStatusBackgroundColor } from "../../store/partogramme/partogrammeStore";
+import { formatDateOnly, formatTimeOnly } from "../../tools/StringUtilitary";
 import { getStringByEnum, partogrammeStates } from "../../../types/constants";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
 import { logger } from "../../lib/logger";
+import { notify } from "../../lib/notify";
+import { colors, spacing, radius, layout, statusColors } from "../../theme";
 
 export type Props = {
   navigation: any;
@@ -49,6 +49,7 @@ export type Props = {
 export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [isReady, setIsReady] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [isFcDialogVisible, setFcDialogVisible] = useState(false);
   const [isDilationDialogVisible, setDilationDialogVisible] = useState(false);
   const [isDescentBabyDialogVisible, setDescentBabyDialogVisible] =
@@ -57,6 +58,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     useState(false);
   const [isDataModifierDialogVisible, setDataModifierDialogVisible] =
     useState(false);
+  const [dataModifierStores, setDataModifierStores] = useState<dataStore_t[]>([]);
   const [isAddCommentDialogVisible, setAddCommentDialogVisible] =
     useState(false);
   const [isChangeStateDialogVisible, setChangeStateDialogVisible] =
@@ -141,7 +143,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     data?: string,
   ) => {
     if (partogramme === null || dataStore === undefined || data === undefined) {
-      Alert.alert(
+      notify.error(
         "Code Error : Unknown data store type. \n contact the administrator",
       );
       return;
@@ -156,7 +158,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         )
         .catch((error) => {
           logger.warn("Graph: createAmnioticLiquid failed", { error: error?.message });
-          Platform.OS === "web" ? null : Alert.alert(error.message);
+          notify.error("Erreur", error.message);
         });
     } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
       dataStore.createNew(
@@ -195,7 +197,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         rank,
       );
     } else {
-      Alert.alert(
+      notify.error(
         "Code Error : Unknown data store type. \n contact the administrator",
       );
       setAddTableDataDialogVisible(false);
@@ -238,18 +240,29 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   };
 
   const fetchData = () => {
-    if (partogramme === null) return;
-    partogramme?.babyHeartFrequencyStore.loadBabyHeartFrequencies();
-    partogramme?.babyDescentStore.loadBabyDescents();
-    partogramme?.dilationStore.loadDilations();
-    partogramme?.motherSystolicBloodPressureStore.loadData();
-    partogramme?.motherDiastolicBloodPressureStore.loadData();
-    partogramme?.motherContractionFrequencyStore.loadMotherContractionsFrequencies();
-    partogramme?.motherContractionDurationStore.load();
-    partogramme?.motherTemperatureStore.loadMotherTemperatures();
-    partogramme?.motherHeartRateFrequencyStore.loadMotherHeartFrequencies();
-    partogramme?.amnioticLiquidStore.loadAmnioticLiquids();
-    partogramme?.commentStore.load();
+    if (partogramme === null) return Promise.resolve();
+    return Promise.allSettled([
+      partogramme?.babyHeartFrequencyStore.loadBabyHeartFrequencies(),
+      partogramme?.babyDescentStore.loadBabyDescents(),
+      partogramme?.dilationStore.loadDilations(),
+      partogramme?.motherSystolicBloodPressureStore.loadData(),
+      partogramme?.motherDiastolicBloodPressureStore.loadData(),
+      partogramme?.motherContractionFrequencyStore.loadMotherContractionsFrequencies(),
+      partogramme?.motherContractionDurationStore.load(),
+      partogramme?.motherTemperatureStore.loadMotherTemperatures(),
+      partogramme?.motherHeartRateFrequencyStore.loadMotherHeartFrequencies(),
+      partogramme?.amnioticLiquidStore.loadAmnioticLiquids(),
+      partogramme?.commentStore.load(),
+    ]);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (partogramme === undefined) {
@@ -259,7 +272,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#403572" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   } else {
@@ -268,13 +281,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         <ScrollView
           style={styles.body}
           contentContainerStyle={styles.scrollViewContentStyle}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.accent]}
+              tintColor={colors.accent}
+            />
+          }
         >
-          <Text style={styles.titleText}>
-            Partogramme de {partogramme?.asJson.patientFirstName}{" "}
+          <Text style={styles.patientTitleLabel}>Partogramme de</Text>
+          <Text style={styles.patientTitle}>
+            {partogramme?.asJson.patientFirstName}{" "}
             {partogramme?.asJson.patientLastName}
-          </Text>
-          <Text style={[styles.sectionTitleText, { marginTop: 10 }]}>
-            Informations générales
           </Text>
           <View style={{ flex: 1, marginTop: 5, width: "95%" }}>
             <View
@@ -291,11 +310,13 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   style={[
                     styles.infoText,
                     {
-                      backgroundColor: getStatusBackgroundColor(
-                        partogramme!.asJson.state,
-                      ),
-                      borderRadius: 5,
-                      padding: 2,
+                      backgroundColor: statusColors(partogramme!.asJson.state).bg,
+                      color: statusColors(partogramme!.asJson.state).fg,
+                      fontWeight: "600",
+                      borderRadius: radius.full,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 2,
+                      overflow: "hidden",
                     },
                   ]}
                 >
@@ -319,8 +340,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     }}
                     style={{
                       flex: 1,
-                      backgroundColor: "#403572",
-                      borderRadius: 5,
+                      backgroundColor: colors.accent,
+                      borderRadius: radius.sm,
                       padding: 2,
                       alignItems: "center",
                       opacity:
@@ -346,8 +367,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     }}
                     style={{
                       flex: 1,
-                      backgroundColor: "#403572",
-                      borderRadius: 5,
+                      backgroundColor: colors.accent,
+                      borderRadius: radius.sm,
                       padding: 2,
                       marginLeft: 5,
                       alignItems: "center",
@@ -374,8 +395,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     }}
                     style={{
                       flex: 1,
-                      backgroundColor: "#403572",
-                      borderRadius: 5,
+                      backgroundColor: colors.accent,
+                      borderRadius: radius.sm,
                       padding: 2,
                       marginLeft: 5,
                       alignItems: "center",
@@ -390,29 +411,45 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 )}
               </View>
             </View>
-            <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-              Date et heure d'admission :{"\n"}
-              {formatDateString(partogramme!.asJson.admissionDateTime)}
-            </Text>
-            <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-              Date et heure de début du travail :{"\n"}
-              {formatDateString(partogramme!.asJson.workStartDateTime)}
-            </Text>
-            <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-              Nom de l'hôpital :{" "}
-              {
-                rootStore.userInfoStore.hospitals.filter(
-                  (h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId,
-                )[0]?.name
-              }
-            </Text>
-            <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-              Numéro de dossier : {partogramme?.asJson.noFile}
-            </Text>
-            {!!partogramme?.asJson.commentary && (
-              <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
-                Commentaire : {partogramme.asJson.commentary}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Admission</Text>
+              <Text style={styles.infoValue}>
+                {formatDateOnly(partogramme!.asJson.admissionDateTime)}
               </Text>
+              <Text style={styles.infoTime}>
+                {formatTimeOnly(partogramme!.asJson.admissionDateTime)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Début du travail</Text>
+              <Text style={styles.infoValue}>
+                {formatDateOnly(partogramme!.asJson.workStartDateTime)}
+              </Text>
+              <Text style={styles.infoTime}>
+                {formatTimeOnly(partogramme!.asJson.workStartDateTime)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Hôpital</Text>
+              <Text style={styles.infoValue}>
+                {
+                  rootStore.userInfoStore.hospitals.filter(
+                    (h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId,
+                  )[0]?.name
+                }
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Dossier</Text>
+              <Text style={styles.infoValue}>#{partogramme?.asJson.noFile}</Text>
+            </View>
+            {!!partogramme?.asJson.commentary && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Commentaire</Text>
+                <Text style={styles.infoValue}>
+                  {partogramme.asJson.commentary}
+                </Text>
+              </View>
             )}
           </View>
 
@@ -436,7 +473,20 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             InfoText={`Voulez-vous vraiment changer l'état du partogramme vers ${partogrammeStates[newState as keyof typeof partogrammeStates]} ?`}
           />
 
-          <Text style={styles.textTitle}>Fréquence Cardiaque du bébé</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.textTitle}>Fréquence Cardiaque du bébé</Text>
+            {canEdit && partogramme!.babyHeartFrequencyStore.dataList.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setDataModifierStores([partogramme!.babyHeartFrequencyStore]);
+                  setDataModifierDialogVisible(true);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.modifyLink}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <BabyGraph
             data={
               rootStore.partogrammeStore.selectedPartogramme
@@ -455,7 +505,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           {canEdit && (
             <CustomButton
               title="+ Ajouter FC bébé"
-              color="#403572"
+              color={colors.accent}
               disabled={false}
               style={styles.buttonStyle}
               onPressFunction={openFcDialog}
@@ -463,7 +513,22 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             />
           )}
 
-          <Text style={styles.textTitle}>Graphique de dilatation</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.textTitle}>Graphique de dilatation</Text>
+            {canEdit &&
+              (partogramme!.dilationStore.dataList.length > 0 ||
+                partogramme!.babyDescentStore.dataList.length > 0) && (
+              <TouchableOpacity
+                onPress={() => {
+                  setDataModifierStores([partogramme!.dilationStore, partogramme!.babyDescentStore]);
+                  setDataModifierDialogVisible(true);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.modifyLink}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <DilationGraph
             dilationStore={partogramme?.dilationStore}
             babyDescentStore={partogramme?.babyDescentStore}
@@ -481,7 +546,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             <View style={styles.buttonRow}>
               <CustomButton
                 title="+ Dilatation"
-                color="#403572"
+                color={colors.accent}
                 disabled={false}
                 style={styles.buttonStyle2}
                 onPressFunction={openDilationDialog}
@@ -489,7 +554,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               />
               <CustomButton
                 title="+ Descente bébé"
-                color="#9F90D4"
+                color={colors.accentPressed}
                 disabled={false}
                 style={styles.buttonStyle2}
                 onPressFunction={openDescentBabyDialog}
@@ -509,6 +574,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
 
           <DataTable
             maxHours={12}
+            editable={canEdit}
             columns={[
               {
                 label: "Temp",
@@ -594,7 +660,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           {canEdit && (
             <CustomButton
               title="+ Ajouter des données au tableau"
-              color="#403572"
+              color={colors.accent}
               disabled={false}
               style={styles.buttonStyle}
               onPressFunction={openAddDataTable}
@@ -605,7 +671,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <CommentsSlider
             data={partogramme!.commentStore.sortedCommentList}
             title="Liste des Commentaires"
-            onDeletePress={(item) => item.delete()}
+            onEditPress={canEdit ? (item) => setEditingTableItem(item) : undefined}
+            onDeletePress={canEdit ? (item) => item.delete() : undefined}
           />
           <DialogEditText
             visible={isAddCommentDialogVisible}
@@ -616,7 +683,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           {canEdit && (
             <CustomButton
               title="+ Ajouter un commentaire"
-              color="#403572"
+              color={colors.accent}
               disabled={false}
               style={styles.buttonAddCommentary}
               onPressFunction={openAddCommentDialog}
@@ -625,14 +692,6 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           )}
         </ScrollView>
 
-        {canEdit && (
-          <TouchableOpacity
-            style={[styles.overlayPenButton, styles.fabButton, { bottom: 20 + insets.bottom, right: 20 + insets.right }]}
-            onPress={() => setDataModifierDialogVisible(true)}
-          >
-            <IconPencil size={24} color="white" />
-          </TouchableOpacity>
-        )}
 
         {partogramme && (
           <DialogDataInputTable
@@ -665,6 +724,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         <DataModifierDialog
           visible={isDataModifierDialogVisible}
           partogramme={partogramme!}
+          dataStores={dataModifierStores}
           onCancel={() => setDataModifierDialogVisible(false)}
         />
       </View>
@@ -675,41 +735,85 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.background,
     width: "100%",
   },
+  // Single content lane: every section (info, buttons, graphs, table,
+  // comments) sizes against this capped column, not the raw window.
   scrollViewContentStyle: {
     alignItems: "center",
     paddingBottom: 100,
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
+    alignSelf: "center",
+  },
+  sectionTitleRow: {
+    width: "95%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginTop: spacing.xxl + spacing.lg,
   },
   textTitle: {
-    marginTop: 50,
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#403572",
+    fontSize: 19,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  modifyLink: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.accent,
+    paddingBottom: 2,
   },
   infoTitleText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#403572",
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
   },
   backGroundInfo: {
-    backgroundColor: "#d5d0e9",
-    paddingLeft: 5,
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
-    borderBottomWidth: 1,
-    marginTop: 5,
-    marginBottom: 5,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   infoText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  infoRow: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  infoValue: {
     fontSize: 15,
-    color: "#403572",
+    fontWeight: "500",
+    color: colors.text,
+    fontVariant: ["tabular-nums"],
+  },
+  infoTime: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontVariant: ["tabular-nums"],
+    marginTop: 1,
   },
   buttonStyle: {
     width: "90%",
-    height: 50,
-    borderRadius: 12,
+    height: layout.touchTarget,
+    borderRadius: radius.sm,
     justifyContent: "center",
     marginTop: 8,
   },
@@ -721,14 +825,14 @@ const styles = StyleSheet.create({
   },
   buttonStyle2: {
     flex: 1,
-    height: 50,
-    borderRadius: 12,
+    height: layout.touchTarget,
+    borderRadius: radius.sm,
     justifyContent: "center",
   },
   buttonAddCommentary: {
     width: "90%",
-    height: 50,
-    borderRadius: 12,
+    height: layout.touchTarget,
+    borderRadius: radius.sm,
     justifyContent: "center",
     marginTop: 8,
     marginBottom: 30,
@@ -740,7 +844,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#9F90D4",
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     elevation: 6,
@@ -749,18 +853,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  titleText: {
-    textAlign: "left",
-    color: "#403572",
-    fontSize: 20,
-    paddingStart: 20,
-    alignSelf: "flex-start",
+  patientTitleLabel: {
+    width: "95%",
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.lg,
+  },
+  patientTitle: {
+    width: "95%",
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "600",
+    marginTop: 2,
+    marginBottom: spacing.xs,
   },
   sectionTitleText: {
     textAlign: "left",
-    color: "#403572",
-    fontSize: 20,
+    color: colors.textSecondary,
+    fontSize: 15,
     margin: 2,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
 });

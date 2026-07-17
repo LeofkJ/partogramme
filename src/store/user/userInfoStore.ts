@@ -3,7 +3,7 @@ import { makePersistable } from "mobx-persist-store";
 import { Database } from "../../../types/supabase";
 import { supabase } from "../../initSupabase";
 import { RootStore } from "../rootStore";
-import { Alert, Platform } from "react-native";
+import { notify } from "../../lib/notify";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Profile, ProfileStore } from "./profileStore";
 import { TransportLayer } from "../../transport/transportLayer";
@@ -129,10 +129,8 @@ export class UserInfoStore {
       .catch((error: PostgrestError) => {
         this.state = "error";
         logger.warn("fetchUserInfo failed", { profileId, code: error.code, message: error.message });
-        if (Platform.OS === "android") {
-          if (error.code !== "PGRST116") {
-            Alert.alert(error.code, error.message);
-          }
+        if (error.code !== "PGRST116") {
+          notify.error(error.code, error.message);
         }
         return Promise.reject(error);
       });
@@ -151,7 +149,7 @@ export class UserInfoStore {
       .catch((error) => {
         this.state = "error";
         logger.warn("createUserInfo failed", { error: error?.message });
-        Alert.alert(error.message);
+        notify.error("Erreur", error.message);
       });
   }
 
@@ -186,9 +184,7 @@ export class UserInfoStore {
           this.state = "error";
         });
         logger.warn("saveUserInfo failed", { id: this.userInfo.id, error: error?.message });
-        if (Platform.OS === "android") {
-          Alert.alert(error.message);
-        }
+        notify.error("Erreur", error.message);
         return Promise.reject(error);
       });
   }

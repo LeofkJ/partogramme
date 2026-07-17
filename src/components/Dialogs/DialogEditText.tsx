@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { colors } from "../../theme";
 import {
   Modal,
   Text,
@@ -45,7 +46,7 @@ export const DialogEditText: React.FC<Props> = ({
             value={dataText}
             multiline={true}
             placeholder="Écrivez votre commentaire ici..."
-            placeholderTextColor="#9F90D4"
+            placeholderTextColor={colors.textMuted}
             textAlignVertical="top"
           />
 
@@ -54,7 +55,7 @@ export const DialogEditText: React.FC<Props> = ({
               style={[styles.button, styles.buttonCancel]}
               onPress={onCancel}
             >
-              <Text style={styles.buttonText}>Annuler</Text>
+              <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -90,15 +91,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 16,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
-    color: "#403572",
+    backgroundColor: colors.surface,
+    color: colors.text,
     fontSize: 15,
     padding: 12,
     minHeight: 120,
@@ -116,10 +117,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  buttonTextCancel: {
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
   buttonText: {
     color: "white",

@@ -3,9 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { observer } from "mobx-react";
 import React, { useState } from "react";
 import {
-  Alert,
   FlatList,
-  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -17,12 +15,11 @@ import { rootStore } from "../store/rootStore";
 import {
   Partogramme,
   Partogramme_t,
-  getStatusBackgroundColor,
 } from "../store/partogramme/partogrammeStore";
 import { getStringByEnum, partogrammeStates } from "../../types/constants";
 import { logger } from "../lib/logger";
-
-declare const window: any;
+import { notify } from "../lib/notify";
+import { colors, spacing, radius, layout, statusColors } from "../theme";
 
 export interface PartogrammeListProps {
   title?: string;
@@ -33,9 +30,6 @@ export interface ItemProps {
   item: Partogramme;
   onPress: () => void;
   onDeleteButtonPress: () => void;
-  backgroundColor: string;
-  patientNameTextColor: string;
-  infoTextColor: string;
 }
 
 const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
@@ -58,96 +52,52 @@ const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
   return patientName;
 };
 
-const pad = (n: number) => n.toString().padStart(2, "0");
-
-const renderDateTextElement = (itemDate: string | null): string => {
-  if (itemDate === null) return "Aucune date";
-  const d = new Date(itemDate);
+const Item = observer(({ item, onPress, onDeleteButtonPress }: ItemProps) => {
+  const status = statusColors(item.partogramme.state);
   return (
-    pad(d.getDate()) + "/" +
-    pad(d.getMonth() + 1) + "/" +
-    d.getFullYear() + "-" +
-    pad(d.getHours()) + ":" +
-    pad(d.getMinutes())
-  );
-};
-
-const Item = observer(
-  ({
-    item,
-    onPress,
-    onDeleteButtonPress,
-    backgroundColor,
-    patientNameTextColor,
-    infoTextColor,
-  }: ItemProps) => (
-    <View style={styles.itemView}>
-      <TouchableOpacity
-        onPress={onDeleteButtonPress}
-        style={styles.deleteButton}
-      >
-        <IconTrash size={16} color="white" />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onPress}
-        style={styles.itemTouchable}
-      >
-        <View style={styles.cardContent}>
-          <View style={styles.nameRow}>
-            <View style={styles.avatarCircle}>
-              <FontAwesomeIcon icon={faUser} size={14} color="#ffffff" style={{}} />
-            </View>
-            <View style={styles.nameBlock}>
-              <Text style={styles.patientNameFont} numberOfLines={1}>
-                {renderPatientTextElement(item.partogramme)}
-              </Text>
-              <Text style={styles.fileNumber}>
-                Dossier #{Number(item.partogramme.noFile)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.datesContainer}>
-            <View style={styles.dateRow}>
-              <Text style={styles.dateLabel}>Admission</Text>
-              <Text style={styles.dateValue}>
-                {renderDateTextElement(item.partogramme.admissionDateTime)}
-              </Text>
-            </View>
-            <View style={styles.dateRow}>
-              <Text style={styles.dateLabel}>Début travail</Text>
-              <Text style={styles.dateValue}>
-                {renderDateTextElement(item.partogramme.workStartDateTime)}
-              </Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: "row" }}>
-            <Text style={[styles.infoFont, { color: patientNameTextColor, opacity: 1 }]}>
-              Statut Patient :
-            </Text>
-            <Text
-              style={[
-                styles.infoFont,
-                styles.statusTextStyle,
-                {
-                  color: "#403572",
-                  opacity: 1,
-                  marginLeft: 10,
-                  backgroundColor: getStatusBackgroundColor(item.partogramme.state) ?? "#8c8c8c",
-                  textAlign: "left",
-                },
-              ]}
-            >
-              {getStringByEnum(partogrammeStates, item.partogramme.state)}
-            </Text>
-          </View>
+    <TouchableOpacity onPress={onPress} style={styles.card} activeOpacity={0.6}>
+      <View style={styles.cardHeader}>
+        <View style={styles.avatarCircle}>
+          <FontAwesomeIcon
+            icon={faUser}
+            size={14}
+            color={colors.textSecondary}
+            style={{}}
+          />
         </View>
-      </TouchableOpacity>
-    </View>
-  ),
-);
+        <View style={styles.nameBlock}>
+          <Text style={styles.patientName} numberOfLines={1}>
+            {renderPatientTextElement(item.partogramme)}
+          </Text>
+          <Text style={styles.fileNumber}>
+            Dossier #{Number(item.partogramme.noFile)}
+          </Text>
+        </View>
+        <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
+          <Text style={[styles.statusChipText, { color: status.fg }]}>
+            {getStringByEnum(partogrammeStates, item.partogramme.state)}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onDeleteButtonPress}
+          style={styles.deleteButton}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <IconTrash size={18} color={colors.danger} />
+        </TouchableOpacity>
+      </View>
+
+      {!!item.partogramme.commentary && (
+        <Text style={styles.commentLine} numberOfLines={2}>
+          « {item.partogramme.commentary} »
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+});
 
 const EmptyListMessage = () => (
-  <Text style={styles.emptyListStyle}>Aucun partogramme disponible !</Text>
+  <Text style={styles.emptyText}>Aucun partogramme disponible.</Text>
 );
 
 export const PartogrammeList = observer(
@@ -174,25 +124,15 @@ export const PartogrammeList = observer(
       navigation.navigate("Screen_Graph");
     };
 
-    const handleDeletePress = (item: Partogramme) => {
-      if (Platform.OS === "web") {
-        if (window.confirm("Êtes-vous sûre de vouloir supprimer ce partogramme?")) {
-          rootStore.partogrammeStore.removePartogramme(item);
-        }
-      } else {
-        Alert.alert(
-          "Confirmation",
-          "Êtes-vous sûre de vouloir supprimer ce partogramme?",
-          [
-            { text: "Annuler", style: "cancel" },
-            {
-              text: "Supprimer",
-              style: "destructive",
-              onPress: () => rootStore.partogrammeStore.removePartogramme(item),
-            },
-          ],
-          { cancelable: true },
-        );
+    const handleDeletePress = async (item: Partogramme) => {
+      const confirmed = await notify.confirm({
+        message: "Êtes-vous sûre de vouloir supprimer ce partogramme?",
+        confirmText: "Supprimer",
+        cancelText: "Annuler",
+        destructive: true,
+      });
+      if (confirmed) {
+        rootStore.partogrammeStore.removePartogramme(item);
       }
     };
 
@@ -201,9 +141,6 @@ export const PartogrammeList = observer(
         item={item}
         onPress={() => partogrammeSelected(item.partogramme.id)}
         onDeleteButtonPress={() => handleDeletePress(item)}
-        backgroundColor="#ffffff"
-        patientNameTextColor="#403572"
-        infoTextColor="#9090A0"
       />
     );
 
@@ -214,13 +151,13 @@ export const PartogrammeList = observer(
         renderItem={renderItem}
         keyExtractor={(item) => item.partogramme.id}
         ListEmptyComponent={EmptyListMessage}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingTop: spacing.sm }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#403572"]}
-            tintColor="#403572"
+            colors={[colors.accent]}
+            tintColor={colors.accent}
           />
         }
       />
@@ -232,108 +169,72 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     width: "100%",
-    paddingTop: 4,
-    paddingHorizontal: 16,
+    maxWidth: layout.maxContentWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.lg,
   },
-  itemView: {
-    marginBottom: 10,
-    width: "100%",
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
-  itemTouchable: {
-    width: "100%",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  nameRow: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    gap: spacing.md,
   },
   avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#9F90D4",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceMuted,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
-    shadowColor: "#9F90D4",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
   },
   nameBlock: {
     flex: 1,
   },
-  patientNameFont: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#403572",
-    letterSpacing: 0.3,
+  patientName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
   },
   fileNumber: {
     fontSize: 12,
-    color: "#9F90D4",
-    marginTop: 4,
-    fontWeight: "500",
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontVariant: ["tabular-nums"],
   },
-  infoFont: {
-    marginLeft: 0,
-    marginTop: 5,
-    color: "#403572",
-    opacity: 0.5,
-    fontSize: 13,
+  statusChip: {
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
-  datesContainer: {
-    marginTop: 8,
-    gap: 4,
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: "#9F90D4",
+  statusChipText: {
+    fontSize: 11,
     fontWeight: "600",
-    width: 100,
-  },
-  dateValue: {
-    fontSize: 12,
-    color: "#403572",
-    opacity: 0.7,
-    flex: 1,
-  },
-  statusTextStyle: {
-    opacity: 1,
-    borderRadius: 5,
-    paddingHorizontal: 6,
-  },
-  emptyListStyle: {
-    padding: 10,
-    marginVertical: 8,
-    alignSelf: "center",
-    textAlign: "center",
-    color: "#9F90D4",
+    letterSpacing: 0.2,
   },
   deleteButton: {
-    backgroundColor: "#e74c3c",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
+    width: 32,
+    height: 32,
     alignItems: "center",
-    position: "absolute",
-    right: 12,
-    top: 12,
-    zIndex: 1,
+    justifyContent: "center",
+  },
+  commentLine: {
+    marginTop: spacing.md,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  emptyText: {
+    marginTop: spacing.xxxl,
+    textAlign: "center",
+    fontSize: 13,
+    color: colors.textMuted,
   },
 });

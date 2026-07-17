@@ -10,9 +10,9 @@ import { DataStore } from "../DataStore";
 import { Partogramme } from "../partogramme/partogrammeStore";
 import { RootStore } from "../rootStore";
 import { TransportLayer } from "../../transport/transportLayer";
-import { Alert, Platform } from "react-native";
 import uuid from 'react-native-uuid';
 import { logger } from "../../lib/logger";
+import { notify } from "../../lib/notify";
 
 export type Comment_t =
   Database["public"]["Tables"]["Comment"];
@@ -66,12 +66,7 @@ export class CommentStore extends DataStore {
       })
       .catch((error: any) => {
         logger.warn("CommentStore.createData failed", { id: data.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              `Impossible de créer ${this.name}`
-            );
+        notify.error("Erreur", `Impossible de créer ${this.name}`);
         runInAction(() => {
           this.state = "error";
         });
@@ -90,12 +85,7 @@ export class CommentStore extends DataStore {
       })
       .catch((error: any) => {
         logger.warn("CommentStore.remove failed", { id: comment.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              `Impossible de supprimer la ${this.name} de la mère`
-            );
+        notify.error("Erreur", `Impossible de supprimer la ${this.name} de la mère`);
         runInAction(() => {
           this.state = "error";
         });
@@ -214,12 +204,7 @@ export class Comment {
       })
       .catch((error: any) => {
         logger.warn("Comment.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              "Impossible de mettre à jour le commentaire"
-            );
+        notify.error("Erreur", "Impossible de mettre à jour le commentaire");
         runInAction(() => {
           this.store.state = "error";
         });

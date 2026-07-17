@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Dispatch, SetStateAction } from "react";
 import { observer } from "mobx-react";
+import { colors } from "../../theme";
 
 interface IProps {
   isVisible: boolean;
@@ -48,7 +49,7 @@ export const DialogConfirm = observer(
                 style={[styles.button, styles.buttonCancel]}
                 onPress={handleCancel}
               >
-                <Text style={styles.buttonText}>Annuler</Text>
+                <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.buttonValidate]}
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 12,
   },
   infoText: {
@@ -105,10 +106,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  buttonTextCancel: {
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
   buttonText: {
     color: "white",

@@ -27,6 +27,7 @@ import { computed, makeAutoObservable, runInAction } from "mobx";
 import { CheckBox } from "@rneui/themed";
 import { CustomDropdown } from "./CustomDropdown";
 import { logger } from "../../lib/logger";
+import { colors } from "../../theme";
 
 let ToastAndroid: typeof RNToastAndroid;
 if (Platform.OS === "android") {
@@ -201,14 +202,14 @@ export const DialogNurseInfo = observer(
               style={styles.input}
               placeholder="Nom de famille"
               value={userInfo.userInfo.lastName}
-              placeholderTextColor="#9F90D4"
+              placeholderTextColor={colors.textMuted}
               onChangeText={(text) => (userInfo.userInfoLastName = text)}
             />
             <TextInput
               style={styles.input}
               placeholder="Prénom"
               value={userInfo.userInfo.firstName}
-              placeholderTextColor="#9F90D4"
+              placeholderTextColor={colors.textMuted}
               onChangeText={(text) => (userInfo.userInfoFirstName = text)}
             />
 
@@ -238,7 +239,7 @@ export const DialogNurseInfo = observer(
 
             {uiState.isLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#403572" />
+                <ActivityIndicator size="small" color={colors.accent} />
                 <Text style={styles.loadingText}>Chargement...</Text>
               </View>
             ) : uiState.fetchError ? (
@@ -293,7 +294,7 @@ export const DialogNurseInfo = observer(
                 style={[styles.button, styles.buttonCancel]}
                 onPress={handleCancel}
               >
-                <Text style={styles.buttonText}>Annuler</Text>
+                <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.buttonValidate]}
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 6,
   },
   subtitle: {
@@ -340,17 +341,17 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: "#403572",
+    color: colors.text,
     fontWeight: "600",
     marginTop: 12,
     marginBottom: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
-    color: "#403572",
+    backgroundColor: colors.surface,
+    color: colors.text,
     fontSize: 15,
     padding: 12,
     marginBottom: 10,
@@ -369,15 +370,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 10,
   },
   checkboxText: {
-    color: "#403572",
+    color: colors.text,
     fontWeight: "600",
     fontSize: 15,
   },
@@ -386,13 +387,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#403572",
+    borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
   },
   checkboxBoxChecked: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   checkboxTick: {
     color: "#fff",
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   errorText: {
-    color: "#DE2C1D",
+    color: colors.danger,
     fontSize: 13,
     marginTop: 8,
     marginBottom: 2,
@@ -418,10 +419,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  buttonTextCancel: {
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
   buttonText: {
     color: "white",
@@ -436,7 +443,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    color: "#403572",
+    color: colors.text,
     fontSize: 14,
   },
   fetchErrorContainer: {
@@ -445,12 +452,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fetchErrorText: {
-    color: "#DE2C1D",
+    color: colors.danger,
     fontSize: 13,
     textAlign: "center",
   },
   retryButton: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 20,

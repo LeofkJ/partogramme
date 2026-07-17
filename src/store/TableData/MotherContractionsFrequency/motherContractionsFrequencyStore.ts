@@ -4,8 +4,8 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
-import { Alert, Platform } from "react-native";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type MotherContractionsFrequency_t =
   Database["public"]["Tables"]["MotherContractionsFrequency"];
@@ -207,12 +207,7 @@ export class MotherContractionsFrequency {
   async update(value: String) {
     let convValue = Number(value);
     if (isNaN(convValue)) {
-      Platform.OS === "web"
-        ? null
-        : Alert.alert(
-            "Erreur",
-            "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre"
-          );
+      notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
     }
     let updatedData = this.asJson;
@@ -226,12 +221,7 @@ export class MotherContractionsFrequency {
       })
       .catch((error: any) => {
         logger.warn("MotherContractionsFrequency.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              "Impossible de mettre à jour les " + this.store.name
-            );
+        notify.error("Erreur", "Impossible de mettre à jour les " + this.store.name);
         runInAction(() => {
           this.store.state = "error";
         });

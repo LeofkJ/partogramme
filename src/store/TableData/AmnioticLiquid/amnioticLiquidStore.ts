@@ -4,11 +4,11 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
-import { Alert, Platform } from "react-native";
 import { throws } from "assert";
 import { liquidStates, getStringByEnum } from '../../../../types/constants';
 import { isLiquidState } from "../../../misc/CheckTypes";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type AmnioticLiquid_t =
   Database["public"]["Tables"]["amnioticLiquid"];
@@ -57,12 +57,7 @@ export class AmnioticLiquidStore {
               this.updateAmnioticLiquidFromServer(json)
                 .catch((error) => {
                   logger.warn("loadAmnioticLiquids: updateAmnioticLiquidFromServer failed", { id: json.id, error: error?.message });
-                  Platform.OS === "web"
-                    ? null
-                    : Alert.alert(
-                      "Erreur",
-                      "Impossible de charger les liquides amniotiques"
-                    );
+                  notify.error("Erreur", "Impossible de charger les liquides amniotiques");
                 })
                 .then(() => { })
             )
@@ -73,12 +68,7 @@ export class AmnioticLiquidStore {
       .catch((error:any) => {
         this.state = "error";
         logger.warn("loadAmnioticLiquids failed", { partogrammeId, error: error?.message });
-        Platform.OS !== "web"
-          ? null
-          : Alert.alert(
-            "Erreur",
-            "Impossible de charger les liquides amniotiques"
-          );
+        notify.error("Erreur", "Impossible de charger les liquides amniotiques");
         return Promise.reject(error);
       });
   }
@@ -122,12 +112,7 @@ export class AmnioticLiquidStore {
         .then(() => { })
         .catch((error) => {
           logger.warn("updateAmnioticLiquidFromServer: removeAmnioticLiquid failed", { id: json.id, error: error?.message });
-          Platform.OS === "web"
-            ? null
-            : Alert.alert(
-              "Erreur",
-              "Impossible de supprimer les liquides amniotiques"
-            );
+          notify.error("Erreur", "Impossible de supprimer les liquides amniotiques");
           return Promise.reject(error);
         });
     } else {
@@ -293,12 +278,7 @@ export class AmnioticLiquid {
       })
       .catch((error) => {
         logger.warn("AmnioticLiquid.delete failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-            "Erreur",
-            "Impossible de supprimer les liquides amniotiques"
-          );
+        notify.error("Erreur", "Impossible de supprimer les liquides amniotiques");
       });
   }
 
@@ -314,12 +294,7 @@ export class AmnioticLiquid {
       })
       .catch((error:any) => {
         logger.warn("AmnioticLiquid.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-            "Erreur",
-            "Impossible de mettre à jour les liquides amniotiques"
-          );
+        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
         runInAction(() => {
           this.store.state = "error";
         });

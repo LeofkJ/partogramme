@@ -61,6 +61,19 @@ export const IconPencil: React.FC<IconProps> = ({ size = 24, color = "#000" }) =
   </Svg>
 );
 
+export const IconX: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M6 6l12 12M18 6L6 18" stroke={color} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+
+export const IconClock: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth={1.8} />
+    <Path d="M12 7.5V12l3 2" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 export const IconMessage: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path

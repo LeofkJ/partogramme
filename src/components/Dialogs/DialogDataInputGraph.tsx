@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { colors } from "../../theme";
 import {
   Modal,
   Text,
@@ -98,7 +99,7 @@ const DialogDataInputGraph: React.FC<Props> = ({
           <TextInput
             style={styles.manualInput}
             placeholder="Saisir une valeur"
-            placeholderTextColor="#9F90D4"
+            placeholderTextColor={colors.textMuted}
             keyboardType="numeric"
             value={manualValue}
             onChangeText={(text) => {
@@ -120,7 +121,7 @@ const DialogDataInputGraph: React.FC<Props> = ({
                 onCancel();
               }}
             >
-              <Text style={styles.buttonText}>Annuler</Text>
+              <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -168,32 +169,32 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 8,
     marginTop: 12,
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
     overflow: "hidden",
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     marginBottom: 4,
   },
   picker: {
     height: 50,
     width: "100%",
-    color: "#403572",
+    color: colors.text,
   },
   pickerItem: {
-    color: "#403572",
-    backgroundColor: "#ffffff",
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   dropdownButton: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     height: 50,
     paddingHorizontal: 14,
     paddingVertical: 0,
@@ -202,29 +203,29 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   dropdownButtonText: {
-    color: "#403572",
+    color: colors.text,
     fontWeight: "normal",
   },
   orLabel: {
     fontSize: 12,
-    color: "#9F90D4",
+    color: colors.textSecondary,
     textAlign: "center",
     marginTop: 12,
     marginBottom: 8,
   },
   manualInput: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
     height: 50,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: "#403572",
-    backgroundColor: "#f5f3fc",
+    color: colors.text,
+    backgroundColor: colors.surface,
     textAlign: "center",
   },
   errorText: {
-    color: "#DE2C1D",
+    color: colors.danger,
     fontSize: 13,
     marginTop: 8,
     textAlign: "center",
@@ -242,10 +243,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  buttonTextCancel: {
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
   buttonText: {
     color: "white",

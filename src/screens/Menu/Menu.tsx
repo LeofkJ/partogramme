@@ -7,6 +7,7 @@ import { DialogNurseInfo } from "../../components/Dialogs/DialogNurseInfo";
 import { useState, useEffect } from "react";
 import { rootStore } from "../../store/rootStore";
 import { logger } from "../../lib/logger";
+import { colors, spacing, layout } from "../../theme";
 
 export type Props = {
   navigation: any;
@@ -52,20 +53,26 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
   return (
     <SafeAreaView style={styles.body}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {firstName} {lastName}
-          </Text>
-          <Text style={styles.headerRole}>
-            {rootStore.userInfoStore.userInfo.role === "NURSE" ? "Infirmière" : "Médecin"}
-          </Text>
+        <View style={styles.headerInner}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {firstName} {lastName}
+            </Text>
+            <Text style={styles.headerRole}>
+              {rootStore.userInfoStore.userInfo.role === "NURSE"
+                ? "Infirmière"
+                : "Médecin"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => setNurseInfoDialogVisible(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <IconUserCog size={19} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => setNurseInfoDialogVisible(true)}
-        >
-          <IconUserCog size={22} color={"#403572"} />
-        </TouchableOpacity>
+        <View style={styles.headerHairline} />
       </View>
 
       <View style={styles.listContainer}>
@@ -78,7 +85,7 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
             style={styles.fab}
             onPress={() => navigation.navigate("Screen_AddPartogramme")}
           >
-            <IconPlus size={22} color={"#ffffff"} />
+            <IconPlus size={22} color={colors.onAccent} />
           </TouchableOpacity>
         </View>
       )}
@@ -95,51 +102,47 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#F4F3FA",
+    backgroundColor: colors.background,
   },
   header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+    alignItems: "center",
+  },
+  headerInner: {
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 14,
-    marginTop: -8,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#E8E6F0",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E8E6F0",
+  },
+  headerHairline: {
+    height: 1,
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
+    backgroundColor: colors.hairline,
+    marginTop: spacing.lg,
   },
   headerLeft: {
     flex: 1,
-    marginRight: 12,
-  },
-  headerLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#9F90D4",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 2,
+    marginRight: spacing.md,
   },
   headerName: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#403572",
-    letterSpacing: 0.2,
+    fontSize: 19,
+    fontWeight: "600",
+    color: colors.text,
   },
   headerRole: {
     fontSize: 13,
-    color: "#9F90D4",
-    fontWeight: "600",
-    marginTop: 2,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
   settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EEECf8",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surfaceMuted,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -149,22 +152,22 @@ const styles = StyleSheet.create({
   },
   fabContainer: {
     position: "absolute",
-    bottom: 28,
+    bottom: spacing.xl + spacing.xs,
     left: 0,
     right: 0,
     alignItems: "center",
   },
   fab: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "#9F90D4",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#403572",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 6,
   },
 });

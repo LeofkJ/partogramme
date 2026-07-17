@@ -1,226 +1,194 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   StyleSheet,
   Text,
   View,
   TextInput,
   Pressable,
+  KeyboardAvoidingView,
 } from "react-native";
 import "react-native-url-polyfill/auto";
-import { supabase } from "../../initSupabase";
-import { rootStore } from "../../store/rootStore";
+import { useRegister } from "./useRegister";
+import { colors, spacing, radius, type, layout } from "../../theme";
 
 export type Props = {
   navigation: any;
 };
 
 export const ScreenRegister: React.FC<Props> = ({ navigation }) => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const RegisterButtonPressed = async () => {
-    setErrorMessage(null);
-
-    if (email === "" || password === "" || confirmPassword === "") {
-      setErrorMessage("Veuillez remplir tous les champs.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMessage("Les mots de passe ne correspondent pas.");
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage("Le mot de passe doit contenir au moins 6 caractères.");
-      return;
-    }
-
-    setIsLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-    });
-
-    if (error) {
-      setIsLoading(false);
-      const msg = error.message.toLowerCase();
-      let friendly = "";
-      if (msg.includes("already registered") || msg.includes("user already exists") || msg.includes("already exists")) {
-        friendly = "Un compte existe déjà avec cet email.";
-      } else if (msg.includes("invalid email") || msg.includes("unable to validate email")) {
-        friendly = "Adresse email invalide.";
-      } else if (msg.includes("password") || msg.includes("weak password")) {
-        friendly = "Le mot de passe ne respecte pas les critères requis (minimum 6 caractères).";
-      } else if (msg.includes("too many requests") || msg.includes("rate limit") || (error as any)?.status === 429) {
-        friendly = "Trop de tentatives. Veuillez réessayer dans quelques minutes.";
-      } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch")) {
-        friendly = "Pas de connexion internet. Vérifiez votre réseau.";
-      } else if (msg.includes("signup") && msg.includes("disabled")) {
-        friendly = "La création de compte est temporairement désactivée.";
-      } else {
-        friendly = "Erreur lors de la création du compte. Veuillez réessayer.";
-      }
-      setErrorMessage(friendly);
-      return;
-    }
-
-    if (data.session) {
-      const { error: profileError } = await supabase
-        .from("Profile")
-        .upsert({ id: data.user!.id, email: email, isDeleted: false });
-      if (profileError) {
-        setIsLoading(false);
-        setErrorMessage("Compte créé mais erreur lors de la configuration du profil. Veuillez réessayer.");
-        return;
-      }
-      rootStore.profileStore.setProfileEmail(email);
-      rootStore.profileStore.setProfileId(data.user!.id);
-      setIsLoading(false);
-      navigation.navigate("Screen_Menu");
-    } else if (data.user && !data.session) {
-      setIsLoading(false);
-      setErrorMessage("Un lien de confirmation a été envoyé à " + email + ". Veuillez confirmer votre email avant de vous connecter.");
-    } else {
-      setIsLoading(false);
-      setErrorMessage("Impossible de créer le compte. Veuillez réessayer.");
-    }
-  };
+  const register = useRegister(() => navigation.navigate("Screen_Menu"));
 
   return (
-    <View style={styles.body}>
-      <View style={styles.header}>
-        <Text style={styles.titleText}>Créer un compte</Text>
-        <Text style={styles.subtitleText}>Rejoignez PartoGraph pour commencer</Text>
-      </View>
+    <KeyboardAvoidingView behavior="padding" style={styles.body}>
+      <View style={styles.card}>
+        <Text style={styles.wordmark}>PartoGraph</Text>
+        <Text style={styles.title}>Créer un compte</Text>
+        <Text style={styles.subtitle}>
+          Rejoignez PartoGraph pour commencer
+        </Text>
 
-      <View>
+        <View style={[styles.hairline, { marginBottom: spacing.xxl }]} />
+
+        <Text style={styles.inputLabel}>Adresse email</Text>
         <TextInput
           style={styles.input}
-          placeholder="Adresse email"
-          placeholderTextColor="#aaa"
-          value={email}
+          placeholder="prenom.nom@hopital.fr"
+          placeholderTextColor={colors.textMuted}
+          value={register.email}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
-          onChangeText={(value) => setEmail(value)}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe"
-          placeholderTextColor="#aaa"
-          value={password}
-          secureTextEntry={true}
-          onChangeText={(value) => setPassword(value)}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmer le mot de passe"
-          placeholderTextColor="#aaa"
-          value={confirmPassword}
-          secureTextEntry={true}
-          onChangeText={(value) => setConfirmPassword(value)}
+          autoComplete="email"
+          returnKeyType="next"
+          onChangeText={register.setEmail}
         />
 
-        {errorMessage && (
-          <Text style={styles.errorText}>{errorMessage}</Text>
+        <Text style={styles.inputLabel}>Mot de passe</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="6 caractères minimum"
+          placeholderTextColor={colors.textMuted}
+          value={register.password}
+          secureTextEntry={true}
+          returnKeyType="next"
+          onChangeText={register.setPassword}
+        />
+
+        <Text style={styles.inputLabel}>Confirmer le mot de passe</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="••••••••"
+          placeholderTextColor={colors.textMuted}
+          value={register.confirmPassword}
+          secureTextEntry={true}
+          returnKeyType="go"
+          onSubmitEditing={register.submit}
+          onChangeText={register.setConfirmPassword}
+        />
+
+        {register.errorMessage && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{register.errorMessage}</Text>
+          </View>
         )}
 
         <Pressable
-          onPress={RegisterButtonPressed}
-          disabled={isLoading}
-          android_ripple={{ color: "#ffffff30" }}
+          onPress={register.submit}
+          disabled={register.isSubmitting}
           style={({ pressed }) => [
             styles.btnPrimary,
-            pressed && { opacity: 0.85 },
-            isLoading && { opacity: 0.6 },
+            pressed && styles.btnPrimaryPressed,
+            register.isSubmitting && styles.btnDisabled,
           ]}
         >
           <Text style={styles.btnPrimaryText}>
-            {isLoading ? "Création en cours…" : "Créer un compte"}
+            {register.isSubmitting ? "Création en cours…" : "Créer un compte"}
           </Text>
         </Pressable>
 
+        <View style={[styles.hairline, { marginTop: spacing.xl }]} />
+
         <Pressable
           onPress={() => navigation.navigate("Screen_Login")}
-          android_ripple={{ color: "#40357220" }}
-          style={({ pressed }) => [
-            styles.btnSecondary,
-            pressed && { opacity: 0.75 },
-          ]}
+          style={({ pressed }) => [styles.btnGhost, pressed && { opacity: 0.6 }]}
         >
-          <Text style={styles.btnSecondaryText}>Déjà un compte ? Se connecter</Text>
+          <Text style={styles.btnGhostText}>Déjà un compte ? Se connecter</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#f7f7f9",
+    backgroundColor: colors.background,
     justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  header: {
     alignItems: "center",
-    marginBottom: 40,
+    padding: spacing.xl,
   },
-  titleText: {
-    color: "#403572",
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-    textAlign: "center",
+  card: {
+    width: "100%",
+    maxWidth: layout.maxFormWidth,
   },
-  subtitleText: {
-    color: "#999",
-    fontSize: 13,
+  hairline: {
+    height: 1,
+    width: "100%",
+    backgroundColor: colors.hairline,
+  },
+  wordmark: {
+    ...type.label,
+    color: colors.accent,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: spacing.lg,
+  },
+  title: {
+    ...type.display,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    ...type.label,
+    fontWeight: "400",
+    marginBottom: spacing.lg,
+  },
+  inputLabel: {
+    ...type.label,
+    marginBottom: spacing.xs,
   },
   input: {
+    height: layout.touchTarget,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginBottom: 12,
-    backgroundColor: "#fff",
-    color: "#222",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    fontSize: type.body.fontSize,
+    color: colors.text,
+    marginBottom: spacing.lg,
   },
-  btnPrimary: {
-    backgroundColor: "#403572",
-    borderRadius: 8,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  btnPrimaryText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  btnSecondary: {
-    borderRadius: 8,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#9F90D4",
-  },
-  btnSecondaryText: {
-    color: "#9F90D4",
-    fontSize: 15,
-    fontWeight: "500",
+  errorBanner: {
+    backgroundColor: colors.dangerSoft,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
   errorText: {
-    color: "#c0392b",
     fontSize: 13,
-    marginBottom: 10,
     lineHeight: 18,
+    color: colors.danger,
+  },
+  btnPrimary: {
+    height: layout.touchTarget,
+    backgroundColor: colors.accent,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  btnPrimaryPressed: {
+    backgroundColor: colors.accentPressed,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnPrimaryText: {
+    color: colors.onAccent,
+    fontSize: type.body.fontSize,
+    fontWeight: "600",
+  },
+  btnGhost: {
+    height: layout.touchTarget,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  btnGhostText: {
+    color: colors.accent,
+    fontSize: type.body.fontSize,
+    fontWeight: "500",
   },
 });

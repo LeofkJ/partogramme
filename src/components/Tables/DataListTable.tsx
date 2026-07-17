@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../../theme";
 import {
   ScrollView,
   StyleSheet,
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignSelf: "center",
   },
-  head: { height: 40, backgroundColor: "#403572", width: "100%" , borderLeftWidth: 2, borderRightWidth: 2, borderTopWidth: 2},
+  head: { height: 40, backgroundColor: colors.accent, width: "100%" , borderLeftWidth: 2, borderRightWidth: 2, borderTopWidth: 2},
   wrapper: { flex: 1, flexDirection: "row", width: "100%" },
   wrapper_rows: { flex: 1, flexDirection: "column", width: "100%" },
   dataWrapper: {},
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", backgroundColor: "#7162b5" , borderLeftWidth: 2, borderRightWidth: 2},
   rowWrapper: { flexDirection: "row" },
   text: { textAlign: "center", color: "#fff", margin: 2 },
-  btn: { width: 40, height: 40, backgroundColor: "#403572", borderRadius: 20, margin: 5 },
+  btn: { width: 40, height: 40, backgroundColor: colors.accent, borderRadius: 20, margin: 5 },
   btnText: { textAlign: "center", color: "#fff" },
 });
 

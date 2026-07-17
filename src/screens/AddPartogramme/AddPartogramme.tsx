@@ -4,6 +4,7 @@ import { observer } from "mobx-react";
 import { rootStore } from "../../store/rootStore";
 import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
 import { logger } from "../../lib/logger";
+import { colors, spacing, radius, type, layout } from "../../theme";
 
 export type Props = {
   navigation: any;
@@ -92,12 +93,13 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.formColumn}>
           <View style={styles.section}>
             <Text style={styles.label}>Prénom du patient</Text>
             <TextInput
               style={styles.input}
               placeholder="Prénom"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={colors.textMuted}
               onChangeText={onChangePatientFirstName}
             />
           </View>
@@ -107,7 +109,7 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             <TextInput
               style={styles.input}
               placeholder="Nom de famille"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={colors.textMuted}
               onChangeText={onChangePatientLastName}
             />
           </View>
@@ -126,7 +128,7 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             <TextInput
               style={styles.input}
               placeholder="Numéro de dossier"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={colors.textMuted}
               keyboardType="numeric"
               onChangeText={onChangeNoFile}
             />
@@ -158,7 +160,7 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
               numberOfLines={4}
               onChangeText={onChangeCommentary}
               placeholder="Commentaire (optionnel)"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={colors.textMuted}
               textAlignVertical="top"
               style={styles.textArea}
             />
@@ -182,6 +184,7 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
               {isSubmitting ? "Création…" : "Valider"}
             </Text>
           </Pressable>
+          </View>
         </ScrollView>
       </View>
     );
@@ -191,77 +194,81 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    backgroundColor: "#f7f7f9",
+    backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    alignItems: "center",
+  },
+  formColumn: {
+    width: "100%",
+    maxWidth: layout.maxFormWidth,
   },
   section: {
-    marginBottom: 14,
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#403572",
-    marginBottom: 5,
+    ...type.label,
+    marginBottom: spacing.xs,
   },
   input: {
+    height: layout.touchTarget,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    backgroundColor: "#fff",
-    color: "#222",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    fontSize: type.body.fontSize,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    color: colors.text,
   },
   readonlyInput: {
+    height: layout.touchTarget,
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    backgroundColor: "#f0f0f5",
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surfaceMuted,
   },
   readonlyText: {
-    fontSize: 15,
-    color: "#666",
+    fontSize: type.body.fontSize,
+    color: colors.textSecondary,
   },
   textArea: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingTop: 11,
-    backgroundColor: "#fff",
-    color: "#222",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    fontSize: type.body.fontSize,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.surface,
+    color: colors.text,
     height: 110,
   },
   divider: {
     height: 1,
-    backgroundColor: "#e8e8e8",
-    marginVertical: 10,
+    backgroundColor: colors.hairline,
+    marginVertical: spacing.md,
   },
   btn: {
-    backgroundColor: "#403572",
-    borderRadius: 8,
-    height: 48,
+    backgroundColor: colors.accent,
+    borderRadius: radius.sm,
+    height: layout.touchTarget,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   btnText: {
-    color: "#fff",
-    fontSize: 15,
+    color: colors.onAccent,
+    fontSize: type.body.fontSize,
     fontWeight: "600",
   },
   errorText: {
-    color: "#c0392b",
+    color: colors.danger,
     fontSize: 13,
-    marginBottom: 10,
+    marginBottom: spacing.md,
     lineHeight: 18,
   },
 });

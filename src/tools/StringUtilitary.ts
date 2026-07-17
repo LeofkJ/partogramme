@@ -13,3 +13,16 @@ export const formatDateString = (date: string | null): string => {
                 .replace(",", "");
 }
 
+export const formatDateOnly = (date: string | null): string => {
+  if (!date) return "Aucune date";
+  return new Date(date).toLocaleDateString();
+}
+
+export const formatTimeOnly = (date: string | null): string => {
+  if (!date) return "";
+  return new Date(date).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+

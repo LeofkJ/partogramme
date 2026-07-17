@@ -4,9 +4,9 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from 'react-native-uuid';
 import { Partogramme, data_t } from '../../partogramme/partogrammeStore';
-import { Alert, Platform } from "react-native";
 import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type BabyHeartFrequency_t = Database["public"]["Tables"]["BabyHeartFrequency"];
 
@@ -55,7 +55,7 @@ export class BabyHeartFrequencyStore {
         logger.warn("loadBabyHeartFrequencies failed", { partogrammeId, error: error?.message });
         runInAction(() => {
           this.isLoading = false;
-          Alert.alert("Erreur", "Impossible de charger les fréquences cardiaques du bébé");
+          notify.error("Erreur", "Impossible de charger les fréquences cardiaques du bébé");
         });
       });
   }
@@ -116,7 +116,7 @@ export class BabyHeartFrequencyStore {
       })
       .catch((error:any) => {
         logger.warn("createBabyHeartFrequency failed", { id: frequency.data.id, error: error?.message });
-        Alert.alert("Erreur",
+        notify.error("Erreur",
         "Impossible d'ajouter la fréquence cardiaque du bébé. \n Veuillez réessayer plus tard.");
         runInAction(() => {
           this.isLoading = false;
@@ -218,12 +218,7 @@ export class BabyHeartFrequency {
   async update(value: String) {
     let convValue = Number(value);
     if (isNaN(convValue)) {
-      Platform.OS === "web"
-        ? null
-        : Alert.alert(
-            "Erreur",
-            "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre"
-          );
+      notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
     }
     let updatedData = {
@@ -241,12 +236,7 @@ export class BabyHeartFrequency {
       })
       .catch((error: any) => {
         logger.warn("BabyHeartFrequency.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              "Impossible de mettre à jour les liquides amniotiques"
-            );
+        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
         runInAction(() => {
           this.store.state = "error";
         });

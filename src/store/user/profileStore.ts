@@ -3,15 +3,8 @@ import { makePersistable } from 'mobx-persist-store';
 import { Database } from '../../../types/supabase';
 import { supabase } from '../../initSupabase';
 import { RootStore } from '../rootStore';
-import { Alert, Platform, ToastAndroid as RNToastAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-
-let ToastAndroid: typeof RNToastAndroid;;
-if (Platform.OS === "android") {
-  // Lazy import only on Android
-  ToastAndroid = require("react-native").ToastAndroid;
-}
+import { notify } from '../../lib/notify';
 
 export type Profile = Database['public']['Tables']['Profile'];
 export type Role = Database['public']['Enums']['Role']
@@ -76,13 +69,7 @@ export class ProfileStore {
         this.profile.email = data.user.email!;
         this.profile.id = data.user.id!;
       });
-      if (Platform.OS === "android") {
-        ToastAndroid.showWithGravity(
-          "Connecté avec " + data.user.email + " !",
-          ToastAndroid.LONG,
-          ToastAndroid.CENTER
-        );
-      }
+      notify.success("Connecté avec " + data.user.email + " !");
     }
     return isLoggedIn;
   }
@@ -93,6 +80,14 @@ export class ProfileStore {
    */
   getProfileName() {
     return this.profile.firstName + " " + this.profile.lastName;
+  }
+
+  /**
+   * Signs the user out of Supabase and clears the local profile.
+   */
+  async signOut() {
+    await supabase.auth.signOut();
+    runInAction(() => this.cleanUp());
   }
 
   /**

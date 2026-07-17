@@ -4,8 +4,8 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
-import { Alert, Platform } from "react-native";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type MotherSystolicBloodPressure_t =
   Database["public"]["Tables"]["MotherSystolicBloodPressure"];
@@ -113,12 +113,7 @@ export class MotherSystolicBloodPressureStore {
     )
     .catch((error: any) => {
       logger.warn("createSystolicMotherBloodPressure failed", { id: pressure.data.id, error: error?.message });
-      Platform.OS === "web"
-        ? null
-        : Alert.alert(
-            "Erreur",
-            "Impossible de créer la pression artérielle systolique de la mère"
-          );
+      notify.error("Erreur", "Impossible de créer la pression artérielle systolique de la mère");
       runInAction(() => {
         this.state = "error";
       });
@@ -219,12 +214,7 @@ export class MotherSystolicBloodPressure {
   async update(value: String) {
     let convValue = Number(value);
     if (isNaN(convValue)) {
-      Platform.OS === "web"
-        ? null
-        : Alert.alert(
-            "Erreur",
-            "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre"
-          );
+      notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
           return  Promise.reject("Not a number");
         }
     let updatedData = this.asJson;
@@ -238,12 +228,7 @@ export class MotherSystolicBloodPressure {
       })
       .catch((error: any) => {
         logger.warn("MotherSystolicBloodPressure.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              "Impossible de mettre à jour les liquides amniotiques"
-            );
+        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
         runInAction(() => {
           this.store.state = "error";
         });

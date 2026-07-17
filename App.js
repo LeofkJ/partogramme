@@ -1,7 +1,10 @@
 import "react-native-url-polyfill/auto";
 import "react-native-get-random-values";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppState } from "react-native";
+import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
+import { navigationRef } from "./src/navigationRef";
+import { colors } from "./src/theme";
 import * as Sentry from "./src/lib/sentry";
 import { logger } from "./src/lib/logger";
 import { NavigationContainer } from "@react-navigation/native";
@@ -35,6 +38,8 @@ const linking = {
 };
 
 function App() {
+  const [currentRouteName, setCurrentRouteName] = useState(undefined);
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       logger.info(`App state: ${state}`);
@@ -42,10 +47,19 @@ function App() {
     return () => sub.remove();
   }, []);
 
+  const syncCurrentRoute = () =>
+    setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer linking={linking}>
+        <NavigationContainer
+          ref={navigationRef}
+          linking={linking}
+          onReady={syncCurrentRoute}
+          onStateChange={syncCurrentRoute}
+        >
+          <NavBar currentRouteName={currentRouteName} />
           <Stack.Navigator>
             <Stack.Screen
               name="Screen_Login"
@@ -60,8 +74,10 @@ function App() {
               component={ScreenRegister}
               options={{
                 title: "Créer un compte",
-                headerTintColor: "#403572",
+                headerTintColor: colors.accent,
                 headerTitleAlign: "center",
+                // The web navbar covers navigation on logged-out screens.
+                headerShown: !NAVBAR_ENABLED,
               }}
             />
             <Stack.Screen
@@ -69,8 +85,13 @@ function App() {
               component={ScreenMenu}
               options={{
                 title: "Menu des Partogrammes",
-                headerTintColor: "#403572",
+                headerTintColor: colors.accent,
                 headerTitleAlign: "center",
+                // The native back button here only exists when Login happens
+                // to still be in history, which a web page refresh wipes out
+                // (the stack is rebuilt from the URL alone). The web navbar's
+                // Connexion link is the reliable way back on web instead.
+                headerShown: !NAVBAR_ENABLED,
               }}
             />
             <Stack.Screen
@@ -78,8 +99,9 @@ function App() {
               component={ScreenAddPartogramme}
               options={{
                 title: "Nouveau Partogramme",
-                headerTintColor: "#403572",
+                headerTintColor: colors.accent,
                 headerTitleAlign: "center",
+                headerShown: !NAVBAR_ENABLED,
               }}
             />
             <Stack.Screen
@@ -87,8 +109,9 @@ function App() {
               component={ScreenGraph}
               options={{
                 title: "Partogramme",
-                headerTintColor: "#403572",
+                headerTintColor: colors.accent,
                 headerTitleAlign: "center",
+                headerShown: !NAVBAR_ENABLED,
               }}
             />
           </Stack.Navigator>

@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { colors } from "../../theme";
 import {
   View,
   TouchableOpacity,
@@ -93,14 +94,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
           style={[
             styles.buttonText,
             textStyle,
-            !selectedValue && { color: "#9F90D4" },
+            !selectedValue && { color: colors.textSecondary },
           ]}
           numberOfLines={1}
         >
           {selectedLabel}
         </Text>
         <Animated.View style={{ marginLeft: 8, transform: [{ rotate: chevronRotate }] }}>
-          <IconChevronDown size={16} color={isOpen ? "#403572" : "#9F90D4"} />
+          <IconChevronDown size={16} color={isOpen ? colors.accent : colors.textMuted} />
         </Animated.View>
       </TouchableOpacity>
 
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
   },
   button: {
     borderWidth: 1.5,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 12,
     backgroundColor: "#f9f8fd",
     paddingHorizontal: 12,
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: "#403572",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   buttonText: {
     flex: 1,
     fontSize: 15,
-    color: "#403572",
+    color: colors.text,
     fontWeight: "500",
   },
   backdrop: {
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: "absolute",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#ECE9F7",
@@ -212,18 +213,18 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0EEF9",
   },
   menuItemSelected: {
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
   },
   menuItemText: {
     fontSize: 15,
-    color: "#403572",
+    color: colors.text,
     flex: 1,
   },
   menuItemTextSelected: {
     fontWeight: "600",
   },
   checkmark: {
-    color: "#403572",
+    color: colors.text,
     fontWeight: "700",
     marginLeft: 8,
   },

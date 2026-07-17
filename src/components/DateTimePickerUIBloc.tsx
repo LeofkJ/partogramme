@@ -1,4 +1,5 @@
 import * as React from "react";
+import { colors } from "../theme";
 import { View, StyleSheet, Text, Pressable } from "react-native";
 import { fr, registerTranslation, DatePickerInput, TimePickerModal } from "react-native-paper-dates";
 registerTranslation("fr", fr);
@@ -66,7 +67,7 @@ export default class DateTimePickerUIBloc extends React.Component<
         <Text style={styles.fieldLabel}>Heure</Text>
         <Pressable
           onPress={() => this.setState({ showTimePicker: true })}
-          android_ripple={{ color: "#40357215" }}
+          android_ripple={{ color: colors.accentSoft }}
           style={({ pressed }) => [
             styles.timeRow,
             pressed && { backgroundColor: "#f0eef8" },
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 8,
   },
   fieldLabel: {

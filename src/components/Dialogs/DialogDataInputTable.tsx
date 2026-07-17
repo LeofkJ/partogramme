@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { colors } from "../../theme";
 import {
   Modal,
   Text,
@@ -38,6 +39,8 @@ export interface Props {
   onCancel: () => void;
   onDelete?: () => void;
   preSelectedDataChoice?: DataInputTable_t;
+  /** When set (editing an existing entry), the ISO timestamp it was recorded at. */
+  recordedAt?: string;
 }
 
 const DialogDataInputTable: React.FC<Props> = observer(({
@@ -47,6 +50,7 @@ const DialogDataInputTable: React.FC<Props> = observer(({
   onCancel,
   onDelete,
   preSelectedDataChoice,
+  recordedAt,
 }) => {
   const { width } = useWindowDimensions();
 
@@ -159,6 +163,20 @@ const DialogDataInputTable: React.FC<Props> = observer(({
       <View style={styles.overlay}>
         <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
 
+          {recordedAt && (
+            <View style={styles.recordedAtRow}>
+              <Text style={styles.recordedAtLabel}>Enregistré le</Text>
+              <View style={styles.recordedAtBadge}>
+                <Text style={styles.recordedAtTime}>
+                  {new Date(recordedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </Text>
+                <Text style={styles.recordedAtDate}>
+                  {new Date(recordedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                </Text>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.sectionLabel}>
             Type de données à ajouter
           </Text>
@@ -208,7 +226,7 @@ const DialogDataInputTable: React.FC<Props> = observer(({
               style={[styles.button, styles.buttonCancel]}
               onPress={onCancel}
             >
-              <Text style={styles.buttonText}>Annuler</Text>
+              <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
@@ -250,7 +268,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -262,34 +280,61 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#403572",
+    color: colors.text,
     marginBottom: 8,
     marginTop: 12,
   },
+  recordedAtRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  recordedAtLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  recordedAtBadge: {
+    alignItems: "flex-end",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  recordedAtTime: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  recordedAtDate: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
     overflow: "hidden",
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     marginBottom: 4,
   },
   picker: {
     height: 50,
     width: "100%",
-    color: "#403572",
-    backgroundColor: "#f5f3fc",
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   pickerItem: {
-    color: "#403572",
-    backgroundColor: "#f5f3fc",
+    color: colors.text,
+    backgroundColor: colors.surface,
     fontSize: 16,
   },
   dropdownButton: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     height: 50,
     paddingHorizontal: 14,
     paddingVertical: 0,
@@ -298,21 +343,21 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   dropdownButtonText: {
-    color: "#403572",
+    color: colors.text,
     fontWeight: "normal",
     fontSize: 16,
   },
   preselectedBox: {
     borderWidth: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f5f3fc",
+    backgroundColor: colors.surface,
     padding: 12,
     alignItems: "center",
     marginBottom: 4,
   },
   preselectedText: {
-    color: "#403572",
+    color: colors.text,
     fontSize: 15,
     fontWeight: "600",
   },
@@ -323,19 +368,19 @@ const styles = StyleSheet.create({
   },
   inputTextNumber: {
     flex: 1,
-    borderColor: "#9F90D4",
+    borderColor: colors.borderStrong,
     borderWidth: 1,
     borderRadius: 10,
     textAlign: "center",
     padding: 10,
     fontSize: 18,
-    color: "#403572",
-    backgroundColor: "#f5f3fc",
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   unitText: {
     marginLeft: 10,
     fontSize: 15,
-    color: "#403572",
+    color: colors.text,
     fontWeight: "600",
   },
   buttonRow: {
@@ -351,10 +396,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  buttonTextCancel: {
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
   buttonText: {
     color: "white",
@@ -367,7 +418,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   deleteLinkText: {
-    color: "#DE2C1D",
+    color: colors.danger,
     fontWeight: "600",
     fontSize: 14,
     textDecorationLine: "underline",

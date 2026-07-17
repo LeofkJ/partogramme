@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../../theme";
 import { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Partogramme, data_t } from "../../store/partogramme/partogrammeStore";
@@ -57,6 +58,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
             data?.partogrammeStore.motherContractionDurationStore,
           ]}
           preSelectedDataChoice={data.store}
+          recordedAt={data.data.created_at}
         />
       )}
       {data instanceof BabyHeartFrequency && (
@@ -117,7 +119,7 @@ const styles = StyleSheet.create({
     width: "90%",
     position: "absolute",
     margin: 20,
-    backgroundColor: "#d0cbeb",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 10,
     alignItems: "center",
@@ -133,10 +135,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   buttonValidate: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
   },
   buttonCancel: {
-    backgroundColor: "#C5613E",
+    backgroundColor: colors.danger,
     alignSelf: "flex-end",
   },
 });

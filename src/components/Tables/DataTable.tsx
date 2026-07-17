@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { colors, layout } from "../../theme";
 
 export interface DataTableColumn {
   label: string;
@@ -13,6 +14,8 @@ export interface DataTableColumn {
 interface Props {
   maxHours: number;
   columns: DataTableColumn[];
+  /** When false (viewer has no edit rights for this status), cells are inert. */
+  editable?: boolean;
 }
 
 const HOUR_LABEL_WIDTH = 40;
@@ -21,43 +24,50 @@ const HEADER_HEIGHT = 44;
 const COL_MIN_WIDTH = 44;
 
 const COLORS = {
-  headerBg: "#f0f0f0",
-  headerText: "#111111",
-  hourLabelBg: "#f7f7f7",
-  hourLabelText: "#222222",
-  rowEven: "#ffffff",
-  rowOdd: "#fafafa",
-  border: "#d0d0d0",
-  cellText: "#222222",
-  emptyText: "#cccccc",
-  editableTint: "#f5f3fc",
+  headerBg: colors.surfaceMuted,
+  headerText: colors.text,
+  hourLabelBg: colors.surfaceMuted,
+  hourLabelText: colors.textSecondary,
+  rowEven: colors.surface,
+  rowOdd: colors.background,
+  border: colors.border,
+  cellText: colors.text,
+  emptyText: colors.textMuted,
+  editableTint: colors.accentSoft,
 };
 
-const DataTable: React.FC<Props> = ({ maxHours, columns }) => {
+const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
   const { width } = useWindowDimensions();
   const colCount = columns.length;
-  const availableWidth = width - HOUR_LABEL_WIDTH - 32;
+  // Cap like the rest of the app: on big monitors the table stays readable
+  // instead of stretching columns across the whole screen.
+  const effectiveWidth = Math.min(width, layout.maxContentWidth);
+  const availableWidth = effectiveWidth - HOUR_LABEL_WIDTH - 32;
   const colWidth = Math.max(COL_MIN_WIDTH, Math.floor(availableWidth / colCount));
   const fontSize = colWidth < 50 ? 10 : 11;
   const lineHeight = Math.ceil(fontSize * 1.3);
 
   const hours = Array.from({ length: maxHours + 1 }, (_, i) => i);
 
+  // Wide screens have room for the real column names; no legend needed then.
+  const useFullNames = effectiveWidth >= 900;
+  const headerHeight = useFullNames ? 60 : HEADER_HEIGHT;
+
   return (
     <View>
       <View style={styles.container}>
         {/* Header row: hour corner + one column per vital sign */}
-        <View style={[styles.row, { height: HEADER_HEIGHT }]}>
+        <View style={[styles.row, { height: headerHeight }]}>
           <View style={[styles.hourCell, styles.hourHeaderCell, { width: HOUR_LABEL_WIDTH }]} />
           {columns.map((col, i) => (
             <View key={i} style={[styles.headerCell, { width: colWidth }]}>
               <Text
                 style={styles.headerText}
-                numberOfLines={2}
+                numberOfLines={useFullNames ? 3 : 2}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
               >
-                {col.label}
+                {useFullNames ? col.fullName : col.label}
               </Text>
             </View>
           ))}
@@ -81,6 +91,11 @@ const DataTable: React.FC<Props> = ({ maxHours, columns }) => {
               const val = itemIndex >= 0 ? col.formattedValues[itemIndex] : null;
               const isEmpty = item == null;
               if (isEmpty) {
+                if (!editable) {
+                  return (
+                    <View key={colIndex} style={[styles.cell, { width: colWidth }]} />
+                  );
+                }
                 return (
                   <TouchableOpacity
                     key={colIndex}
@@ -92,6 +107,23 @@ const DataTable: React.FC<Props> = ({ maxHours, columns }) => {
                   </TouchableOpacity>
                 );
               }
+              const valueText = (
+                <Text
+                  style={[styles.cellText, { fontSize, lineHeight }]}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {val}
+                </Text>
+              );
+              if (!editable) {
+                return (
+                  <View key={colIndex} style={[styles.cell, { width: colWidth }]}>
+                    {valueText}
+                  </View>
+                );
+              }
               return (
                 <TouchableOpacity
                   key={colIndex}
@@ -99,14 +131,7 @@ const DataTable: React.FC<Props> = ({ maxHours, columns }) => {
                   onPress={() => col.onPress(item)}
                   activeOpacity={0.6}
                 >
-                  <Text
-                    style={[styles.cellText, { fontSize, lineHeight }]}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                  >
-                    {val}
-                  </Text>
+                  {valueText}
                 </TouchableOpacity>
               );
             })}
@@ -114,14 +139,17 @@ const DataTable: React.FC<Props> = ({ maxHours, columns }) => {
         ))}
       </View>
 
-      {/* Legend: full name behind each abbreviated header — its own separate card */}
-      <View style={styles.legend}>
-        {columns.map((col, i) => (
-          <Text key={i} style={styles.legendText}>
-            <Text style={styles.legendAbbr}>{col.label}</Text> = {col.fullName}
-          </Text>
-        ))}
-      </View>
+      {/* Legend: full name behind each abbreviated header — only needed
+          when the headers show abbreviations */}
+      {!useFullNames && (
+        <View style={styles.legend}>
+          {columns.map((col, i) => (
+            <Text key={i} style={styles.legendText}>
+              <Text style={styles.legendAbbr}>{col.label}</Text> = {col.fullName}
+            </Text>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
@@ -130,6 +158,7 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 12,
     marginVertical: 8,
+    alignSelf: "center",
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,

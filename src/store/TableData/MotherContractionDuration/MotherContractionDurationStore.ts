@@ -10,9 +10,9 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
-import { Alert, Platform } from "react-native";
 import { DataStore } from "../../DataStore";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type MotherContractionDuration_t =
   Database["public"]["Tables"]["MotherContractionDuration"];
@@ -68,12 +68,7 @@ export class MotherContractionDurationStore extends DataStore {
       })
       .catch((error: any) => {
         logger.warn("MotherContractionDurationStore.createData failed", { id: data.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              `Impossible de créer la ${this.name}`
-            );
+        notify.error("Erreur", `Impossible de créer la ${this.name}`);
         runInAction(() => {
           this.state = "error";
         });
@@ -92,12 +87,7 @@ export class MotherContractionDurationStore extends DataStore {
       })
       .catch((error: any) => {
         logger.warn("MotherContractionDurationStore.remove failed", { id: data.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              `Impossible de supprimer la ${this.name} de la mère`
-            );
+        notify.error("Erreur", `Impossible de supprimer la ${this.name} de la mère`);
         runInAction(() => {
           this.state = "error";
         });
@@ -216,12 +206,7 @@ export class MotherContractionDuration {
   async update(value: String) {
     let convValue = Number(value);
     if (isNaN(convValue)) {
-      Platform.OS === "web"
-        ? null
-        : Alert.alert(
-            "Erreur",
-            "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre"
-          );
+      notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
     }
     let updatedData = this.asJson;
@@ -235,12 +220,7 @@ export class MotherContractionDuration {
       })
       .catch((error: any) => {
         logger.warn("MotherContractionDuration.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-              "Erreur",
-              "Impossible de mettre à jour les liquides amniotiques"
-            );
+        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
         runInAction(() => {
           this.store.state = "error";
         });

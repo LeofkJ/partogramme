@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../../theme";
 import {
   Modal,
   StyleSheet,
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -102,14 +103,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#DE2C1D",
+    backgroundColor: colors.danger,
     justifyContent: "center",
     alignItems: "center",
   },
   title: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#DE2C1D",
+    color: colors.danger,
     flex: 1,
   },
   errorMsg: {
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   button: {
-    backgroundColor: "#403572",
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",

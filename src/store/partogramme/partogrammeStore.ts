@@ -541,6 +541,24 @@ export class Partogramme {
    * @brief this function return a list of every data added in the last 10 minutes in the partogramme.
    * @returns the last 10 minutes data ids
    */
+  /**
+   * Every data point of the partogramme across all stores, newest first,
+   * so any entry can be corrected while the record is active.
+   */
+  get allDataSorted() {
+    const allData = [];
+    for (const store of this.dataStores) {
+      for (const data of store.dataList) {
+        allData.push(data);
+      }
+    }
+    return allData.sort(
+      (a, b) =>
+        new Date(b.data.created_at).getTime() -
+        new Date(a.data.created_at).getTime()
+    );
+  }
+
   get Last10MinutesDataIds() {
     const now = new Date();
     const last10Minutes = new Date(now.getTime() - 10 * 60000);

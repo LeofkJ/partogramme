@@ -1,4 +1,5 @@
 import React from "react";
+import { colors, radius, spacing } from "../theme";
 import { useState } from "react";
 import {
   Modal,
@@ -8,45 +9,61 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { Partogramme, data_t } from '../store/partogramme/partogrammeStore';
+import { Partogramme, data_t, dataStore_t } from '../store/partogramme/partogrammeStore';
 import EditDataDialog from "./Dialogs/EditDataDialog";
 import { DataList } from "./DataList";
 import { observer } from "mobx-react";
 import { runInAction } from "mobx";
 import ErrorDialog from "./Dialogs/ErrorDialog";
 import { logger } from "../lib/logger";
+import { IconX } from "./Icons";
 
 interface Props {
   visible: boolean;
   partogramme: Partogramme;
   onCancel: () => void;
+  dataStores?: dataStore_t[];
 }
 
 const DataModifierDialog: React.FC<Props> = observer(({
   visible,
   partogramme,
   onCancel,
+  dataStores,
 }) => {
   const { width, height } = useWindowDimensions();
   const [isEditDialogVisible, setIsEditDialogVisible] = useState(false);
   const [isErrorDialogVisible, setIsErrorDialogVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const dataList = (partogramme.allDataSorted ?? []).filter(
+    (item) => !dataStores || dataStores.includes(item.store)
+  );
+
   return (
     <View>
       <Modal
-        visible={visible}
+        visible={visible && !isEditDialogVisible}
         animationType="fade"
         transparent={true}
       >
         <View style={styles.overlay}>
           <View style={[
             styles.card,
-            { width: Math.min(width * 0.92, 480), maxHeight: height * 0.8 }
+            { width: Math.min(width * 0.92, 440), maxHeight: height * 0.75 }
           ]}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Modifier les données</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onCancel}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <IconX size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <DataList
-              title="Données des 10 dernières minutes"
-              dataList={partogramme.Last10MinutesDataIds.slice()}
+              dataList={dataList}
               onEditButtonPress={(item) => {
                 runInAction(() => {
                   item.partogrammeStore.editedDataId = item.data.id;
@@ -54,12 +71,6 @@ const DataModifierDialog: React.FC<Props> = observer(({
                 setIsEditDialogVisible(true);
               }}
             />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onCancel}
-            >
-              <Text style={styles.closeButtonText}>Fermer</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -98,26 +109,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 10,
   },
-  closeButton: {
-    backgroundColor: "#DE2C1D",
-    borderRadius: 10,
-    paddingVertical: 12,
+  header: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  closeButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 15,
+  headerTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  closeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

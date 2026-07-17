@@ -5,9 +5,9 @@ import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { Float } from "react-native/Libraries/Types/CodegenTypes";
-import { Alert, Platform } from "react-native";
 import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
+import { notify } from "../../../lib/notify";
 
 export type BabyDescent_t = Database["public"]["Tables"]["BabyDescent"];
 
@@ -201,12 +201,7 @@ export class BabyDescent {
       })
       .catch((error) => {
         logger.warn("BabyDescent.update failed", { id: this.data.id, error: error?.message });
-        Platform.OS === "web"
-          ? null
-          : Alert.alert(
-            "Erreur",
-            "Impossible de mettre à jour les liquides amniotiques"
-          );
+        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
         runInAction(() => {
           this.store.state = "error";
         });
