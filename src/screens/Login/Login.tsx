@@ -29,7 +29,10 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
     };
 
     const handleAuthStateChange = (event: any) => {
-      if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+        // Clear any previous user's data before the new session's data is fetched,
+        // so a different user logging in on the same device never sees stale
+        // partogrammes/info left over from the last session.
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
       }

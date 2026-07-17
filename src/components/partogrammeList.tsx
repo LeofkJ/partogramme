@@ -58,15 +58,17 @@ const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
   return patientName;
 };
 
+const pad = (n: number) => n.toString().padStart(2, "0");
+
 const renderDateTextElement = (itemDate: string | null): string => {
   if (itemDate === null) return "Aucune date";
   const d = new Date(itemDate);
   return (
-    d.getDate() + "/" +
-    (d.getMonth() + 1) + "/" +
+    pad(d.getDate()) + "/" +
+    pad(d.getMonth() + 1) + "/" +
     d.getFullYear() + "-" +
-    d.getHours() + ":" +
-    d.getMinutes()
+    pad(d.getHours()) + ":" +
+    pad(d.getMinutes())
   );
 };
 

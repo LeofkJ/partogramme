@@ -131,6 +131,12 @@ export class PartogrammeStore {
       .then((fetchedPartogrammes) => {
         runInAction(() => {
           if (fetchedPartogrammes) {
+            const fetchedIds = new Set(fetchedPartogrammes.map((json) => json.id));
+            for (let i = this.partogrammeList.length - 1; i >= 0; i--) {
+              if (!fetchedIds.has(this.partogrammeList[i].partogramme.id)) {
+                this.partogrammeList.splice(i, 1);
+              }
+            }
             fetchedPartogrammes.forEach((json: Partogramme_t["Row"]) =>
               this.updatePartogrammeFromServer(json).catch((error) => {
                 logger.warn("fetchFromServer: updatePartogrammeFromServer failed", { id: json.id, error: error?.message });

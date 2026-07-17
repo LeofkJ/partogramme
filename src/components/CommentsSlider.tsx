@@ -4,17 +4,20 @@ import {
   Text,
   View,
   StyleSheet,
+  TouchableOpacity,
 } from "react-native";
-import { IconMessage } from "./Icons";
+import { IconMessage, IconTrash } from "./Icons";
 
 export interface Props {
   data: any;
   title?: string;
+  onDeletePress?: (item: any) => void;
 }
 
 export const CommentsSlider: React.FC<Props> = ({
   data,
   title = "Comments",
+  onDeletePress,
 }) => {
   return (
     <View style={styles.container}>
@@ -22,7 +25,7 @@ export const CommentsSlider: React.FC<Props> = ({
       <View style={styles.list}>
         {data && data.length > 0
           ? data.map((item: any, index: number) => (
-              <Item key={index} data={item} />
+              <Item key={index} data={item} onDeletePress={onDeletePress} />
             ))
           : <EmptyListMessage />}
       </View>
@@ -41,9 +44,10 @@ const EmptyListMessage = () => {
 
 export interface ItemProps {
   data: any;
+  onDeletePress?: (item: any) => void;
 }
 
-const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
+const Item: React.FC<ItemProps> = observer(({ data, onDeletePress }: ItemProps) => {
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "long",
@@ -59,11 +63,22 @@ const Item: React.FC<ItemProps> = observer(({ data }: ItemProps) => {
           <IconMessage size={14} color="#6b7280" />
           <Text style={styles.itemLabel}>Commentaire</Text>
         </View>
-        <Text style={styles.itemDate}>
-          {new Date(data.created_at).toLocaleDateString("fr-FR", options)}
-        </Text>
+        <View style={styles.itemHeaderRight}>
+          <Text style={styles.itemDate}>
+            {new Date(data.data.created_at).toLocaleDateString("fr-FR", options)}
+          </Text>
+          {onDeletePress && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => onDeletePress(data)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <IconTrash size={13} color="#b0303a" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-      <Text style={styles.itemText}>{data.value}</Text>
+      <Text style={styles.itemText}>{data.data.value}</Text>
     </View>
   );
 });
@@ -116,6 +131,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  itemHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  deleteButton: {
+    padding: 2,
   },
   itemLabel: {
     fontSize: 11,

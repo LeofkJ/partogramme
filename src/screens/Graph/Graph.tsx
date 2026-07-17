@@ -31,6 +31,7 @@ import ErrorDialog from "../../components/Dialogs/ErrorDialog";
 import { IconPencil } from "../../components/Icons";
 import CustomButton from "../../components/CustomButton";
 import DataModifierDialog from "../../components/DataModifierDialog";
+import EditDataDialog from "../../components/Dialogs/EditDataDialog";
 import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
 import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
 import { CommentsSlider } from "../../components/CommentsSlider";
@@ -64,6 +65,9 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [errorCode, setErrorCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [newState, setNewState] = useState("");
+  const [editingTableItem, setEditingTableItem] = useState<any>(null);
+  const [addTableDataPreselected, setAddTableDataPreselected] = useState<DataInputTable_t | undefined>(undefined);
+  const [addTableDataTargetHour, setAddTableDataTargetHour] = useState<number | null>(null);
 
   const partogramme = rootStore.partogrammeStore.selectedPartogramme;
 
@@ -142,11 +146,12 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       );
       return;
     }
+    const rank = addTableDataTargetHour ?? Number(dataStore.highestRank) + 1;
     if (dataStore instanceof AmnioticLiquidStore) {
       dataStore
         .createAmnioticLiquid(
           new Date().toISOString(),
-          Number(dataStore.highestRank) + 1,
+          rank,
           data as Database["public"]["Enums"]["LiquidState"],
         )
         .catch((error) => {
@@ -157,37 +162,37 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       dataStore.createNew(
         Number(data),
         new Date().toISOString(),
-        Number(dataStore.highestRank) + 1,
+        rank,
       );
     } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
       dataStore.createNew(
         Number(data),
         new Date().toISOString(),
-        Number(dataStore.highestRank) + 1,
+        rank,
       );
     } else if (dataStore instanceof MotherContractionsFrequencyStore) {
       dataStore.createMotherContractionsFrequency(
         Number(data),
         new Date().toISOString(),
-        Number(dataStore.highestRank) + 1,
+        rank,
       );
     } else if (dataStore instanceof MotherContractionDurationStore) {
       dataStore.createData({
         value: Number(data),
         created_at: new Date().toISOString(),
-        Rank: Number(dataStore.highestRank) + 1,
+        Rank: rank,
       });
     } else if (dataStore instanceof MotherHeartFrequencyStore) {
       dataStore.createMotherHeartFrequency(
         Number(data),
         new Date().toISOString(),
-        Number(dataStore.highestRank) + 1,
+        rank,
       );
     } else if (dataStore instanceof MotherTemperatureStore) {
       dataStore.createMotherTemperature(
         Number(data),
         new Date().toISOString(),
-        Number(dataStore.highestRank) + 1,
+        rank,
       );
     } else {
       Alert.alert(
@@ -197,6 +202,8 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       return;
     }
     setAddTableDataDialogVisible(false);
+    setAddTableDataPreselected(undefined);
+    setAddTableDataTargetHour(null);
   };
 
   const onDialogCloseAddComment = (comment: string) => {
@@ -219,7 +226,16 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const openFcDialog = () => setFcDialogVisible(true);
   const openDilationDialog = () => setDilationDialogVisible(true);
   const openDescentBabyDialog = () => setDescentBabyDialogVisible(true);
-  const openAddDataTable = () => setAddTableDataDialogVisible(true);
+  const openAddDataTable = () => {
+    setAddTableDataPreselected(undefined);
+    setAddTableDataTargetHour(null);
+    setAddTableDataDialogVisible(true);
+  };
+  const openAddDataTableForCell = (store: DataInputTable_t, hour: number) => {
+    setAddTableDataPreselected(store);
+    setAddTableDataTargetHour(hour);
+    setAddTableDataDialogVisible(true);
+  };
 
   const fetchData = () => {
     if (partogramme === null) return;
@@ -393,6 +409,11 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
               Numéro de dossier : {partogramme?.asJson.noFile}
             </Text>
+            {!!partogramme?.asJson.commentary && (
+              <Text style={[styles.infoTitleText, styles.backGroundInfo]}>
+                Commentaire : {partogramme.asJson.commentary}
+              </Text>
+            )}
           </View>
 
           <DialogConfirm
@@ -488,20 +509,88 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
 
           <DataTable
             maxHours={12}
-            tableData={[
-              partogramme!.motherTemperatureStore.motherTemperatureListAsString,
-              partogramme!.motherSystolicBloodPressureStore
-                .motherBloodPressureListAsString,
-              partogramme!.motherDiastolicBloodPressureStore
-                .motherBloodPressureListAsString,
-              partogramme!.motherHeartRateFrequencyStore
-                .motherHeartRateFrequencyListAsString,
-              partogramme!.motherContractionFrequencyStore
-                .motherContractionFrequencyListAsString,
-              partogramme!.motherContractionDurationStore.DataListAsString,
-              partogramme!.amnioticLiquidStore.amnioticLiquidAsTableString,
+            columns={[
+              {
+                label: "Temp",
+                fullName: "Température de la mère",
+                items: partogramme!.motherTemperatureStore.sortedMotherTemperatureList,
+                formattedValues: partogramme!.motherTemperatureStore.motherTemperatureListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherTemperatureStore, hour),
+              },
+              {
+                label: "PA Sys",
+                fullName: "Tension artérielle Systolique de la mère",
+                items: partogramme!.motherSystolicBloodPressureStore.sortedMotherBloodPressureList,
+                formattedValues: partogramme!.motherSystolicBloodPressureStore.motherBloodPressureListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherSystolicBloodPressureStore, hour),
+              },
+              {
+                label: "PA Dia",
+                fullName: "Tension artérielle Diastolique de la mère",
+                items: partogramme!.motherDiastolicBloodPressureStore.sortedMotherBloodPressureList,
+                formattedValues: partogramme!.motherDiastolicBloodPressureStore.motherBloodPressureListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherDiastolicBloodPressureStore, hour),
+              },
+              {
+                label: "Pouls",
+                fullName: "Pouls de la mère",
+                items: partogramme!.motherHeartRateFrequencyStore.sortedMotherHeartFrequencyList,
+                formattedValues: partogramme!.motherHeartRateFrequencyStore.motherHeartRateFrequencyListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherHeartRateFrequencyStore, hour),
+              },
+              {
+                label: "Fréq. contr.",
+                fullName: "Fréquence des contractions",
+                items: partogramme!.motherContractionFrequencyStore.sortedMotherContractionsFrequencyList,
+                formattedValues: partogramme!.motherContractionFrequencyStore.motherContractionFrequencyListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherContractionFrequencyStore, hour),
+              },
+              {
+                label: "Durée contr.",
+                fullName: "Durée des contractions de la mère",
+                items: partogramme!.motherContractionDurationStore.sortedMotherContractionDurationList,
+                formattedValues: partogramme!.motherContractionDurationStore.DataListAsString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherContractionDurationStore, hour),
+              },
+              {
+                label: "Liquide",
+                fullName: "Liquide Amniotique",
+                items: partogramme!.amnioticLiquidStore.sortedAmnioticLiquidList,
+                formattedValues: partogramme!.amnioticLiquidStore.amnioticLiquidAsTableString,
+                onPress: (item) => setEditingTableItem(item),
+                onAddPress: (hour) => openAddDataTableForCell(partogramme!.amnioticLiquidStore, hour),
+              },
             ]}
           />
+          {editingTableItem && (
+            <EditDataDialog
+              visible={!!editingTableItem}
+              data={editingTableItem}
+              onCancel={() => setEditingTableItem(null)}
+              onDelete={() => {
+                editingTableItem.delete();
+                setEditingTableItem(null);
+              }}
+              onValidate={(data) => {
+                editingTableItem
+                  ?.update(data.toString())
+                  .then(() => setEditingTableItem(null))
+                  .catch((error: any) => {
+                    logger.warn("Graph: table cell edit failed", { error: error?.message });
+                    setErrorMsg(error.message);
+                    setErrorCode(error.code);
+                    setIsErrorDialogVisible(true);
+                    setEditingTableItem(null);
+                  });
+              }}
+            />
+          )}
           {canEdit && (
             <CustomButton
               title="+ Ajouter des données au tableau"
@@ -514,8 +603,9 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           )}
 
           <CommentsSlider
-            data={partogramme!.commentStore.DataListAsJson}
+            data={partogramme!.commentStore.sortedCommentList}
             title="Liste des Commentaires"
+            onDeletePress={(item) => item.delete()}
           />
           <DialogEditText
             visible={isAddCommentDialogVisible}
@@ -548,7 +638,12 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <DialogDataInputTable
             visible={isAddTableDataDialogVisible}
             onClose={onDialogCloseAddDataTable}
-            onCancel={() => setAddTableDataDialogVisible(false)}
+            onCancel={() => {
+              setAddTableDataDialogVisible(false);
+              setAddTableDataPreselected(undefined);
+              setAddTableDataTargetHour(null);
+            }}
+            preSelectedDataChoice={addTableDataPreselected}
             data={[
               partogramme.amnioticLiquidStore,
               partogramme.motherSystolicBloodPressureStore,

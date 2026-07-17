@@ -36,6 +36,7 @@ export interface Props {
   data: DataInputTable_t[];
   onClose: (dataStore: DataInputTable_t, data: string) => void;
   onCancel: () => void;
+  onDelete?: () => void;
   preSelectedDataChoice?: DataInputTable_t;
 }
 
@@ -44,6 +45,7 @@ const DialogDataInputTable: React.FC<Props> = observer(({
   data,
   onClose,
   onCancel,
+  onDelete,
   preSelectedDataChoice,
 }) => {
   const { width } = useWindowDimensions();
@@ -228,6 +230,12 @@ const DialogDataInputTable: React.FC<Props> = observer(({
             </TouchableOpacity>
           </View>
 
+          {onDelete && (
+            <TouchableOpacity style={styles.deleteLink} onPress={onDelete}>
+              <Text style={styles.deleteLinkText}>Supprimer cette valeur</Text>
+            </TouchableOpacity>
+          )}
+
         </View>
       </View>
     </Modal>
@@ -352,6 +360,17 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 15,
+  },
+  deleteLink: {
+    alignItems: "center",
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  deleteLinkText: {
+    color: "#DE2C1D",
+    fontWeight: "600",
+    fontSize: 14,
+    textDecorationLine: "underline",
   },
 });
 

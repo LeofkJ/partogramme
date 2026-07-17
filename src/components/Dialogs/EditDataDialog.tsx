@@ -21,6 +21,7 @@ interface Props {
   data: data_t;
   onValidate: (data: String) => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }
 
 /**
@@ -32,6 +33,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
   data,
   onCancel,
   onValidate,
+  onDelete,
 }) => {
   // Put state variables here
 
@@ -44,6 +46,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
             onValidate(data);
           }}
           onCancel={() => onCancel()}
+          onDelete={onDelete}
           data={[
             data?.partogrammeStore.amnioticLiquidStore,
             data?.partogrammeStore.motherSystolicBloodPressureStore,

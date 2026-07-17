@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   Platform,
 } from "react-native";
@@ -32,6 +33,8 @@ const DialogDataInputGraph: React.FC<Props> = ({
 }) => {
   const { width } = useWindowDimensions();
   const [selectedValue, setSelectedValue] = useState(startValue.toString());
+  const [manualValue, setManualValue] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const generatePickerItems = () => {
     const items = [];
@@ -91,16 +94,49 @@ const DialogDataInputGraph: React.FC<Props> = ({
             />
           )}
 
+          <Text style={styles.orLabel}>ou saisissez une valeur précise</Text>
+          <TextInput
+            style={styles.manualInput}
+            placeholder="Saisir une valeur"
+            placeholderTextColor="#9F90D4"
+            keyboardType="numeric"
+            value={manualValue}
+            onChangeText={(text) => {
+              setManualValue(text);
+              setErrorMessage(null);
+            }}
+          />
+
+          {errorMessage && (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          )}
+
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.button, styles.buttonCancel]}
-              onPress={onCancel}
+              onPress={() => {
+                setManualValue("");
+                setErrorMessage(null);
+                onCancel();
+              }}
             >
               <Text style={styles.buttonText}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
-              onPress={() => onClose(selectedValue)}
+              onPress={() => {
+                const trimmedManual = manualValue.trim();
+                if (trimmedManual !== "") {
+                  if (Number.isNaN(Number(trimmedManual))) {
+                    setErrorMessage("Veuillez saisir un nombre valide.");
+                    return;
+                  }
+                  setManualValue("");
+                  onClose(trimmedManual);
+                } else {
+                  onClose(selectedValue);
+                }
+              }}
             >
               <Text style={styles.buttonText}>Valider</Text>
             </TouchableOpacity>
@@ -168,6 +204,30 @@ const styles = StyleSheet.create({
   dropdownButtonText: {
     color: "#403572",
     fontWeight: "normal",
+  },
+  orLabel: {
+    fontSize: 12,
+    color: "#9F90D4",
+    textAlign: "center",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  manualInput: {
+    borderWidth: 1,
+    borderColor: "#9F90D4",
+    borderRadius: 10,
+    height: 50,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    color: "#403572",
+    backgroundColor: "#f5f3fc",
+    textAlign: "center",
+  },
+  errorText: {
+    color: "#DE2C1D",
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: "center",
   },
   buttonRow: {
     flexDirection: "row",
