@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -6,6 +7,7 @@ import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type MotherHeartFrequency_t =
   Database["public"]["Tables"]["MotherHeartFrequency"];
@@ -20,17 +22,19 @@ export class MotherHeartFrequencyStore {
   isLoading = false;
   name = "Fréquence cardiaque de la mère";
   unit = "bpm";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer
   ) {
-    makeAutoObservable(this, {
+    makeAutoObservable<MotherHeartFrequencyStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedMotherHeartFrequencyList: computed,
       highestRank: computed,
     });
@@ -56,6 +60,19 @@ export class MotherHeartFrequencyStore {
           }
         });
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<MotherHeartFrequency_t["Row"]>(
+      `MotherHeartFrequency-${partogrammeId}`,
+      "MotherHeartFrequency",
+      partogrammeId,
+      (row) => runInAction(() => this.updateMotherHeartFrequencyFromServer(row))
+    );
   }
 
   // Update a mother heart frequency with information from the server. Guarantees a mother heart frequency only
@@ -138,7 +155,15 @@ export class MotherHeartFrequencyStore {
   }
 
   // CleanUp mother heart frequency store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
   }
 }

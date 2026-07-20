@@ -30,7 +30,8 @@ export class MotherContractionDurationStore extends DataStore {
       rootStore,
       transportLayer,
       "Durée des contractions de la mère",
-      "s"
+      "s",
+      "MotherContractionDuration"
     );
     makeObservable(this, {
       rootStore: false,
@@ -144,6 +145,7 @@ export class MotherContractionDurationStore extends DataStore {
   }
 
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
     this.state = "done";
     this.isInSync = false;

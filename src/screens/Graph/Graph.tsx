@@ -72,12 +72,46 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [addTableDataTargetHour, setAddTableDataTargetHour] = useState<number | null>(null);
 
   const partogramme = rootStore.partogrammeStore.selectedPartogramme;
+  // A web page refresh wipes all in-memory state (partogrammeList, the
+  // selection) but the login session and *which* partogramme id was
+  // selected both survive it (persisted storage). So instead of instantly
+  // bouncing out when nothing's selected yet, try to recover first — only
+  // give up if that recovery genuinely fails (e.g. really logged out).
+  const [isRecoveringSelection, setIsRecoveringSelection] = useState(true);
 
   useEffect(() => {
-    if (partogramme === undefined) {
+    if (partogramme !== undefined) {
+      setIsRecoveringSelection(false);
+      return;
+    }
+    rootStore.userInfoStore
+      .fetchUserInfo()
+      .then(() => {
+        const fetch =
+          rootStore.userInfoStore.userInfo.role === "NURSE"
+            ? rootStore.partogrammeStore.fetchFromServer(rootStore.profileStore.profile.id)
+            : rootStore.partogrammeStore.fetchFromServer();
+        return fetch;
+      })
+      .then(() => {
+        // The recovered partogramme's own graphs/tables/comments still need
+        // their own load — the mount effect already ran once with nothing
+        // selected, so it never fetched any of this.
+        if (rootStore.partogrammeStore.selectedPartogramme !== undefined) {
+          fetchData();
+        }
+      })
+      .catch((error) => {
+        logger.warn("Graph: selection recovery failed", { error: error?.message });
+      })
+      .finally(() => setIsRecoveringSelection(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isRecoveringSelection && partogramme === undefined) {
       navigation.goBack();
     }
-  }, [partogramme, navigation]);
+  }, [isRecoveringSelection, partogramme, navigation]);
 
   // Role and status helpers
   const userRole = rootStore.userInfoStore.userInfo.role;
@@ -95,6 +129,26 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       fetchData();
       setTimeout(() => setIsReady(true), 1);
     });
+    // Stop listening for live updates on this partogramme once we leave —
+    // otherwise every visit leaves its realtime subscriptions running forever.
+    // (This only tears down the subscription, not the loaded data itself.)
+    // Looked up fresh (not the `partogramme` closed over at mount) since a
+    // page-refresh recovery can select it well after this effect ran.
+    return () => {
+      const current = rootStore.partogrammeStore.selectedPartogramme;
+      if (current === undefined) return;
+      current.babyHeartFrequencyStore.stopRealtimeSync();
+      current.babyDescentStore.stopRealtimeSync();
+      current.dilationStore.stopRealtimeSync();
+      current.motherSystolicBloodPressureStore.stopRealtimeSync();
+      current.motherDiastolicBloodPressureStore.stopRealtimeSync();
+      current.motherContractionFrequencyStore.stopRealtimeSync();
+      current.motherContractionDurationStore.stopRealtimeSync();
+      current.motherTemperatureStore.stopRealtimeSync();
+      current.motherHeartRateFrequencyStore.stopRealtimeSync();
+      current.amnioticLiquidStore.stopRealtimeSync();
+      current.commentStore.stopRealtimeSync();
+    };
   }, []);
 
   useEffect(() => {
@@ -240,19 +294,23 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   };
 
   const fetchData = () => {
-    if (partogramme === null) return Promise.resolve();
+    // Looked up fresh rather than using the outer `partogramme` const, so
+    // this still works when called after a page-refresh recovery selects
+    // the partogramme later than this closure was created.
+    const current = rootStore.partogrammeStore.selectedPartogramme;
+    if (current === undefined) return Promise.resolve();
     return Promise.allSettled([
-      partogramme?.babyHeartFrequencyStore.loadBabyHeartFrequencies(),
-      partogramme?.babyDescentStore.loadBabyDescents(),
-      partogramme?.dilationStore.loadDilations(),
-      partogramme?.motherSystolicBloodPressureStore.loadData(),
-      partogramme?.motherDiastolicBloodPressureStore.loadData(),
-      partogramme?.motherContractionFrequencyStore.loadMotherContractionsFrequencies(),
-      partogramme?.motherContractionDurationStore.load(),
-      partogramme?.motherTemperatureStore.loadMotherTemperatures(),
-      partogramme?.motherHeartRateFrequencyStore.loadMotherHeartFrequencies(),
-      partogramme?.amnioticLiquidStore.loadAmnioticLiquids(),
-      partogramme?.commentStore.load(),
+      current.babyHeartFrequencyStore.loadBabyHeartFrequencies(),
+      current.babyDescentStore.loadBabyDescents(),
+      current.dilationStore.loadDilations(),
+      current.motherSystolicBloodPressureStore.loadData(),
+      current.motherDiastolicBloodPressureStore.loadData(),
+      current.motherContractionFrequencyStore.loadMotherContractionsFrequencies(),
+      current.motherContractionDurationStore.load(),
+      current.motherTemperatureStore.loadMotherTemperatures(),
+      current.motherHeartRateFrequencyStore.loadMotherHeartFrequencies(),
+      current.amnioticLiquidStore.loadAmnioticLiquids(),
+      current.commentStore.load(),
     ]);
   };
 

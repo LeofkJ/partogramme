@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -8,6 +9,7 @@ import { Float } from "react-native/Libraries/Types/CodegenTypes";
 import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type BabyDescent_t = Database["public"]["Tables"]["BabyDescent"];
 
@@ -21,17 +23,19 @@ export class BabyDescentStore {
   isLoading = false;
   name = "Descente du bébé";
   unit = "cm";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer
   ) {
-    makeAutoObservable(this, {
+    makeAutoObservable<BabyDescentStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedBabyDescentList: computed,
     });
     this.partogrammeStore = partogrammeStore;
@@ -56,6 +60,19 @@ export class BabyDescentStore {
           }
         });
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<BabyDescent_t["Row"]>(
+      `BabyDescent-${partogrammeId}`,
+      "BabyDescent",
+      partogrammeId,
+      (row) => runInAction(() => this.updateBabyDescentFromServer(row))
+    );
   }
 
   // Update a baby descent with information from the server. Guarantees a baby descent only
@@ -125,7 +142,15 @@ export class BabyDescentStore {
   }
 
   // Clean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
   }
 }

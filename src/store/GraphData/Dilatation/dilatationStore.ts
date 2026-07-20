@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -7,6 +8,7 @@ import { Partogramme } from "../../partogramme/partogrammeStore";
 import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type Dilation_t = Database["public"]["Tables"]["Dilation"];
 
@@ -20,13 +22,15 @@ export class DilationStore {
   isLoading = false;
   name = "Dilation";
   unit = "cm";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(partogrammeStore: Partogramme, rootStore: RootStore, transportLayer: TransportLayer) {
-    makeAutoObservable(this, {
+    makeAutoObservable<DilationStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedDilationList: computed,
     });
     this.partogrammeStore = partogrammeStore;
@@ -45,6 +49,19 @@ export class DilationStore {
         }
       });
     });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<Dilation_t["Row"]>(
+      `Dilation-${partogrammeId}`,
+      "Dilation",
+      partogrammeId,
+      (row) => runInAction(() => this.updateDilationFromServer(row))
+    );
   }
 
   // Update a dilation with information from the server. Guarantees a dilation only exists once.
@@ -109,7 +126,15 @@ export class DilationStore {
   }
 
   // Clean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
   };
 }
@@ -177,7 +202,7 @@ export class Dilation {
     let updatedData = this.asJson;
     updatedData.value = Number(value);
     this.store.transportLayer
-      .updateSystolicMotherBloodPressure(updatedData)
+      .updateDilation(updatedData)
       .then((response: any) => {
         runInAction(() => {
           this.data = updatedData;

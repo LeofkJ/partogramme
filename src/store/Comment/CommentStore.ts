@@ -30,7 +30,8 @@ export class CommentStore extends DataStore {
       rootStore,
       transportLayer,
       "Commentaire",
-      ""
+      "",
+      "Comment"
     );
     makeObservable(this, {
       rootStore: false,
@@ -138,6 +139,7 @@ export class CommentStore extends DataStore {
   }
 
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
     this.state = "done";
     this.isInSync = false;

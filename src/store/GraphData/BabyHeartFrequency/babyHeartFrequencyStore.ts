@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -7,6 +8,7 @@ import { Partogramme, data_t } from '../../partogramme/partogrammeStore';
 import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type BabyHeartFrequency_t = Database["public"]["Tables"]["BabyHeartFrequency"];
 
@@ -20,13 +22,15 @@ export class BabyHeartFrequencyStore {
   isLoading = false;
   name = "Fréquence Cardiaque du bébé";
   unit = "bpm";
-  
+  private realtimeChannel: RealtimeChannel | null = null;
+
   constructor(partogrammeStore: Partogramme, rootStore: RootStore, transportLayer: TransportLayer) {
-    makeAutoObservable(this, {
+    makeAutoObservable<BabyHeartFrequencyStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedBabyHeartFrequencyList: computed,
       babyHeartFrequencyGraphData: computed,
       dataList: observable,
@@ -58,6 +62,19 @@ export class BabyHeartFrequencyStore {
           notify.error("Erreur", "Impossible de charger les fréquences cardiaques du bébé");
         });
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<BabyHeartFrequency_t["Row"]>(
+      `BabyHeartFrequency-${partogrammeId}`,
+      "BabyHeartFrequency",
+      partogrammeId,
+      (row) => runInAction(() => this.updateBabyHeartFrequencyFromServer(row))
+    );
   }
 
   // Update a baby heart frequency with information from the server. Guarantees a baby heart frequency only
@@ -154,7 +171,15 @@ export class BabyHeartFrequencyStore {
   }
 
   // CLean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
   }
 }

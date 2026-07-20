@@ -1,4 +1,6 @@
 import { makeAutoObservable, runInAction, computed, observable } from "mobx";
+import { makePersistable } from "mobx-persist-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import uuid from "react-native-uuid";
 import { logger } from "../../lib/logger";
 import { Database } from "../../../types/supabase";
@@ -115,6 +117,13 @@ export class PartogrammeStore {
     });
     this.rootStore = rootStore;
     this.transportLayer = transportLayer;
+    // Survives a web page refresh, so the Graph screen can recover which
+    // patient was open instead of just bouncing back to the menu.
+    makePersistable(this, {
+      name: "PartogrammeStore",
+      properties: ["selectedPartogrammeId"],
+      storage: AsyncStorage,
+    });
   }
 
   get selectedPartogramme(): Partogramme | undefined {

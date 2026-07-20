@@ -10,10 +10,12 @@ import {
   makeObservable,
   runInAction,
 } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { RootStore } from "./rootStore";
 import { Partogramme } from "./partogramme/partogrammeStore";
 import { TransportLayer } from "../transport/transportLayer";
 import { logger } from "../lib/logger";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "./realtimeSync";
 
 export abstract class DataStore {
   rootStore: RootStore;
@@ -24,13 +26,16 @@ export abstract class DataStore {
   isLoading = false;
   name;
   unit;
+  tableName;
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer,
     name: string,
-    unit: string
+    unit: string,
+    tableName: string
   ) {
     makeObservable(this, {
       rootStore: false,
@@ -44,6 +49,7 @@ export abstract class DataStore {
     this.transportLayer = transportLayer;
     this.name = name;
     this.unit = unit;
+    this.tableName = tableName;
   }
 
   // Fetch mother heart frequencies from the server and update the store
@@ -62,7 +68,27 @@ export abstract class DataStore {
       logger.warn(`${this.name}: load failed`, { partogrammeId, error: error?.message });
       return Promise.reject(error);
     });
+    this.subscribeToRealtime(partogrammeId);
     return Promise.resolve();
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable(
+      `${this.tableName}-${partogrammeId}`,
+      this.tableName,
+      partogrammeId,
+      (row: any) => runInAction(() => this.updateFromServer(row))
+    );
+  }
+
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
   }
 
   abstract fetch(partogrammeId: string): Promise<any>;

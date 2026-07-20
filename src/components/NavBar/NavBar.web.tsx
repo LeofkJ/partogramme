@@ -83,7 +83,9 @@ export const NavBar = ({ currentRouteName }: NavBarProps) => {
   return (
     <View style={styles.bar}>
       <View style={styles.inner}>
-        <Text style={styles.wordmark}>PartoGraph</Text>
+        <Pressable onPress={handleLogout}>
+          <Text style={styles.wordmark}>PartoGraph</Text>
+        </Pressable>
         <View style={styles.links}>
           <NavLink label="Connexion" onPress={handleLogout} />
         </View>

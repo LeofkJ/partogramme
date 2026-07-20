@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -6,6 +7,7 @@ import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type MotherContractionsFrequency_t =
   Database["public"]["Tables"]["MotherContractionsFrequency"];
@@ -21,17 +23,19 @@ export class MotherContractionsFrequencyStore {
   name = "Fréquence des contractions";
   unit = "contractions/10min";
   unit_short = "/10min";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer
   ) {
-    makeAutoObservable(this, {
+    makeAutoObservable<MotherContractionsFrequencyStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedMotherContractionsFrequencyList: computed,
       highestRank: computed,
     });
@@ -58,6 +62,19 @@ export class MotherContractionsFrequencyStore {
           }
         });
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<MotherContractionsFrequency_t["Row"]>(
+      `MotherContractionsFrequency-${partogrammeId}`,
+      "MotherContractionsFrequency",
+      partogrammeId,
+      (row) => runInAction(() => this.updateMotherContractionsFrequencyFromServer(row))
+    );
   }
 
   // Update a mother contractions frequency with information from the server. Guarantees a mother contractions frequency only
@@ -143,7 +160,15 @@ export class MotherContractionsFrequencyStore {
   }
 
   // clean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
     this.state = "done";
     this.isInSync = false;

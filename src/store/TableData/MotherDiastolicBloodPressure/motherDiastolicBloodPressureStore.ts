@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from "../../../../types/supabase";
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -6,6 +7,7 @@ import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type MotherDiastolicBloodPressure_t =
   Database["public"]["Tables"]["MotherDiastolicBloodPressure"];
@@ -20,21 +22,22 @@ export class MotherDiastolicBloodPressureStore {
   isLoading = false;
   name = "Pressions artérielles diastolique de la mère";
   unit = "mmHg";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer
   ) {
-    makeAutoObservable(this, {
+    makeAutoObservable<MotherDiastolicBloodPressureStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedMotherBloodPressureList: computed,
       highestRank: computed,
       motherBloodPressureListAsString: computed,
-      timeOrderedMotherBloodPressureList: computed,
     });
     this.partogrammeStore = partogrammeStore;
     this.rootStore = rootStore;
@@ -57,6 +60,19 @@ export class MotherDiastolicBloodPressureStore {
           }
         });
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<MotherDiastolicBloodPressure_t["Row"]>(
+      `MotherDiastolicBloodPressure-${partogrammeId}`,
+      "MotherDiastolicBloodPressure",
+      partogrammeId,
+      (row) => runInAction(() => this.updateMotherBloodPressureFromServer(row))
+    );
   }
 
   // Update a mother blood pressure with information from the server. Guarantees a mother blood pressure only
@@ -153,7 +169,15 @@ export class MotherDiastolicBloodPressureStore {
   }
 
   // clean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
     this.state = "done";
     this.isInSync = false;

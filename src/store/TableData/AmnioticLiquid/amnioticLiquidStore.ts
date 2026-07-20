@@ -1,4 +1,5 @@
 import { computed, makeAutoObservable, observable, runInAction } from "mobx";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { Database } from '../../../../types/supabase';
 import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
@@ -9,6 +10,7 @@ import { liquidStates, getStringByEnum } from '../../../../types/constants';
 import { isLiquidState } from "../../../misc/CheckTypes";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
 
 export type AmnioticLiquid_t =
   Database["public"]["Tables"]["amnioticLiquid"];
@@ -22,17 +24,19 @@ export class AmnioticLiquidStore {
   isInSync = false;
   name = "Liquides amniotiques";
   unit = "";
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor(
     partogrammeStore: Partogramme,
     rootStore: RootStore,
     transportLayer: TransportLayer
   ) {
-    makeAutoObservable(this, {
+    makeAutoObservable<AmnioticLiquidStore, "realtimeChannel">(this, {
       rootStore: false,
       transportLayer: false,
       partogrammeStore: false,
       isInSync: false,
+      realtimeChannel: false,
       sortedAmnioticLiquidList: computed,
       highestRank: computed,
       amnioticLiquidAsTableString: computed,
@@ -71,6 +75,19 @@ export class AmnioticLiquidStore {
         notify.error("Erreur", "Impossible de charger les liquides amniotiques");
         return Promise.reject(error);
       });
+    this.subscribeToRealtime(partogrammeId);
+  }
+
+  // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
+  // any device, gets pushed into the store without a manual refresh.
+  private subscribeToRealtime(partogrammeId: string) {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = subscribeToPartogrammeTable<AmnioticLiquid_t["Row"]>(
+      `amnioticLiquid-${partogrammeId}`,
+      "amnioticLiquid",
+      partogrammeId,
+      (row) => runInAction(() => { this.updateAmnioticLiquidFromServer(row); })
+    );
   }
 
   // Update an amniotic liquid with information from the server. Guarantees an amniotic liquid only
@@ -216,7 +233,15 @@ export class AmnioticLiquidStore {
   }
 
   // Clean up the store
+  // Tears down just the live subscription, leaving loaded data in place —
+  // for leaving a screen. cleanUp() (data-clearing) also calls this.
+  stopRealtimeSync() {
+    unsubscribeChannel(this.realtimeChannel);
+    this.realtimeChannel = null;
+  }
+
   cleanUp() {
+    this.stopRealtimeSync();
     this.dataList.splice(0, this.dataList.length);
   }
 }

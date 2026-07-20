@@ -85,6 +85,7 @@ const DataModifierDialog: React.FC<Props> = observer(({
               .then(() => setIsEditDialogVisible(false))
               .catch((error: any) => {
                 logger.warn("DataModifierDialog: data update failed", { error: error?.message });
+                setIsEditDialogVisible(false);
                 setErrorMessage(error.message);
                 setIsErrorDialogVisible(true);
               });
