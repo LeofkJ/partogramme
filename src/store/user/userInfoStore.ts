@@ -25,6 +25,9 @@ export class UserInfoStore {
     refDoctorId: "",
     role: "NURSE",
     hospitalId: "",
+    phone: "",
+    address: null,
+    mustChangePassword: false,
   };
 
   doctorIds: string[] = [];
@@ -45,7 +48,7 @@ export class UserInfoStore {
     this.transportLayer = rootStore.transportLayer;
 
     makePersistable(this, {
-      name: "UserStore",
+      name: "UserInfoStore",
       properties: ["userInfo"],
       storage: AsyncStorage,
       expireIn: 86400000,
@@ -97,6 +100,14 @@ export class UserInfoStore {
     this.userInfo.isDeleted = userInfoIsDeleted;
   }
 
+  set userInfoPhone(userInfoPhone: string) {
+    this.userInfo.phone = userInfoPhone;
+  }
+
+  set userInfoAddress(userInfoAddress: string) {
+    this.userInfo.address = userInfoAddress;
+  }
+
   setDoctorIds(doctorIds: string[]) {
     this.doctorIds = doctorIds;
   }
@@ -133,23 +144,6 @@ export class UserInfoStore {
           notify.error(error.code, error.message);
         }
         return Promise.reject(error);
-      });
-  }
-
-  async createUserInfo() {
-    this.in_sync = false;
-    await this.transportLayer
-      .createUserInfo(this.userInfo)
-      .then((data) => {
-        runInAction(() => {
-          this.in_sync = true;
-        });
-        this.state = "done";
-      })
-      .catch((error) => {
-        this.state = "error";
-        logger.warn("createUserInfo failed", { error: error?.message });
-        notify.error("Erreur", error.message);
       });
   }
 
@@ -193,6 +187,28 @@ export class UserInfoStore {
     return this.userInfo;
   }
 
+  /** First-login flow for admin-activated accounts (see Admin.tsx): sets the
+   * user's own password, replacing the temp one the admin relayed, then
+   * clears mustChangePassword so the blocking dialog doesn't show again. */
+  async completePasswordChange(newPassword: string) {
+    const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+    if (authError) {
+      logger.warn("completePasswordChange failed", { error: authError.message });
+      throw authError;
+    }
+    runInAction(() => {
+      this.userInfo.mustChangePassword = false;
+    });
+    await this.saveUserInfo();
+  }
+
+  /** Looks up another user's info by their profile id — e.g. a doctor
+   * looking up the nurse assigned to a patient via the partogramme's
+   * nurseId (which is the nurse's profileId). */
+  async fetchOtherUserInfo(profileId: string) {
+    return this.transportLayer.fetchUserInfo(profileId);
+  }
+
   cleanUp() {
     this.userInfo = {
       firstName: "",
@@ -203,6 +219,9 @@ export class UserInfoStore {
       refDoctorId: "",
       role: "NURSE",
       hospitalId: "",
+      phone: "",
+      address: null,
+      mustChangePassword: false,
     };
   }
 }

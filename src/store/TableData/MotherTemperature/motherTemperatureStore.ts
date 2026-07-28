@@ -81,11 +81,18 @@ export class MotherTemperatureStore {
   // exists once. Might either construct a new temperature, update an existing one,
   // or remove a temperature if it has been deleted on the server.
   updateMotherTemperatureFromServer(json: MotherTemperature_t["Row"]) {
-    let temperature = this.dataList.find(
+    const existing = this.dataList.find(
       (temperature) => temperature.data.id === json.id
     );
-    if (!temperature) {
-      temperature = new MotherTemperature(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.removeMotherTemperature(existing);
+      return;
+    }
+    if (!existing) {
+      const temperature = new MotherTemperature(
         this,
         this.partogrammeStore,
         json.id,
@@ -96,11 +103,8 @@ export class MotherTemperatureStore {
         json.isDeleted
       );
       this.dataList.push(temperature);
-    }
-    if (json.isDeleted) {
-      this.removeMotherTemperature(temperature);
     } else {
-      temperature.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

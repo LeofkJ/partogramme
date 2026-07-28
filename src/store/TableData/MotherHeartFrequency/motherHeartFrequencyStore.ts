@@ -79,11 +79,18 @@ export class MotherHeartFrequencyStore {
   // exists once. Might either construct a new frequency, update an existing one,
   // or remove a frequency if it has been deleted on the server.
   updateMotherHeartFrequencyFromServer(json: MotherHeartFrequency_t["Row"]) {
-    let frequency = this.dataList.find(
+    const existing = this.dataList.find(
       (frequency) => frequency.data.id === json.id
     );
-    if (!frequency) {
-      frequency = new MotherHeartFrequency(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.removeMotherHeartFrequency(existing);
+      return;
+    }
+    if (!existing) {
+      const frequency = new MotherHeartFrequency(
         this,
         this.partogrammeStore,
         json.id,
@@ -94,11 +101,8 @@ export class MotherHeartFrequencyStore {
         json.isDeleted
       );
       this.dataList.push(frequency);
-    }
-    if (json.isDeleted) {
-      this.removeMotherHeartFrequency(frequency);
     } else {
-      frequency.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

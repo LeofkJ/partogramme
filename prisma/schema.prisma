@@ -17,16 +17,20 @@ model Profile {
 }
 
 model userInfo {
-  id          String   @id @db.Uuid
-  lastName    String
-  firstName   String
-  role        Role     @default(NURSE)
-  isDeleted   Boolean? @default(false)
-  profileId   String   @db.Uuid
-  hospitalId  String  @db.Uuid
-  refDoctorId String   @db.Uuid
-  profile     Profile  @relation(fields: [profileId], references: [id])
-  hospital    hospital? @relation(fields: [hospitalId], references: [id])
+  id                String    @id @db.Uuid
+  lastName          String
+  firstName         String
+  role              Role      @default(NURSE)
+  isDeleted         Boolean?  @default(false)
+  mustChangePassword Boolean  @default(false)
+  profileId         String    @db.Uuid
+  // Nullable: a system-wide ADMIN isn't scoped to one hospital and has no ref doctor.
+  hospitalId        String?   @db.Uuid
+  refDoctorId       String?   @db.Uuid
+  phone             String    @default("")
+  address           String?
+  profile           Profile   @relation(fields: [profileId], references: [id])
+  hospital          hospital? @relation(fields: [hospitalId], references: [id])
 }
 
 model hospital {
@@ -178,6 +182,7 @@ model Comment {
 enum Role {
   NURSE
   DOCTOR
+  ADMIN
 }
 
 enum PartogrammeState {

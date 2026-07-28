@@ -13,16 +13,24 @@ import { layout, svgFontFamily } from "../../theme";
 
 interface BabyGraphProps {
   data?: Array<{ x: number; y: number }>;
+  /** Labor start — ticks are rendered as the real clock time this many hours after it. */
+  startTime?: string | null;
 }
 
-export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data }) => {
+export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data, startTime }) => {
   const { width: windowWidth } = useWindowDimensions();
+
+  const formatTick = (hours: number) => {
+    if (!startTime) return `${hours}h`;
+    const d = new Date(new Date(startTime).getTime() + hours * 3600000);
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  };
 
   // Same content cap as the rest of the app: on big monitors the chart
     // stays a readable width instead of stretching across the whole screen.
     const svgWidth = Math.max(Math.min(windowWidth, layout.maxContentWidth) - 32, 200);
-  const svgHeight = 280;
-  const padL = 46, padR = 16, padT = 16, padB = 52;
+  const svgHeight = 300;
+  const padL = 46, padR = 16, padT = 16, padB = 72;
   const cW = svgWidth - padL - padR;
   const cH = svgHeight - padT - padB;
 
@@ -53,7 +61,7 @@ export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data }) => {
         {xTicks.map(x => (
           <G key={`x${x}`}>
             <Line x1={toX(x)} y1={padT} x2={toX(x)} y2={padT + cH} stroke="#e8e8e8" strokeWidth={0.7} />
-            <SvgText fontFamily={svgFontFamily} x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{x}h</SvgText>
+            <SvgText fontFamily={svgFontFamily} x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{formatTick(x)}</SvgText>
           </G>
         ))}
 
@@ -65,8 +73,8 @@ export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data }) => {
           <Circle key={i} cx={toX(d.x)} cy={toY(d.y)} r={4} fill="#c43a31" />
         ))}
 
-        <SvgText fontFamily={svgFontFamily} x={padL + cW / 2} y={svgHeight - 8} textAnchor="middle" fontSize={9} fill="#555">
-          Temps (heures)
+        <SvgText fontFamily={svgFontFamily} x={padL + cW / 2} y={padT + cH + 30} textAnchor="middle" fontSize={9} fill="#555">
+          Heure
         </SvgText>
         <SvgText fontFamily={svgFontFamily}
           x={10}
@@ -80,8 +88,8 @@ export const BabyGraph: React.FC<BabyGraphProps> = observer(({ data }) => {
         </SvgText>
 
         <G>
-          <Circle cx={padL + 8} cy={svgHeight - 32} r={4} fill="#c43a31" />
-          <SvgText fontFamily={svgFontFamily} x={padL + 17} y={svgHeight - 28} fontSize={9} fill="#333">
+          <Circle cx={padL + 8} cy={padT + cH + 48} r={4} fill="#c43a31" />
+          <SvgText fontFamily={svgFontFamily} x={padL + 17} y={padT + cH + 52} fontSize={9} fill="#333">
             Fréquence cardiaque du bébé
           </SvgText>
         </G>

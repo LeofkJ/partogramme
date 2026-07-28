@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 import { Database } from "../types/supabase";
 import {SUPABASEURL, SUPABASEKEY} from "@env"
 import { logger } from "./lib/logger";
@@ -24,7 +25,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
         storage: AsyncStorage as any,
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false,
+        // Web only: needed if a URL ever carries a session token in its
+        // fragment (magic link, invite, etc). Native has no deep-link
+        // handling for this yet, so it stays off there. Currently unused —
+        // account creation no longer sends invite links — but harmless to
+        // leave on for whenever a link-based auth flow shows up again.
+        detectSessionInUrl: Platform.OS === "web",
     },
     global: { fetch: loggedFetch },
 });

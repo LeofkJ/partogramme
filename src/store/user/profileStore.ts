@@ -32,7 +32,7 @@ export class ProfileStore {
     makeAutoObservable(this);
     this.rootStore = rootStore;
     makePersistable(this, {
-      name: "UserStore",
+      name: "ProfileStore",
       properties: ["profile"],
       storage: AsyncStorage,
       expireIn: 86400000, // 1 day in ms
@@ -50,6 +50,28 @@ export class ProfileStore {
 
   setPassword(profilePassword: string) {
     this.password = profilePassword;
+  }
+
+  /** Saves this.profile.email to the Profile table (a plain contact field,
+   * separate from the Supabase Auth login email). */
+  async saveProfile() {
+    return this.rootStore.transportLayer
+      .updateProfile(this.profile)
+      .catch((error: any) => {
+        notify.error("Erreur", "Impossible de mettre à jour le profil");
+        return Promise.reject(error);
+      });
+  }
+
+  /** Changes the account's login password via Supabase Auth. The user is
+   * already authenticated, so no current-password re-entry is required. */
+  async changePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      notify.error("Erreur", error.message);
+      return Promise.reject(error);
+    }
+    return Promise.resolve();
   }
 
   async signInWithEmail(email: string, password: string) {

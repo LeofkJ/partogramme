@@ -1,10 +1,10 @@
-import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { Platform, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { IconUserCog, IconPlus } from "../../components/Icons";
 import { PartogrammeList } from "../../components/partogrammeList";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DialogNurseInfo } from "../../components/Dialogs/DialogNurseInfo";
-import { useState, useEffect } from "react";
+import { DialogSetPassword } from "../../components/Dialogs/DialogSetPassword";
+import { useEffect } from "react";
 import { rootStore } from "../../store/rootStore";
 import { logger } from "../../lib/logger";
 import { colors, spacing, layout } from "../../theme";
@@ -14,39 +14,35 @@ export type Props = {
 };
 
 export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
-  const [isNurseInfoDialogVisible, setNurseInfoDialogVisible] = useState(false);
-
   const isNurse = rootStore.userInfoStore.userInfo.role === "NURSE";
   const firstName = rootStore.userInfoStore.userInfo.firstName;
   const lastName = rootStore.userInfoStore.userInfo.lastName;
 
+  // firstName/lastName/hospitalId/refDoctorId are all set by the admin at
+  // account creation now (see Admin.tsx) — nothing here fills them in
+  // afterward, so this just waits out mustChangePassword (DialogSetPassword
+  // below) and then loads the patient list.
+  const checkOnboarding = () => {
+    if (rootStore.userInfoStore.userInfo.mustChangePassword) {
+      // Blocked by the DialogSetPassword modal below — it calls this again
+      // via onDone once the password is set.
+      return;
+    }
+    if (rootStore.userInfoStore.userInfo.role === "NURSE") {
+      rootStore.partogrammeStore.fetchFromServer(
+        rootStore.profileStore.profile.id,
+      );
+    } else if (rootStore.userInfoStore.userInfo.role === "DOCTOR") {
+      rootStore.partogrammeStore.fetchFromServer();
+    }
+  };
+
   useEffect(() => {
     rootStore.userInfoStore
       .fetchUserInfo()
-      .then(() => {
-        if (
-          rootStore.userInfoStore.userInfo.firstName === "" ||
-          rootStore.userInfoStore.userInfo.lastName === "" ||
-          rootStore.userInfoStore.userInfo.refDoctorId === "" ||
-          rootStore.userInfoStore.userInfo.hospitalId === ""
-        ) {
-          setNurseInfoDialogVisible(true);
-        } else {
-          if (rootStore.userInfoStore.userInfo.role === "NURSE") {
-            rootStore.partogrammeStore.fetchFromServer(
-              rootStore.profileStore.profile.id,
-            );
-          } else if (rootStore.userInfoStore.userInfo.role === "DOCTOR") {
-            rootStore.partogrammeStore.fetchFromServer();
-          }
-        }
-      })
+      .then(checkOnboarding)
       .catch((error) => {
-        if (error.code === "PGRST116") {
-          setNurseInfoDialogVisible(true);
-        } else {
-          logger.warn("Menu: fetchUserInfo failed", { code: error?.code, message: error?.message });
-        }
+        logger.warn("Menu: fetchUserInfo failed", { code: error?.code, message: error?.message });
       });
   }, []);
 
@@ -66,7 +62,7 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
           </View>
           <TouchableOpacity
             style={styles.settingsButton}
-            onPress={() => setNurseInfoDialogVisible(true)}
+            onPress={() => navigation.navigate("Screen_Profile")}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <IconUserCog size={19} color={colors.textSecondary} />
@@ -79,7 +75,8 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         <PartogrammeList title={"Partogrammes"} navigation={navigation} />
       </View>
 
-      {isNurse && (
+      {/* Native: the bottom tab bar's "+" replaces this — see MainTabs.tsx. */}
+      {isNurse && Platform.OS === "web" && (
         <View style={styles.fabContainer}>
           <TouchableOpacity
             style={styles.fab}
@@ -90,10 +87,10 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         </View>
       )}
 
-      <DialogNurseInfo
-        isVisible={isNurseInfoDialogVisible}
+      <DialogSetPassword
+        isVisible={rootStore.userInfoStore.userInfo.mustChangePassword ?? false}
         userInfo={rootStore.userInfoStore}
-        setIsVisible={setNurseInfoDialogVisible}
+        onDone={checkOnboarding}
       />
     </SafeAreaView>
   );

@@ -1,7 +1,7 @@
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import type { Notify } from "./notifyTypes";
 
-// Web implementation: lightweight DOM banners, no dependencies.
+// Web implementation: lightweight DOM toasts, no dependencies.
 // react-native-web renders into the DOM, so document is always available here.
 // The project's tsconfig has no "dom" lib (React Native), hence the declares.
 declare const document: any;
@@ -16,15 +16,14 @@ function getContainer(): any {
     el.id = CONTAINER_ID;
     Object.assign(el.style, {
       position: "fixed",
-      top: "16px",
-      left: "50%",
-      transform: "translateX(-50%)",
+      top: "20px",
+      right: "20px",
       zIndex: "9999",
       display: "flex",
       flexDirection: "column",
       gap: "8px",
-      maxWidth: "480px",
-      width: "calc(100% - 32px)",
+      maxWidth: "360px",
+      width: "calc(100% - 40px)",
       pointerEvents: "none",
     });
     document.body.appendChild(el);
@@ -32,45 +31,87 @@ function getContainer(): any {
   return el;
 }
 
-function showBanner(
+// Minimal check/cross glyph. Colored icon carries the meaning, the card stays neutral.
+function iconSvg(kind: "success" | "error"): string {
+  return kind === "success"
+    ? `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.7L13 4.5" stroke="${colors.success}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    : `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M12 4L4 12" stroke="${colors.danger}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function showToast(
   text: string,
-  fg: string,
-  bg: string,
+  kind: "success" | "error",
   timeoutMs: number,
 ): void {
-  const banner = document.createElement("div");
-  banner.setAttribute("role", "alert");
-  banner.textContent = text;
-  Object.assign(banner.style, {
+  const iconBg = kind === "success" ? colors.successSoft : colors.dangerSoft;
+
+  const toast = document.createElement("div");
+  toast.setAttribute("role", "alert");
+  Object.assign(toast.style, {
     pointerEvents: "auto",
     cursor: "pointer",
-    background: bg,
-    color: fg,
-    borderLeft: `3px solid ${fg}`,
-    borderRadius: "6px",
-    padding: "12px 16px",
-    font: `500 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    borderRadius: `${radius.md}px`,
+    padding: "12px 14px",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.04)",
+    font: `500 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+    color: colors.text,
+    opacity: "0",
+    transform: "translateY(6px) scale(0.98)",
+    transition: "opacity 160ms ease, transform 160ms ease",
   });
-  const dismiss = () => banner.remove();
-  banner.addEventListener("click", dismiss);
-  getContainer().appendChild(banner);
+
+  const iconEl = document.createElement("div");
+  Object.assign(iconEl.style, {
+    flexShrink: "0",
+    width: "20px",
+    height: "20px",
+    borderRadius: "50%",
+    background: iconBg,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  });
+  iconEl.innerHTML = iconSvg(kind);
+
+  const textEl = document.createElement("div");
+  textEl.textContent = text;
+
+  toast.appendChild(iconEl);
+  toast.appendChild(textEl);
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    Object.assign(toast.style, {
+      opacity: "0",
+      transform: "translateY(6px) scale(0.98)",
+    });
+    window.setTimeout(() => toast.remove(), 160);
+  };
+  toast.addEventListener("click", dismiss);
+  getContainer().appendChild(toast);
+
+  // Next frame so the transition from the initial (hidden) state actually animates.
+  window.requestAnimationFrame(() => {
+    Object.assign(toast.style, { opacity: "1", transform: "translateY(0) scale(1)" });
+  });
+
   window.setTimeout(dismiss, timeoutMs);
 }
 
 export const notify: Notify = {
   error(title, message) {
-    showBanner(
-      message ? `${title} — ${message}` : title,
-      colors.danger,
-      colors.dangerSoft,
-      6000,
-    );
+    showToast(message ? `${title}: ${message}` : title, "error", 5000);
   },
 
-  success(_message) {
-    // Quiet on web, like iOS: success is the default outcome and announces
-    // itself (navigation, updated data). Only errors get a banner.
+  success(message) {
+    showToast(message, "success", 3000);
   },
 
   confirm({ title, message }) {

@@ -1,7 +1,7 @@
 import "react-native-url-polyfill/auto";
 import "react-native-get-random-values";
 import { useEffect, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
 import { navigationRef } from "./src/navigationRef";
 import { colors, radius } from "./src/theme";
@@ -13,14 +13,16 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PaperProvider, MD3LightTheme } from "react-native-paper";
 import { ScreenLogin } from "./src/screens/Login/Login";
-import { ScreenRegister } from "./src/screens/Register/register";
 import { ScreenMenu } from "./src/screens/Menu/Menu";
 import { ScreenAddPartogramme } from "./src/screens/AddPartogramme/AddPartogramme";
 import { ScreenGraph } from "./src/screens/Graph/Graph";
+import { ScreenProfile } from "./src/screens/Profile/Profile";
+import { ScreenAdmin } from "./src/screens/Admin/Admin";
+import { MainTabs } from "./src/navigation/MainTabs";
 
 // react-native-paper-dates (the date/time pickers) renders through
 // react-native-paper components, which default to Paper's stock purple
-// theme without a Provider — this keeps them on the app's actual palette.
+// theme without a Provider, this keeps them on the app's actual palette.
 const paperTheme = {
   ...MD3LightTheme,
   roundness: radius.sm,
@@ -49,10 +51,11 @@ const linking = {
   config: {
     screens: {
       Screen_Login: "/login",
-      Screen_Register: "/register",
       Screen_Menu: "/menu",
       Screen_AddPartogramme: "/add_partogramme",
       Screen_Graph: "/graph",
+      Screen_Profile: "/profile",
+      Screen_Admin: "/admin",
     },
   },
 };
@@ -91,19 +94,11 @@ function App() {
                 }}
               />
               <Stack.Screen
-                name="Screen_Register"
-                component={ScreenRegister}
-                options={{
-                  title: "Créer un compte",
-                  headerTintColor: colors.accent,
-                  headerTitleAlign: "center",
-                  // The web navbar covers navigation on logged-out screens.
-                  headerShown: !NAVBAR_ENABLED,
-                }}
-              />
-              <Stack.Screen
                 name="Screen_Menu"
-                component={ScreenMenu}
+                // Native: Menu + Profile live inside a bottom tab bar
+                // (MainTabs handles its own per-tab headers). Web keeps the
+                // top NavBar instead, with Menu/Profile as plain screens.
+                component={Platform.OS === "web" ? ScreenMenu : MainTabs}
                 options={{
                   title: "Menu des Partogrammes",
                   headerTintColor: colors.accent,
@@ -112,7 +107,7 @@ function App() {
                   // to still be in history, which a web page refresh wipes out
                   // (the stack is rebuilt from the URL alone). The web navbar's
                   // Connexion link is the reliable way back on web instead.
-                  headerShown: !NAVBAR_ENABLED,
+                  headerShown: Platform.OS === "web" ? !NAVBAR_ENABLED : false,
                 }}
               />
               <Stack.Screen
@@ -135,6 +130,30 @@ function App() {
                   headerShown: !NAVBAR_ENABLED,
                 }}
               />
+              {Platform.OS === "web" && (
+                <Stack.Screen
+                  name="Screen_Profile"
+                  component={ScreenProfile}
+                  options={{
+                    title: "Mon profil",
+                    headerTintColor: colors.accent,
+                    headerTitleAlign: "center",
+                    headerShown: !NAVBAR_ENABLED,
+                  }}
+                />
+              )}
+              {Platform.OS === "web" && (
+                <Stack.Screen
+                  name="Screen_Admin"
+                  component={ScreenAdmin}
+                  options={{
+                    title: "Administration",
+                    headerTintColor: colors.accent,
+                    headerTitleAlign: "center",
+                    headerShown: !NAVBAR_ENABLED,
+                  }}
+                />
+              )}
             </Stack.Navigator>
           </NavigationContainer>
         </SafeAreaProvider>

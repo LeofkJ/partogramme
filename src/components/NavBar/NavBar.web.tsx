@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
+import { observer } from "mobx-react";
 import { navigate, reset } from "../../navigationRef";
 import { rootStore } from "../../store/rootStore";
 import { logger } from "../../lib/logger";
@@ -8,8 +9,8 @@ import type { NavBarProps } from "./NavBar";
 
 export const NAVBAR_ENABLED = true;
 
-// Landing-page chrome: the navbar shows the auth links here...
-const LOGGED_OUT_ROUTES = ["Screen_Login", "Screen_Register"];
+// Landing-page chrome: the navbar shows the auth link here...
+const LOGGED_OUT_ROUTES = ["Screen_Login"];
 // ...and defaults to a single "Connexion" link (acting as sign-out)
 // everywhere else, since those screens have no other way back.
 
@@ -48,12 +49,13 @@ const NavLink = ({
   </Pressable>
 );
 
-export const NavBar = ({ currentRouteName }: NavBarProps) => {
+export const NavBar = observer(({ currentRouteName }: NavBarProps) => {
+  const isAdmin = rootStore.userInfoStore.userInfo.role === "ADMIN";
   // currentRouteName is undefined for a brief moment on every web load/refresh,
   // until the navigation container reports it's ready. Rendering nothing in
-  // that gap is what made this bar seem to "disappear" — default to the
+  // that gap is what made this bar seem to "disappear". Default to the
   // logged-in bar instead so there's always a way back, and only switch to
-  // the logged-out variant once we positively know we're on Login/Register.
+  // the logged-out variant once we positively know we're on Login.
   if (currentRouteName && LOGGED_OUT_ROUTES.includes(currentRouteName)) {
     return (
       <View style={styles.bar}>
@@ -68,12 +70,6 @@ export const NavBar = ({ currentRouteName }: NavBarProps) => {
               active={currentRouteName === "Screen_Login"}
               onPress={() => navigate("Screen_Login")}
             />
-            <View style={styles.hairline} />
-            <NavLink
-              label="Créer un compte"
-              active={currentRouteName === "Screen_Register"}
-              onPress={() => navigate("Screen_Register")}
-            />
           </View>
         </View>
       </View>
@@ -87,12 +83,30 @@ export const NavBar = ({ currentRouteName }: NavBarProps) => {
           <Text style={styles.wordmark}>PartoGraph</Text>
         </Pressable>
         <View style={styles.links}>
-          <NavLink label="Connexion" onPress={handleLogout} />
+          <NavLink
+            label="Menu"
+            active={currentRouteName === "Screen_Menu"}
+            onPress={() => navigate("Screen_Menu")}
+          />
+          <NavLink
+            label="Profil"
+            active={currentRouteName === "Screen_Profile"}
+            onPress={() => navigate("Screen_Profile")}
+          />
+          {isAdmin && (
+            <NavLink
+              label="Administration"
+              active={currentRouteName === "Screen_Admin"}
+              onPress={() => navigate("Screen_Admin")}
+            />
+          )}
+          <View style={styles.hairline} />
+          <NavLink label="Déconnexion" onPress={handleLogout} />
         </View>
       </View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   bar: {

@@ -96,29 +96,31 @@ export class MotherContractionDurationStore extends DataStore {
   }
 
   async updateFromServer(json: any): Promise<any> {
-    {
-      let motherContractionDuration = this.dataList.find(
-        (motherContractionDuration) =>
-          motherContractionDuration.data.id === json.id
+    const existing = this.dataList.find(
+      (motherContractionDuration) =>
+        motherContractionDuration.data.id === json.id
+    );
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.remove(existing);
+      return;
+    }
+    if (!existing) {
+      const motherContractionDuration = new MotherContractionDuration(
+        this,
+        this.partogrammeStore,
+        json.id,
+        json.value,
+        json.created_at,
+        json.partogrammeId,
+        json.Rank,
+        json.isDeleted
       );
-      if (!motherContractionDuration) {
-        motherContractionDuration = new MotherContractionDuration(
-          this,
-          this.partogrammeStore,
-          json.id,
-          json.value,
-          json.created_at,
-          json.partogrammeId,
-          json.Rank,
-          json.isDeleted
-        );
-        this.dataList.push(motherContractionDuration);
-      }
-      if (json.isDeleted) {
-        this.remove(motherContractionDuration);
-      } else {
-        motherContractionDuration.updateFromJson(json);
-      }
+      this.dataList.push(motherContractionDuration);
+    } else {
+      existing.updateFromJson(json);
     }
   }
 

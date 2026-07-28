@@ -4,6 +4,7 @@ import {
   View,
   TouchableOpacity,
   Text,
+  TextInput,
   Modal,
   FlatList,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { IconChevronDown } from "../Icons";
+import { IconChevronDown, IconX } from "../Icons";
 
 interface DropdownItem {
   label: string;
@@ -27,6 +28,15 @@ interface CustomDropdownProps {
   placeholder?: string;
   buttonStyle?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  menuItemStyle?: StyleProp<ViewStyle>;
+  menuItemTextStyle?: StyleProp<TextStyle>;
+  /** Shows a text filter at the top of the opened menu — useful once the
+   * list is long enough that scrolling to find one item gets annoying. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  /** Shows an "X" in the closed button (next to the chevron) that clears
+   * the selection without opening the menu — for undoing an accidental tap. */
+  clearable?: boolean;
 }
 
 interface Anchor {
@@ -45,14 +55,27 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
   placeholder = "Sélectionnez",
   buttonStyle,
   textStyle,
+  menuItemStyle,
+  menuItemTextStyle,
+  searchable = false,
+  searchPlaceholder = "Rechercher…",
+  clearable = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [anchor, setAnchor] = useState<Anchor>({ x: 0, y: 0, width: 0, height: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
   const containerRef = useRef<View>(null);
   const rotation = useRef(new Animated.Value(0)).current;
 
   const selectedLabel =
     items.find((item) => item.value === selectedValue)?.label || placeholder;
+
+  const visibleItems =
+    searchable && searchQuery.trim()
+      ? items.filter((item) =>
+          item.label.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+        )
+      : items;
 
   const animateChevron = (open: boolean) => {
     Animated.timing(rotation, {
@@ -73,6 +96,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const closeDropdown = () => {
     setIsOpen(false);
     animateChevron(false);
+    setSearchQuery("");
   };
 
   const chevronRotate = rotation.interpolate({
@@ -100,6 +124,15 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         >
           {selectedLabel}
         </Text>
+        {clearable && !!selectedValue && (
+          <TouchableOpacity
+            onPress={() => onValueChange("")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.clearButton}
+          >
+            <IconX size={13} color={colors.danger} />
+          </TouchableOpacity>
+        )}
         <Animated.View style={{ marginLeft: 8, transform: [{ rotate: chevronRotate }] }}>
           <IconChevronDown size={16} color={isOpen ? colors.accent : colors.textMuted} />
         </Animated.View>
@@ -129,21 +162,37 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 : { top: anchor.y + anchor.height + 6 },
             ]}
           >
+            {searchable && (
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoFocus
+              />
+            )}
             <FlatList
-              data={items}
+              style={styles.list}
+              data={visibleItems}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => {
                 const selected = selectedValue === item.value;
                 return (
                   <TouchableOpacity
-                    style={[styles.menuItem, selected && styles.menuItemSelected]}
+                    style={[styles.menuItem, menuItemStyle, selected && styles.menuItemSelected]}
                     onPress={() => {
                       onValueChange(item.value);
                       closeDropdown();
                     }}
                   >
                     <Text
-                      style={[styles.menuItemText, selected && styles.menuItemTextSelected]}
+                      style={[
+                        styles.menuItemText,
+                        menuItemTextStyle,
+                        selected && styles.menuItemTextSelected,
+                      ]}
                       numberOfLines={1}
                     >
                       {item.label}
@@ -152,8 +201,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                   </TouchableOpacity>
                 );
               }}
-              scrollEnabled={items.length > 5}
+              scrollEnabled={visibleItems.length > 5}
               nestedScrollEnabled={true}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>Aucun résultat</Text>
+              }
             />
           </View>
         </TouchableOpacity>
@@ -203,6 +255,11 @@ const styles = StyleSheet.create({
     elevation: 8,
     overflow: "hidden",
   },
+  // Without this, the list stretches to fill the menu's maxHeight on web
+  // even with one row — flexGrow:0 lets it size to actual content instead.
+  list: {
+    flexGrow: 0,
+  },
   menuItem: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -227,5 +284,26 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
     marginLeft: 8,
+  },
+  clearButton: {
+    marginLeft: 8,
+  },
+  searchInput: {
+    margin: 8,
+    marginBottom: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.background,
+    fontSize: 12,
+    color: colors.text,
+  },
+  emptyText: {
+    padding: 10,
+    textAlign: "center",
+    fontSize: 12,
+    color: colors.textMuted,
   },
 });

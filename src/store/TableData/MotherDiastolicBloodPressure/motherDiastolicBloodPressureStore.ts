@@ -81,11 +81,18 @@ export class MotherDiastolicBloodPressureStore {
   updateMotherBloodPressureFromServer(
     json: MotherDiastolicBloodPressure_t["Row"]
   ) {
-    let pressure = this.dataList.find(
+    const existing = this.dataList.find(
       (pressure) => pressure.data.id === json.id
     );
-    if (!pressure) {
-      pressure = new MotherDiastolicBloodPressure(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.removeDiastolicMotherBloodPressure(existing);
+      return;
+    }
+    if (!existing) {
+      const pressure = new MotherDiastolicBloodPressure(
         this,
         this.partogrammeStore,
         json.id,
@@ -96,11 +103,8 @@ export class MotherDiastolicBloodPressureStore {
         json.isDeleted
       );
       this.dataList.push(pressure);
-    }
-    if (json.isDeleted) {
-      this.removeDiastolicMotherBloodPressure(pressure);
     } else {
-      pressure.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

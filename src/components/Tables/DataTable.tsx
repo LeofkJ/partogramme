@@ -12,13 +12,14 @@ export interface DataTableColumn {
 }
 
 interface Props {
-  maxHours: number;
   columns: DataTableColumn[];
   /** When false (viewer has no edit rights for this status), cells are inert. */
   editable?: boolean;
+  /** Labor start — rows are labeled with the real clock time, in 15-minute steps after it. */
+  startTime?: string | null;
 }
 
-const HOUR_LABEL_WIDTH = 40;
+const HOUR_LABEL_WIDTH = 56;
 const ROW_HEIGHT = 46;
 const HEADER_HEIGHT = 44;
 const COL_MIN_WIDTH = 44;
@@ -36,7 +37,7 @@ const COLORS = {
   editableTint: colors.accentSoft,
 };
 
-const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
+const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => {
   const { width } = useWindowDimensions();
   const colCount = columns.length;
   // Cap like the rest of the app: on big monitors the table stays readable
@@ -47,7 +48,25 @@ const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
   const fontSize = colWidth < 50 ? 10 : 11;
   const lineHeight = Math.ceil(fontSize * 1.3);
 
-  const hours = Array.from({ length: maxHours + 1 }, (_, i) => i);
+  // Rows are 15-minute slots, not hourly — anything entered within the same
+  // 15-minute window lands on the same row (`Rank` is the slot index). Only
+  // slots that actually have at least one value get a row, the table isn't
+  // a fixed grid of every possible slot across the whole span.
+  const SLOT_MINUTES = 15;
+  const hours = Array.from(
+    new Set(
+      columns
+        .flatMap((col) => col.items)
+        .map((item) => item?.data?.Rank)
+        .filter((rank): rank is number => rank != null)
+    )
+  ).sort((a, b) => a - b);
+
+  const formatRowLabel = (h: number) => {
+    if (!startTime) return `${h}h`;
+    const d = new Date(new Date(startTime).getTime() + h * SLOT_MINUTES * 60000);
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  };
 
   // Wide screens have room for the real column names; no legend needed then.
   const useFullNames = effectiveWidth >= 900;
@@ -74,7 +93,17 @@ const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
         </View>
 
         {/* One row per hour */}
-        {hours.map((h) => (
+        {hours.map((h) => {
+          // Prefer the real time something was actually recorded in this row
+          // over the assumed slot time — only fall back for rows nothing's
+          // been entered in yet, since there's no real time to show there.
+          const rowItem = columns
+            .flatMap((col) => col.items)
+            .find((i) => i?.data?.Rank === h);
+          const rowLabel = rowItem?.data?.created_at
+            ? new Date(rowItem.data.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+            : formatRowLabel(h);
+          return (
           <View
             key={h}
             style={[
@@ -83,7 +112,9 @@ const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
             ]}
           >
             <View style={[styles.hourCell, { width: HOUR_LABEL_WIDTH }]}>
-              <Text style={styles.hourText}>{h}h</Text>
+              <Text style={styles.hourText} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.7}>
+                {rowLabel}
+              </Text>
             </View>
             {columns.map((col, colIndex) => {
               const itemIndex = col.items.findIndex((i) => i?.data?.Rank === h);
@@ -136,7 +167,8 @@ const DataTable: React.FC<Props> = ({ maxHours, columns, editable = true }) => {
               );
             })}
           </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Legend: full name behind each abbreviated header — only needed

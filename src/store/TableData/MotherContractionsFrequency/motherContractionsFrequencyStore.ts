@@ -83,11 +83,18 @@ export class MotherContractionsFrequencyStore {
   updateMotherContractionsFrequencyFromServer(
     json: MotherContractionsFrequency_t["Row"]
   ) {
-    let frequency = this.dataList.find(
+    const existing = this.dataList.find(
       (frequency) => frequency.data.id === json.id
     );
-    if (!frequency) {
-      frequency = new MotherContractionsFrequency(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.removeMotherContractionsFrequency(existing);
+      return;
+    }
+    if (!existing) {
+      const frequency = new MotherContractionsFrequency(
         this,
         this.partogrammeStore,
         json.id,
@@ -98,11 +105,8 @@ export class MotherContractionsFrequencyStore {
         json.isDeleted
       );
       this.dataList.push(frequency);
-    }
-    if (json.isDeleted) {
-      this.removeMotherContractionsFrequency(frequency);
     } else {
-      frequency.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

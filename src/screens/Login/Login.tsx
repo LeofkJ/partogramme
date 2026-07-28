@@ -75,15 +75,6 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
             {login.isSubmitting ? "Connexion…" : "Se connecter"}
           </Text>
         </Pressable>
-
-        <View style={[styles.hairline, { marginTop: spacing.xl }]} />
-
-        <Pressable
-          onPress={() => navigation.navigate("Screen_Register")}
-          style={({ pressed }) => [styles.btnGhost, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.btnGhostText}>Créer un compte</Text>
-        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
@@ -169,16 +160,5 @@ const styles = StyleSheet.create({
     color: colors.onAccent,
     fontSize: type.body.fontSize,
     fontWeight: "600",
-  },
-  btnGhost: {
-    height: layout.touchTarget,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: spacing.sm,
-  },
-  btnGhostText: {
-    color: colors.accent,
-    fontSize: type.body.fontSize,
-    fontWeight: "500",
   },
 });

@@ -8,10 +8,7 @@ import {
   StyleSheet,
   TextInput,
   useWindowDimensions,
-  Platform,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { CustomDropdown } from "./CustomDropdown";
 
 interface Props {
   visible: boolean;
@@ -30,34 +27,26 @@ const DialogDataInputGraph: React.FC<Props> = ({
   onCancel,
   startValue,
   endValue,
-  step,
 }) => {
   const { width } = useWindowDimensions();
-  const [selectedValue, setSelectedValue] = useState(startValue.toString());
-  const [manualValue, setManualValue] = useState("");
+  const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const generatePickerItems = () => {
-    const items = [];
-    for (let i = startValue; i <= endValue; i += step) {
-      items.push(
-        <Picker.Item
-          key={i}
-          label={i.toString()}
-          value={i.toString()}
-          style={styles.pickerItem}
-        />
-      );
-    }
-    return items;
+  const handleCancel = () => {
+    setValue("");
+    setErrorMessage(null);
+    onCancel();
   };
 
-  const dropdownItems = () => {
-    const items = [];
-    for (let i = startValue; i <= endValue; i += step) {
-      items.push({ label: i.toString(), value: i.toString() });
+  const handleValidate = () => {
+    const trimmed = value.trim();
+    if (trimmed === "" || Number.isNaN(Number(trimmed))) {
+      setErrorMessage("Veuillez saisir un nombre valide.");
+      return;
     }
-    return items;
+    setValue("");
+    setErrorMessage(null);
+    onClose(trimmed);
   };
 
   return (
@@ -72,38 +61,19 @@ const DialogDataInputGraph: React.FC<Props> = ({
           <Text style={styles.sectionLabel}>
             {dataName}
           </Text>
+          <Text style={styles.hintText}>
+            Entre {startValue} et {endValue}
+          </Text>
 
-          {Platform.OS === "web" ? (
-            <View style={styles.pickerContainer}>
-              <Picker
-                style={styles.picker}
-                mode="dropdown"
-                prompt="Sélectionnez un chiffre"
-                selectedValue={selectedValue}
-                onValueChange={(itemValue) => setSelectedValue(itemValue)}
-              >
-                {generatePickerItems()}
-              </Picker>
-            </View>
-          ) : (
-            <CustomDropdown
-              items={dropdownItems()}
-              selectedValue={selectedValue}
-              onValueChange={setSelectedValue}
-              buttonStyle={styles.dropdownButton}
-              textStyle={styles.dropdownButtonText}
-            />
-          )}
-
-          <Text style={styles.orLabel}>ou saisissez une valeur précise</Text>
           <TextInput
             style={styles.manualInput}
             placeholder="Saisir une valeur"
             placeholderTextColor={colors.textMuted}
             keyboardType="numeric"
-            value={manualValue}
+            value={value}
+            autoFocus
             onChangeText={(text) => {
-              setManualValue(text);
+              setValue(text);
               setErrorMessage(null);
             }}
           />
@@ -115,29 +85,13 @@ const DialogDataInputGraph: React.FC<Props> = ({
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.button, styles.buttonCancel]}
-              onPress={() => {
-                setManualValue("");
-                setErrorMessage(null);
-                onCancel();
-              }}
+              onPress={handleCancel}
             >
               <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.buttonValidate]}
-              onPress={() => {
-                const trimmedManual = manualValue.trim();
-                if (trimmedManual !== "") {
-                  if (Number.isNaN(Number(trimmedManual))) {
-                    setErrorMessage("Veuillez saisir un nombre valide.");
-                    return;
-                  }
-                  setManualValue("");
-                  onClose(trimmedManual);
-                } else {
-                  onClose(selectedValue);
-                }
-              }}
+              onPress={handleValidate}
             >
               <Text style={styles.buttonText}>Valider</Text>
             </TouchableOpacity>
@@ -170,48 +124,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
     marginTop: 12,
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: colors.surface,
-    marginBottom: 4,
-  },
-  picker: {
-    height: 50,
-    width: "100%",
-    color: colors.text,
-  },
-  pickerItem: {
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  dropdownButton: {
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    height: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 0,
-    marginBottom: 4,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  dropdownButtonText: {
-    color: colors.text,
-    fontWeight: "normal",
-  },
-  orLabel: {
+  hintText: {
     fontSize: 12,
     color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   manualInput: {
     borderWidth: 1,

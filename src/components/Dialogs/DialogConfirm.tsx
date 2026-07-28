@@ -16,10 +16,24 @@ interface IProps {
   InfoText?: string;
   setIsVisible: Dispatch<SetStateAction<boolean>>;
   onValidate: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  /** Red confirm button instead of the default accent — for actions that
+   * remove access/data rather than just confirming a routine choice. */
+  destructive?: boolean;
 }
 
 export const DialogConfirm = observer(
-  ({ isVisible, setIsVisible, onValidate, Title, InfoText }: IProps) => {
+  ({
+    isVisible,
+    setIsVisible,
+    onValidate,
+    Title,
+    InfoText,
+    confirmText = "Valider",
+    cancelText = "Annuler",
+    destructive = false,
+  }: IProps) => {
     const { width } = useWindowDimensions();
 
     const handleCancel = () => setIsVisible(false);
@@ -36,7 +50,7 @@ export const DialogConfirm = observer(
         onRequestClose={handleCancel}
       >
         <View style={styles.overlay}>
-          <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
+          <View style={[styles.card, { width: Math.min(width * 0.9, 320) }]}>
 
             <Text style={styles.title}>{Title}</Text>
 
@@ -49,13 +63,13 @@ export const DialogConfirm = observer(
                 style={[styles.button, styles.buttonCancel]}
                 onPress={handleCancel}
               >
-                <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
+                <Text style={[styles.buttonText, styles.buttonTextCancel]}>{cancelText}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.buttonValidate]}
+                style={[styles.button, destructive ? styles.buttonDestructive : styles.buttonValidate]}
                 onPress={handleValidate}
               >
-                <Text style={styles.buttonText}>Valider</Text>
+                <Text style={styles.buttonText}>{confirmText}</Text>
               </TouchableOpacity>
             </View>
 
@@ -75,38 +89,41 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 10,
   },
   title: {
-    fontSize: 17,
-    fontWeight: "bold",
+    fontSize: 15,
+    fontWeight: "700",
     color: colors.text,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   infoText: {
-    fontSize: 14,
-    color: "#555",
-    lineHeight: 20,
-    marginBottom: 20,
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 16,
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
   },
   button: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 8,
+    paddingVertical: 9,
     alignItems: "center",
   },
   buttonValidate: {
     backgroundColor: colors.accent,
+  },
+  buttonDestructive: {
+    backgroundColor: colors.danger,
   },
   buttonCancel: {
     backgroundColor: colors.surface,
@@ -119,7 +136,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "white",
-    fontWeight: "bold",
-    fontSize: 15,
+    fontWeight: "600",
+    fontSize: 13,
   },
 });

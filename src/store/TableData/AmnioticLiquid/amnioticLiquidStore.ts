@@ -94,11 +94,27 @@ export class AmnioticLiquidStore {
   // exists once. Might either construct a new liquid, update an existing one,
   // or remove a liquid if it has been deleted on the server.
   async updateAmnioticLiquidFromServer(json: AmnioticLiquid_t["Row"]) {
-    let liquid = this.dataList.find(
+    const existing = this.dataList.find(
       (liquid) => liquid.data.id === json.id
     );
-    if (!liquid) {
-      liquid = new AmnioticLiquid(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it (and re-write it
+    // to the server) just to delete it again, which is what required a
+    // second delete tap.
+    if (json.isDeleted) {
+      if (existing) {
+        this.removeAmnioticLiquid(existing)
+          .then(() => { })
+          .catch((error) => {
+            logger.warn("updateAmnioticLiquidFromServer: removeAmnioticLiquid failed", { id: json.id, error: error?.message });
+            notify.error("Erreur", "Impossible de supprimer les liquides amniotiques");
+            return Promise.reject(error);
+          });
+      }
+      return;
+    }
+    if (!existing) {
+      const liquid = new AmnioticLiquid(
         this,
         this.partogrammeStore,
         json.id,
@@ -112,7 +128,7 @@ export class AmnioticLiquidStore {
         .updateAmnioticLiquid(liquid.data)
         .then(() => {
           runInAction(() => {
-            this.dataList.push(liquid!);
+            this.dataList.push(liquid);
             this.state = "done";
           });
         })
@@ -123,17 +139,8 @@ export class AmnioticLiquidStore {
           logger.warn("updateAmnioticLiquidFromServer: updateAmnioticLiquid failed", { id: json.id, error: error?.message });
           return Promise.reject(error);
         });
-    }
-    if (json.isDeleted) {
-      this.removeAmnioticLiquid(liquid)
-        .then(() => { })
-        .catch((error) => {
-          logger.warn("updateAmnioticLiquidFromServer: removeAmnioticLiquid failed", { id: json.id, error: error?.message });
-          notify.error("Erreur", "Impossible de supprimer les liquides amniotiques");
-          return Promise.reject(error);
-        });
     } else {
-      liquid.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

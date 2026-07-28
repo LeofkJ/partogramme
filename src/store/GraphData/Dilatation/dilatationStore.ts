@@ -68,9 +68,17 @@ export class DilationStore {
   // Might either construct a new dilation, update an existing one,
   // or remove a dilation if it has been deleted on the server.
   updateDilationFromServer(json: Dilation_t["Row"]) {
-    let dilation = this.dataList.find((dilation) => dilation.data.id === json.id);
-    if (!dilation) {
-      dilation = new Dilation(
+    const existing = this.dataList.find((dilation) => dilation.data.id === json.id);
+    // Check isDeleted before ever constructing a new instance — otherwise a
+    // self-echoed realtime update for a row we just optimistically removed
+    // locally would resurrect it (find() no longer sees it) just to delete
+    // it again, flickering the item back and requiring a second delete tap.
+    if (json.isDeleted) {
+      if (existing) this.removeDilation(existing);
+      return;
+    }
+    if (!existing) {
+      const dilation = new Dilation(
         this,
         this.partogrammeStore,
         json.id,
@@ -81,11 +89,8 @@ export class DilationStore {
         json.isDeleted
       );
       this.dataList.push(dilation);
-    }
-    if (json.isDeleted) {
-      this.removeDilation(dilation);
     } else {
-      dilation.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

@@ -79,11 +79,18 @@ export class BabyDescentStore {
   // exists once. Might either construct a new descent, update an existing one,
   // or remove a descent if it has been deleted on the server.
   updateBabyDescentFromServer(json: BabyDescent_t["Row"]) {
-    let descent = this.dataList.find(
+    const existing = this.dataList.find(
       (descent) => descent.data.id === json.id
     );
-    if (!descent) {
-      descent = new BabyDescent(
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.removeBabyDescent(existing);
+      return;
+    }
+    if (!existing) {
+      const descent = new BabyDescent(
         this,
         this.partogrammeStore,
         json.id,
@@ -94,11 +101,8 @@ export class BabyDescentStore {
         json.isDeleted
       );
       this.dataList.push(descent);
-    }
-    if (json.isDeleted) {
-      this.removeBabyDescent(descent);
     } else {
-      descent.updateFromJson(json);
+      existing.updateFromJson(json);
     }
   }
 

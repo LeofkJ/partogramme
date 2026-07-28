@@ -6,7 +6,12 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.0 (ec89f6b)"
+  }
   public: {
     Tables: {
       _prisma_migrations: {
@@ -71,9 +76,10 @@ export interface Database {
           {
             foreignKeyName: "amnioticLiquid_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       BabyDescent: {
@@ -105,9 +111,10 @@ export interface Database {
           {
             foreignKeyName: "BabyDescent_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       BabyHeartFrequency: {
@@ -139,9 +146,10 @@ export interface Database {
           {
             foreignKeyName: "BabyHeartFrequency_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       Comment: {
@@ -170,9 +178,10 @@ export interface Database {
           {
             foreignKeyName: "Comment_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       Dilation: {
@@ -204,9 +213,10 @@ export interface Database {
           {
             foreignKeyName: "Dilation_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       hospital: {
@@ -259,9 +269,10 @@ export interface Database {
           {
             foreignKeyName: "MotherContractionDuration_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       MotherContractionsFrequency: {
@@ -293,9 +304,10 @@ export interface Database {
           {
             foreignKeyName: "MotherContractionsFrequency_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       MotherDiastolicBloodPressure: {
@@ -327,9 +339,10 @@ export interface Database {
           {
             foreignKeyName: "MotherDiastolicBloodPressure_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       MotherHeartFrequency: {
@@ -361,9 +374,10 @@ export interface Database {
           {
             foreignKeyName: "MotherHeartFrequency_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       MotherSystolicBloodPressure: {
@@ -395,9 +409,10 @@ export interface Database {
           {
             foreignKeyName: "MotherSystolicBloodPressure_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       MotherTemperature: {
@@ -429,9 +444,10 @@ export interface Database {
           {
             foreignKeyName: "MotherTemperature_partogrammeId_fkey"
             columns: ["partogrammeId"]
+            isOneToOne: false
             referencedRelation: "Partogramme"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       Partogramme: {
@@ -481,15 +497,17 @@ export interface Database {
           {
             foreignKeyName: "Partogramme_hospitalId_fkey"
             columns: ["hospitalId"]
+            isOneToOne: false
             referencedRelation: "hospital"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "Partogramme_nurseId_fkey"
             columns: ["nurseId"]
+            isOneToOne: false
             referencedRelation: "Profile"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       Profile: {
@@ -512,48 +530,59 @@ export interface Database {
       }
       userInfo: {
         Row: {
+          address: string | null
           firstName: string
-          hospitalId: string
+          hospitalId: string | null
           id: string
           isDeleted: boolean | null
           lastName: string
+          mustChangePassword: boolean
+          phone: string
           profileId: string
-          refDoctorId: string
+          refDoctorId: string | null
           role: Database["public"]["Enums"]["Role"]
         }
         Insert: {
+          address?: string | null
           firstName: string
-          hospitalId: string
+          hospitalId?: string | null
           id: string
           isDeleted?: boolean | null
           lastName: string
+          mustChangePassword?: boolean
+          phone?: string
           profileId: string
-          refDoctorId: string
+          refDoctorId?: string | null
           role?: Database["public"]["Enums"]["Role"]
         }
         Update: {
+          address?: string | null
           firstName?: string
-          hospitalId?: string
+          hospitalId?: string | null
           id?: string
           isDeleted?: boolean | null
           lastName?: string
+          mustChangePassword?: boolean
+          phone?: string
           profileId?: string
-          refDoctorId?: string
+          refDoctorId?: string | null
           role?: Database["public"]["Enums"]["Role"]
         }
         Relationships: [
           {
             foreignKeyName: "userInfo_hospitalId_fkey"
             columns: ["hospitalId"]
+            isOneToOne: false
             referencedRelation: "hospital"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "userInfo_profileId_fkey"
             columns: ["profileId"]
+            isOneToOne: true
             referencedRelation: "Profile"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
     }
@@ -561,54 +590,28 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      delete_claim: {
-        Args: {
-          uid: string
-          claim: string
-        }
-        Returns: string
-      }
-      get_claim: {
-        Args: {
-          uid: string
-          claim: string
-        }
-        Returns: Json
-      }
-      get_claims: {
-        Args: {
-          uid: string
-        }
-        Returns: Json
-      }
+      delete_claim: { Args: { claim: string; uid: string }; Returns: string }
+      get_claim: { Args: { claim: string; uid: string }; Returns: Json }
+      get_claims: { Args: { uid: string }; Returns: Json }
       get_every_doctor: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           email: string | null
           id: string
           isDeleted: boolean | null
         }[]
-      }
-      get_my_claim: {
-        Args: {
-          claim: string
+        SetofOptions: {
+          from: "*"
+          to: "Profile"
+          isOneToOne: false
+          isSetofReturn: true
         }
-        Returns: Json
       }
-      get_my_claims: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      is_claims_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      get_my_claim: { Args: { claim: string }; Returns: Json }
+      get_my_claims: { Args: never; Returns: Json }
+      is_claims_admin: { Args: never; Returns: boolean }
       set_claim: {
-        Args: {
-          uid: string
-          claim: string
-          value: Json
-        }
+        Args: { claim: string; uid: string; value: Json }
         Returns: string
       }
     }
@@ -625,7 +628,7 @@ export interface Database {
         | "IN_PROGRESS"
         | "TRANSFERRED"
         | "WORK_FINISHED"
-      Role: "NURSE" | "DOCTOR"
+      Role: "NURSE" | "DOCTOR" | "ADMIN"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -633,3 +636,141 @@ export interface Database {
   }
 }
 
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      LiquidState: [
+        "NONE",
+        "INTACT",
+        "CLAIR",
+        "MECONIAL",
+        "SANG",
+        "PUREE_DE_POIS",
+      ],
+      PartogrammeState: [
+        "ADMITTED",
+        "IN_PROGRESS",
+        "TRANSFERRED",
+        "WORK_FINISHED",
+      ],
+      Role: ["NURSE", "DOCTOR", "ADMIN"],
+    },
+  },
+} as const

@@ -14,8 +14,9 @@ export const notify: Notify = {
         ToastAndroid.LONG,
         ToastAndroid.CENTER,
       );
+    } else {
+      Alert.alert("", message);
     }
-    // iOS stays quiet on success: errors are loud, the default outcome is not.
   },
 
   confirm({

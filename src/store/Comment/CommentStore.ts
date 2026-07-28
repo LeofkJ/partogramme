@@ -94,28 +94,30 @@ export class CommentStore extends DataStore {
   }
 
   async updateFromServer(json: any): Promise<any> {
-    {
-      let comment = this.dataList.find(
-        (comment) =>
-          comment.data.id === json.id
+    const existing = this.dataList.find(
+      (comment) =>
+        comment.data.id === json.id
+    );
+    // Check isDeleted before constructing — a self-echoed realtime update for
+    // a row already removed locally shouldn't resurrect it just to delete it
+    // again (that flicker is what required a second delete tap).
+    if (json.isDeleted) {
+      if (existing) this.remove(existing);
+      return;
+    }
+    if (!existing) {
+      const comment = new Comment(
+        this,
+        this.partogrammeStore,
+        json.id,
+        json.value,
+        json.created_at,
+        json.partogrammeId,
+        json.isDeleted
       );
-      if (!comment) {
-        comment = new Comment(
-          this,
-          this.partogrammeStore,
-          json.id,
-          json.value,
-          json.created_at,
-          json.partogrammeId,
-          json.isDeleted
-        );
-        this.dataList.push(comment);
-      }
-      if (json.isDeleted) {
-        this.remove(comment);
-      } else {
-        comment.updateFromJson(json);
-      }
+      this.dataList.push(comment);
+    } else {
+      existing.updateFromJson(json);
     }
   }
 

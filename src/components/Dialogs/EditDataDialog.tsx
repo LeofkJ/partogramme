@@ -43,8 +43,8 @@ const EditDataDialog: React.FC<Props> = observer( ({
       {isTableData(data) && (
         <DialogDataInputTable
           visible={visible}
-          onClose={(dataStore: DataInputTable_t, data: string) => {
-            onValidate(data);
+          onClose={(entries) => {
+            onValidate(entries[0].value);
           }}
           onCancel={() => onCancel()}
           onDelete={onDelete}

@@ -18,6 +18,7 @@ import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import DataTable from "../../components/Tables/DataTable";
 import DialogDataInputTable, {
   DataInputTable_t,
+  DataInputEntry,
 } from "../../components/Dialogs/DialogDataInputTable";
 import { AmnioticLiquidStore } from "../../store/TableData/AmnioticLiquid/amnioticLiquidStore";
 import { Database } from "../../../types/supabase";
@@ -59,6 +60,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [isDataModifierDialogVisible, setDataModifierDialogVisible] =
     useState(false);
   const [dataModifierStores, setDataModifierStores] = useState<dataStore_t[]>([]);
+  const [dataModifierGroupByRow, setDataModifierGroupByRow] = useState(false);
   const [isAddCommentDialogVisible, setAddCommentDialogVisible] =
     useState(false);
   const [isChangeStateDialogVisible, setChangeStateDialogVisible] =
@@ -70,6 +72,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [editingTableItem, setEditingTableItem] = useState<any>(null);
   const [addTableDataPreselected, setAddTableDataPreselected] = useState<DataInputTable_t | undefined>(undefined);
   const [addTableDataTargetHour, setAddTableDataTargetHour] = useState<number | null>(null);
+  const [assignedNurse, setAssignedNurse] = useState<{ name: string; phone: string | null } | null>(null);
 
   const partogramme = rootStore.partogrammeStore.selectedPartogramme;
   // A web page refresh wipes all in-memory state (partogrammeList, the
@@ -123,6 +126,28 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const canEdit =
     (isNurse && status === "IN_PROGRESS") ||
     (isDoctor && status === "TRANSFERRED");
+
+  // Doctor looking up which nurse is responsible for this patient, via the
+  // partogramme's nurseId (the nurse's own profileId).
+  const nurseId = partogramme?.asJson.nurseId;
+  useEffect(() => {
+    if (!isDoctor || !nurseId) {
+      setAssignedNurse(null);
+      return;
+    }
+    rootStore.userInfoStore
+      .fetchOtherUserInfo(nurseId)
+      .then((nurse) => {
+        if (!nurse) return;
+        setAssignedNurse({
+          name: `${nurse.firstName} ${nurse.lastName}`,
+          phone: nurse.phone,
+        });
+      })
+      .catch((error: any) => {
+        logger.warn("Graph: fetchOtherUserInfo (nurse lookup) failed", { nurseId, error: error?.message });
+      });
+  }, [isDoctor, nurseId]);
 
   useEffect(() => {
     InteractionManager.runAfterInteractions(() => {
@@ -192,71 +217,82 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     setDescentBabyDialogVisible(false);
   };
 
-  const onDialogCloseAddDataTable = (
-    dataStore?: DataInputTable_t,
-    data?: string,
-  ) => {
-    if (partogramme === null || dataStore === undefined || data === undefined) {
+  const onDialogCloseAddDataTable = (entries: DataInputEntry[]) => {
+    if (partogramme === null || entries.length === 0) {
       notify.error(
         "Code Error : Unknown data store type. \n contact the administrator",
       );
       return;
     }
-    const rank = addTableDataTargetHour ?? Number(dataStore.highestRank) + 1;
-    if (dataStore instanceof AmnioticLiquidStore) {
-      dataStore
-        .createAmnioticLiquid(
-          new Date().toISOString(),
-          rank,
-          data as Database["public"]["Enums"]["LiquidState"],
-        )
-        .catch((error) => {
-          logger.warn("Graph: createAmnioticLiquid failed", { error: error?.message });
+    // Table rows are 15-minute slots — values added together (or within the
+    // same 15 minutes) land on the same row, computed from real elapsed time
+    // since labor start rather than just incrementing the last row used.
+    const currentSlotRank = Math.floor(
+      (Date.now() - new Date(partogramme!.asJson.workStartDateTime!).getTime()) / (15 * 60 * 1000)
+    );
+    entries.forEach(({ dataStore, value: data }) => {
+      const rank = addTableDataTargetHour ?? currentSlotRank;
+      // This field already has a value in the row it would land in — update
+      // it instead of creating a second entry at the same rank, which the
+      // table can't display anyway (one value per cell) and would just sit
+      // there invisibly piling up.
+      const existing = (dataStore.dataList as any[]).find((item) => item.data.Rank === rank);
+      if (existing) {
+        existing.update(data).catch((error: any) => {
+          logger.warn("Graph: table cell update (existing row) failed", { error: error?.message });
           notify.error("Erreur", error.message);
         });
-    } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
-      dataStore.createNew(
-        Number(data),
-        new Date().toISOString(),
-        rank,
-      );
-    } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
-      dataStore.createNew(
-        Number(data),
-        new Date().toISOString(),
-        rank,
-      );
-    } else if (dataStore instanceof MotherContractionsFrequencyStore) {
-      dataStore.createMotherContractionsFrequency(
-        Number(data),
-        new Date().toISOString(),
-        rank,
-      );
-    } else if (dataStore instanceof MotherContractionDurationStore) {
-      dataStore.createData({
-        value: Number(data),
-        created_at: new Date().toISOString(),
-        Rank: rank,
-      });
-    } else if (dataStore instanceof MotherHeartFrequencyStore) {
-      dataStore.createMotherHeartFrequency(
-        Number(data),
-        new Date().toISOString(),
-        rank,
-      );
-    } else if (dataStore instanceof MotherTemperatureStore) {
-      dataStore.createMotherTemperature(
-        Number(data),
-        new Date().toISOString(),
-        rank,
-      );
-    } else {
-      notify.error(
-        "Code Error : Unknown data store type. \n contact the administrator",
-      );
-      setAddTableDataDialogVisible(false);
-      return;
-    }
+        return;
+      }
+      if (dataStore instanceof AmnioticLiquidStore) {
+        dataStore
+          .createAmnioticLiquid(
+            new Date().toISOString(),
+            rank,
+            data as Database["public"]["Enums"]["LiquidState"],
+          )
+          .catch((error) => {
+            logger.warn("Graph: createAmnioticLiquid failed", { error: error?.message });
+            notify.error("Erreur", error.message);
+          });
+      } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
+        dataStore.createNew(
+          Number(data),
+          new Date().toISOString(),
+          rank,
+        );
+      } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
+        dataStore.createNew(
+          Number(data),
+          new Date().toISOString(),
+          rank,
+        );
+      } else if (dataStore instanceof MotherContractionsFrequencyStore) {
+        dataStore.createMotherContractionsFrequency(
+          Number(data),
+          new Date().toISOString(),
+          rank,
+        );
+      } else if (dataStore instanceof MotherContractionDurationStore) {
+        dataStore.createData({
+          value: Number(data),
+          created_at: new Date().toISOString(),
+          Rank: rank,
+        });
+      } else if (dataStore instanceof MotherHeartFrequencyStore) {
+        dataStore.createMotherHeartFrequency(
+          Number(data),
+          new Date().toISOString(),
+          rank,
+        );
+      } else if (dataStore instanceof MotherTemperatureStore) {
+        dataStore.createMotherTemperature(
+          Number(data),
+          new Date().toISOString(),
+          rank,
+        );
+      }
+    });
     setAddTableDataDialogVisible(false);
     setAddTableDataPreselected(undefined);
     setAddTableDataTargetHour(null);
@@ -442,6 +478,33 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   </TouchableOpacity>
                 )}
 
+                {/* RÉCLAMER — doctor only, before TRANSFERRED. Lets a
+                    doctor pull a patient under her care directly (e.g. during
+                    rounds) instead of waiting on the nurse to push it via
+                    TRANSFERÉ. Both lead to the same TRANSFERRED state. */}
+                {isDoctor && (status === "ADMITTED" || status === "IN_PROGRESS") && (
+                  <TouchableOpacity
+                    activeOpacity={0.2}
+                    onPress={() => {
+                      setNewState("TRANSFERRED");
+                      setChangeStateDialogVisible(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: colors.accent,
+                      borderRadius: radius.sm,
+                      padding: 2,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: "white" }]}
+                    >
+                      {"RÉCLAMER"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 {/* TERMINÉ — nurse when IN_PROGRESS, doctor when TRANSFERRED */}
                 {((isNurse && status === "IN_PROGRESS") ||
                   (isDoctor && status === "TRANSFERRED")) && (
@@ -501,6 +564,15 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               <Text style={styles.infoLabel}>Dossier</Text>
               <Text style={styles.infoValue}>#{partogramme?.asJson.noFile}</Text>
             </View>
+            {isDoctor && assignedNurse && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Infirmière</Text>
+                <Text style={styles.infoValue}>{assignedNurse.name}</Text>
+                {!!assignedNurse.phone && (
+                  <Text style={styles.infoTime}>{assignedNurse.phone}</Text>
+                )}
+              </View>
+            )}
             {!!partogramme?.asJson.commentary && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Commentaire</Text>
@@ -533,15 +605,16 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
 
           <View style={styles.sectionTitleRow}>
             <Text style={styles.textTitle}>Fréquence Cardiaque du bébé</Text>
-            {canEdit && partogramme!.babyHeartFrequencyStore.dataList.length > 0 && (
+            {partogramme!.babyHeartFrequencyStore.dataList.length > 0 && (
               <TouchableOpacity
                 onPress={() => {
                   setDataModifierStores([partogramme!.babyHeartFrequencyStore]);
+                  setDataModifierGroupByRow(false);
                   setDataModifierDialogVisible(true);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.modifyLink}>Modifier</Text>
+                <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -550,6 +623,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               rootStore.partogrammeStore.selectedPartogramme
                 ?.babyHeartFrequencyStore.babyHeartFrequencyGraphData
             }
+            startTime={partogramme?.asJson.workStartDateTime}
           />
           <DialogDataInputGraph
             visible={isFcDialogVisible}
@@ -573,17 +647,17 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
 
           <View style={styles.sectionTitleRow}>
             <Text style={styles.textTitle}>Graphique de dilatation</Text>
-            {canEdit &&
-              (partogramme!.dilationStore.dataList.length > 0 ||
-                partogramme!.babyDescentStore.dataList.length > 0) && (
+            {(partogramme!.dilationStore.dataList.length > 0 ||
+              partogramme!.babyDescentStore.dataList.length > 0) && (
               <TouchableOpacity
                 onPress={() => {
                   setDataModifierStores([partogramme!.dilationStore, partogramme!.babyDescentStore]);
+                  setDataModifierGroupByRow(false);
                   setDataModifierDialogVisible(true);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.modifyLink}>Modifier</Text>
+                <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -630,9 +704,38 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             dataName={"Descente du bébé"}
           />
 
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.textTitle}>Tableau</Text>
+            {(partogramme!.motherTemperatureStore.dataList.length > 0 ||
+              partogramme!.motherSystolicBloodPressureStore.dataList.length > 0 ||
+              partogramme!.motherDiastolicBloodPressureStore.dataList.length > 0 ||
+              partogramme!.motherHeartRateFrequencyStore.dataList.length > 0 ||
+              partogramme!.motherContractionFrequencyStore.dataList.length > 0 ||
+              partogramme!.motherContractionDurationStore.dataList.length > 0 ||
+              partogramme!.amnioticLiquidStore.dataList.length > 0) && (
+              <TouchableOpacity
+                onPress={() => {
+                  setDataModifierStores([
+                    partogramme!.motherTemperatureStore,
+                    partogramme!.motherSystolicBloodPressureStore,
+                    partogramme!.motherDiastolicBloodPressureStore,
+                    partogramme!.motherHeartRateFrequencyStore,
+                    partogramme!.motherContractionFrequencyStore,
+                    partogramme!.motherContractionDurationStore,
+                    partogramme!.amnioticLiquidStore,
+                  ]);
+                  setDataModifierGroupByRow(true);
+                  setDataModifierDialogVisible(true);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <DataTable
-            maxHours={12}
             editable={canEdit}
+            startTime={partogramme?.asJson.workStartDateTime}
             columns={[
               {
                 label: "Temp",
@@ -783,7 +886,9 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           visible={isDataModifierDialogVisible}
           partogramme={partogramme!}
           dataStores={dataModifierStores}
+          groupByRow={dataModifierGroupByRow}
           onCancel={() => setDataModifierDialogVisible(false)}
+          readOnly={!canEdit}
         />
       </View>
     );
@@ -811,6 +916,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "space-between",
     marginTop: spacing.xxl + spacing.lg,
+    marginBottom: spacing.md,
   },
   textTitle: {
     fontSize: 19,

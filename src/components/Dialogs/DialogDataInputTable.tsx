@@ -32,10 +32,15 @@ export type DataInputTable_t =
   | MotherHeartFrequencyStore
   | MotherTemperatureStore;
 
+export interface DataInputEntry {
+  dataStore: DataInputTable_t;
+  value: string;
+}
+
 export interface Props {
   visible: boolean;
   data: DataInputTable_t[];
-  onClose: (dataStore: DataInputTable_t, data: string) => void;
+  onClose: (entries: DataInputEntry[]) => void;
   onCancel: () => void;
   onDelete?: () => void;
   preSelectedDataChoice?: DataInputTable_t;
@@ -81,20 +86,44 @@ const DialogDataInputTable: React.FC<Props> = observer(({
     useState(getValueByRank(liquidStates, 0) as string);
   const [inputDataNumber, setInputDataNumber] = useState("0");
 
-  const generateDataNamesItem = () => {
-    return data.map((item, i) => (
-      <Picker.Item
-        key={i}
-        label={item.name}
-        value={item.name}
-        style={styles.pickerItem}
-      />
-    ));
+  // Multi-field entry (no preselected type): one optional value per data
+  // type, starts empty every time the dialog opens — pre-filling with the
+  // last recorded value read as "did this not clear?" once someone had just
+  // submitted that same value moments before.
+  const [multiValues, setMultiValues] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (visible && !preSelectedDataChoice) {
+      setMultiValues({});
+    }
+  }, [visible, preSelectedDataChoice]);
+
+  // Brief confirmation flash so submitting always gives clear, immediate
+  // proof it worked — a submission that updates an existing row instead of
+  // creating a new one is otherwise invisible, which reads as "did nothing".
+  const [justSaved, setJustSaved] = useState(false);
+  const confirmSave = (entries: DataInputEntry[]) => {
+    onClose(entries);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 900);
   };
 
-  const dataNamesDropdownItems = () => {
-    return data.map((item) => ({ label: item.name, value: item.name }));
-  };
+  // Confirming a too-soon submission is a second screen inside this SAME
+  // modal (not a separate sibling <Modal>) — two simultaneously-visible
+  // React Native Modals don't reliably stack on top of each other on native,
+  // so the confirm has to live inside this one to actually be seen.
+  const [pendingEntries, setPendingEntries] = useState<DataInputEntry[] | null>(null);
+  const [recentMinutesAgo, setRecentMinutesAgo] = useState(0);
+
+  useEffect(() => {
+    if (visible) setPendingEntries(null);
+  }, [visible]);
+
+  // MotherContractionsFrequencyStore's full unit ("contractions/10min") is
+  // long enough to crush the numeric input next to it on narrow screens —
+  // prefer its short form here, same as the compact table view already does.
+  const displayUnit = (store: DataInputTable_t): string =>
+    store instanceof MotherContractionsFrequencyStore ? store.unit_short : store.unit;
 
   const generateAmnioticLiquidItems = () => {
     return Array.from({ length: Object.keys(liquidStates).length }, (_, i) => (
@@ -146,112 +175,212 @@ const DialogDataInputTable: React.FC<Props> = observer(({
             value={inputDataNumber}
             maxLength={7}
           />
-          <Text style={styles.unitText}>
-            {data[selectedDataNameIndex].unit}
+          <Text style={styles.unitText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {displayUnit(data[selectedDataNameIndex])}
           </Text>
         </View>
       );
     }
   };
 
+  const renderMultiFieldRow = (store: DataInputTable_t, index: number) => {
+    const value = multiValues[index] ?? "";
+    const setValue = (v: string) => setMultiValues((prev) => ({ ...prev, [index]: v }));
+
+    if (store instanceof AmnioticLiquidStore) {
+      return (
+        <View key={index} style={styles.multiFieldRow}>
+          <Text style={styles.multiFieldLabel}>{store.name}</Text>
+          {Platform.OS === "web" ? (
+            <View style={styles.multiFieldPickerContainer}>
+              <Picker
+                style={styles.multiFieldPicker}
+                mode="dropdown"
+                selectedValue={value}
+                onValueChange={setValue}
+              >
+                <Picker.Item label="—" value="" style={styles.pickerItem} />
+                {generateAmnioticLiquidItems()}
+              </Picker>
+            </View>
+          ) : (
+            <CustomDropdown
+              items={amnioticLiquidDropdownItems()}
+              selectedValue={value}
+              onValueChange={setValue}
+              buttonStyle={styles.multiFieldDropdownButton}
+              textStyle={styles.multiFieldDropdownButtonText}
+            />
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <View key={index} style={styles.multiFieldRow}>
+        <Text style={styles.multiFieldLabel}>{store.name}</Text>
+        <View style={styles.numberInputRow}>
+          <TextInput
+            style={styles.multiFieldNumberInput}
+            keyboardType="numeric"
+            onChangeText={setValue}
+            value={value}
+            placeholder="—"
+            maxLength={7}
+          />
+          <Text style={styles.multiFieldUnitText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {displayUnit(store)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const hasAnyMultiValue = data.some((_, i) => (multiValues[i] ?? "").trim() !== "");
+
   return (
     <Modal
-      visible={visible}
+      visible={visible || justSaved}
       animationType="fade"
       transparent={true}
     >
       <View style={styles.overlay}>
         <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
 
-          {recordedAt && (
-            <View style={styles.recordedAtRow}>
-              <Text style={styles.recordedAtLabel}>Enregistré le</Text>
-              <View style={styles.recordedAtBadge}>
-                <Text style={styles.recordedAtTime}>
-                  {new Date(recordedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                </Text>
-                <Text style={styles.recordedAtDate}>
-                  {new Date(recordedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                </Text>
-              </View>
+          {justSaved ? (
+            <View style={styles.savedState}>
+              <Text style={styles.savedCheck}>✓</Text>
+              <Text style={styles.savedText}>Ajouté</Text>
             </View>
-          )}
-
-          <Text style={styles.sectionLabel}>
-            Type de données à ajouter
-          </Text>
-          {preSelectedDataChoice ? (
-            <View style={styles.preselectedBox}>
-              <Text style={styles.preselectedText}>
-                {preSelectedDataChoice.name}
+          ) : pendingEntries !== null ? (
+            <>
+              <Text style={styles.sectionLabel}>Saisie récente</Text>
+              <Text style={styles.confirmText}>
+                Dernière saisie il y a {recentMinutesAgo} minute{recentMinutesAgo === 1 ? "" : "s"}. Ajouter quand même ?
               </Text>
-            </View>
-          ) : Platform.OS === "web" ? (
-            <View style={styles.pickerContainer} pointerEvents="auto">
-              <Picker
-                style={styles.picker}
-                mode="dropdown"
-                selectedValue={selectedDataName}
-                onValueChange={(itemValue, itemIndex) => {
-                  setSelectedDataName(itemValue);
-                  setSelectedDataNameIndex(itemIndex);
-                }}
-                enabled={true}
-                itemStyle={styles.pickerItem}
-                prompt="Sélectionner un type de données"
-              >
-                {generateDataNamesItem()}
-              </Picker>
-            </View>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonCancel]}
+                  onPress={() => setPendingEntries(null)}
+                >
+                  <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonValidate]}
+                  onPress={() => {
+                    confirmSave(pendingEntries);
+                    setPendingEntries(null);
+                  }}
+                >
+                  <Text style={styles.buttonText}>Ajouter quand même</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
-            <CustomDropdown
-              items={dataNamesDropdownItems()}
-              selectedValue={selectedDataName}
-              onValueChange={(itemValue) => {
-                setSelectedDataName(itemValue);
-                setSelectedDataNameIndex(data.findIndex((item) => item.name === itemValue));
-              }}
-              buttonStyle={styles.dropdownButton}
-              textStyle={styles.dropdownButtonText}
-            />
-          )}
+            <>
+              {recordedAt && (
+                <View style={styles.recordedAtRow}>
+                  <Text style={styles.recordedAtLabel}>Enregistré le</Text>
+                  <View style={styles.recordedAtBadge}>
+                    <Text style={styles.recordedAtTime}>
+                      {new Date(recordedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                    <Text style={styles.recordedAtDate}>
+                      {new Date(recordedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
-          <Text style={styles.sectionLabel}>
-            Valeur à ajouter
-          </Text>
-          {renderDataPicker()}
+              {preSelectedDataChoice ? (
+                <>
+                  <Text style={styles.sectionLabel}>
+                    Type de données à ajouter
+                  </Text>
+                  <View style={styles.preselectedBox}>
+                    <Text style={styles.preselectedText}>
+                      {preSelectedDataChoice.name}
+                    </Text>
+                  </View>
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonCancel]}
-              onPress={onCancel}
-            >
-              <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonValidate]}
-              onPress={() => {
-                if (rootStore.partogrammeStore.selectedPartogramme) {
-                  const dataStore = rootStore.partogrammeStore.selectedPartogramme.getDataStore(selectedDataName);
-                  if (dataStore) {
-                    onClose(
-                      dataStore,
-                      selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name
-                        ? (getEnumByString(liquidStates, selectedAmnioticLiquidState) || selectedAmnioticLiquidState)
-                        : inputDataNumber
-                    );
-                  }
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Valider</Text>
-            </TouchableOpacity>
-          </View>
+                  <Text style={styles.sectionLabel}>
+                    Valeur à ajouter
+                  </Text>
+                  {renderDataPicker()}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sectionLabel}>
+                    Valeurs à ajouter (au moins une)
+                  </Text>
+                  {data.map((store, i) => renderMultiFieldRow(store, i))}
+                </>
+              )}
 
-          {onDelete && (
-            <TouchableOpacity style={styles.deleteLink} onPress={onDelete}>
-              <Text style={styles.deleteLinkText}>Supprimer cette valeur</Text>
-            </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonCancel]}
+                  onPress={onCancel}
+                >
+                  <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.buttonValidate,
+                    !preSelectedDataChoice && !hasAnyMultiValue && styles.buttonDisabled,
+                  ]}
+                  disabled={!preSelectedDataChoice && !hasAnyMultiValue}
+                  onPress={() => {
+                    if (!rootStore.partogrammeStore.selectedPartogramme) return;
+
+                    if (preSelectedDataChoice) {
+                      const dataStore = rootStore.partogrammeStore.selectedPartogramme.getDataStore(selectedDataName);
+                      if (dataStore) {
+                        confirmSave([{
+                          dataStore,
+                          value: selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name
+                            ? (getEnumByString(liquidStates, selectedAmnioticLiquidState) || selectedAmnioticLiquidState)
+                            : inputDataNumber,
+                        }]);
+                      }
+                    } else {
+                      const entries = data
+                        .map((store, i) => ({ store, value: multiValues[i] ?? "" }))
+                        .filter(({ value }) => value.trim() !== "")
+                        .map(({ store, value }) => ({
+                          dataStore: store,
+                          value: store instanceof AmnioticLiquidStore
+                            ? (getEnumByString(liquidStates, value) || value)
+                            : value,
+                        }));
+                      if (entries.length === 0) return;
+
+                      const lastEntryTime = data
+                        .flatMap((store) => store.dataList as any[])
+                        .map((item) => new Date(item.data.created_at).getTime())
+                        .sort((a, b) => b - a)[0];
+                      const minutesAgo = lastEntryTime ? (Date.now() - lastEntryTime) / 60000 : Infinity;
+
+                      if (minutesAgo < 60) {
+                        setRecentMinutesAgo(Math.round(minutesAgo));
+                        setPendingEntries(entries);
+                      } else {
+                        confirmSave(entries);
+                      }
+                    }
+                  }}
+                >
+                  <Text style={styles.buttonText}>Valider</Text>
+                </TouchableOpacity>
+              </View>
+
+              {onDelete && (
+                <TouchableOpacity style={styles.deleteLink} onPress={onDelete}>
+                  <Text style={styles.deleteLinkText}>Supprimer cette valeur</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
         </View>
@@ -277,12 +406,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
+  savedState: {
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  savedCheck: {
+    fontSize: 40,
+    color: colors.success,
+    marginBottom: 8,
+  },
+  savedText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.text,
+  },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "bold",
     color: colors.text,
     marginBottom: 8,
     marginTop: 12,
+  },
+  confirmText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+    marginBottom: 8,
   },
   recordedAtRow: {
     flexDirection: "row",
@@ -347,6 +496,64 @@ const styles = StyleSheet.create({
     fontWeight: "normal",
     fontSize: 16,
   },
+  multiFieldRow: {
+    marginBottom: 8,
+  },
+  multiFieldLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 3,
+  },
+  multiFieldNumberInput: {
+    flex: 1,
+    borderColor: colors.borderStrong,
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlign: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  multiFieldUnitText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: "600",
+  },
+  multiFieldDropdownButton: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    height: 38,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    marginBottom: 0,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  multiFieldDropdownButtonText: {
+    color: colors.text,
+    fontWeight: "normal",
+    fontSize: 13,
+  },
+  multiFieldPickerContainer: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
+    marginBottom: 0,
+  },
+  multiFieldPicker: {
+    height: 38,
+    width: "100%",
+    color: colors.text,
+    backgroundColor: colors.surface,
+    fontSize: 13,
+  },
   preselectedBox: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
@@ -397,6 +604,9 @@ const styles = StyleSheet.create({
   },
   buttonValidate: {
     backgroundColor: colors.accent,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonCancel: {
     backgroundColor: colors.surface,

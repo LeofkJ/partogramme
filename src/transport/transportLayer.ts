@@ -14,18 +14,41 @@ import { Partogramme_t } from "../store/partogramme/partogrammeStore";
 import { MotherContractionDuration_t } from "../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
 import { Comment_t } from "../store/Comment/CommentStore";
 import { UserInfo } from "../store/user/userInfoStore";
+import { Profile } from "../store/user/profileStore";
+
+// supabase-js's FunctionsHttpError only exposes a generic "non-2xx status
+// code" message; the actual JSON body the Edge Function returned lives on
+// error.context (the raw Response). Unwrap it, log it, and return the real
+// message so callers can surface it to the user instead of the generic
+// wrapper message.
+async function unwrapFunctionError(fnName: string, error: any): Promise<Error> {
+  let body: any = undefined;
+  try {
+    body = await error?.context?.clone?.().json();
+  } catch {
+    try { body = await error?.context?.clone?.().text(); } catch {}
+  }
+  logger.error(`Edge Function ${fnName} failed: ${error?.message}`, { status: error?.context?.status, body });
+  const realMessage = typeof body === "object" && body?.error ? body.error : undefined;
+  return new Error(realMessage ?? error?.message ?? "Unknown error");
+}
 
 export class TransportLayer {
   client = supabase;
 
   async fetchPartogrammes(hospitalId: string, nurseId?: string) {
     if (nurseId && hospitalId) {
+      // Only patients she's currently managing — once a patient is
+      // TRANSFERRED (pushed by her or claimed by a doctor) or WORK_FINISHED,
+      // she's no longer "currently managing" it (see
+      // 2026-07-28_doctor_claim_patient.sql for the write-side counterpart).
       const { data, error } = await supabase
         .from("Partogramme")
         .select("*")
         .eq("nurseId", nurseId)
         .eq("hospitalId", hospitalId)
-        .eq("isDeleted", false);
+        .eq("isDeleted", false)
+        .in("state", ["ADMITTED", "IN_PROGRESS"]);
       if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
       return data;
     } else {
@@ -478,16 +501,19 @@ export class TransportLayer {
     return data;
   }
 
-  async createUserInfo(userInfo: UserInfo["Row"]) {
-    const { data, error } = await supabase.from("userInfo").insert(userInfo);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
-    return data;
-  }
-
   async saveUserInfo(userInfo: UserInfo["Row"]) {
     const { data, error } = await supabase
       .from("userInfo")
       .upsert(userInfo, { onConflict: "profileId" });
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  async updateProfile(profile: Profile["Row"]) {
+    const { data, error } = await supabase
+      .from("Profile")
+      .update(profile)
+      .eq("id", profile.id);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
     return data;
   }
@@ -507,6 +533,28 @@ export class TransportLayer {
     return data;
   }
 
+  // Admin-only, gated by the "Admins can create hospitals" RLS policy
+  // (supabase/policies/2026-07-27_admin_hospital_insert.sql).
+  async createHospital(hospital: { id: string; name: string; city: string }) {
+    const { data, error } = await supabase
+      .from("hospital")
+      .insert({ ...hospital, isDeleted: false });
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // Soft-delete, same pattern as Partogramme/userInfo. Admin-only, gated by
+  // the "Admins can update hospitals" RLS policy
+  // (supabase/policies/2026-07-27_admin_hospital_update.sql).
+  async removeHospital(hospitalId: string) {
+    const { data, error } = await supabase
+      .from("hospital")
+      .update({ isDeleted: true })
+      .eq("id", hospitalId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
   async fetchAllDoctors() {
     const { data, error } = await supabase
       .from("userInfo")
@@ -514,6 +562,52 @@ export class TransportLayer {
       .eq("role", "DOCTOR")
       .neq("isDeleted", true);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // Admin-only. Backed by the "Admins can view all userInfo rows" RLS
+  // policy (supabase/policies/2026-07-27_admin_userinfo_select.sql). A
+  // non-admin caller just gets back the same hospital-scoped rows they'd
+  // see anyway, not an error.
+  async fetchAllUserInfo() {
+    const { data, error } = await supabase
+      .from("userInfo")
+      .select("*")
+      .neq("isDeleted", true);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // The two admin actions below run through Edge Functions, not plain
+  // table calls. Creating/banning an auth.users row needs the
+  // service_role key, which can only run server-side (see
+  // supabase/functions/create-account, supabase/functions/remove-account).
+  // Each function re-checks the caller is an ADMIN itself; RLS isn't what's
+  // protecting these two operations.
+
+  async adminCreateAccount(input: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: "NURSE" | "DOCTOR";
+    hospitalId: string | null;
+    refDoctorId: string | null;
+    phone?: string;
+  }) {
+    const { data, error } = await supabase.functions.invoke("create-account", {
+      body: input,
+    });
+    if (error) { throw await unwrapFunctionError("create-account", error); }
+    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    return data as { userId: string; tempPassword: string };
+  }
+
+  async adminRemoveAccount(userInfoId: string) {
+    const { data, error } = await supabase.functions.invoke("remove-account", {
+      body: { userInfoId },
+    });
+    if (error) { throw await unwrapFunctionError("remove-account", error); }
+    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
     return data;
   }
 }

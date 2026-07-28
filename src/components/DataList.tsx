@@ -15,13 +15,14 @@ import { IconPencil, IconTrash } from "./Icons";
 export interface DataListProps {
   title?: string;
   dataList: data_t[];
-  onEditButtonPress: (data: data_t) => void;
+  /** Omit to render a read-only list (no edit/delete actions). */
+  onEditButtonPress?: (data: data_t) => void;
 }
 
 export interface ItemProps {
   item: data_t;
   showType: boolean;
-  onEditButtonPress: (data: data_t) => void;
+  onEditButtonPress?: (data: data_t) => void;
 }
 
 const Item: React.FC<ItemProps> = observer(({ item, showType, onEditButtonPress }) => {
@@ -44,29 +45,30 @@ const Item: React.FC<ItemProps> = observer(({ item, showType, onEditButtonPress 
         <Text style={styles.timestampTime}>{time}</Text>
         <Text style={styles.timestampDate}>{date}</Text>
       </View>
-      <View style={styles.itemActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => onEditButtonPress(item)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconPencil size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => item.delete()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconTrash size={16} color={colors.danger} />
-        </TouchableOpacity>
-      </View>
+      {onEditButtonPress && (
+        <View style={styles.itemActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => onEditButtonPress(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <IconPencil size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => item.delete()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <IconTrash size={16} color={colors.danger} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 });
 
 const EmptyListMessage = () => (
   <View style={styles.emptyState}>
-    <Text style={styles.emptyIcon}>🗒️</Text>
     <Text style={styles.emptyText}>
       Aucune donnée enregistrée pour le moment.
     </Text>
@@ -174,10 +176,6 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     paddingVertical: spacing.xxl,
-  },
-  emptyIcon: {
-    fontSize: 28,
-    marginBottom: spacing.sm,
   },
   emptyText: {
     color: colors.textMuted,

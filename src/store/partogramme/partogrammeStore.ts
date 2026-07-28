@@ -178,7 +178,20 @@ export class PartogrammeStore {
 
     const handlePayload = (payload: any) => {
       const row = payload.new as Partogramme_t["Row"];
-      if (nurseId && row.nurseId !== nurseId) return;
+      if (nurseId) {
+        if (row.nurseId !== nurseId) return;
+        // Claimed by a doctor (or finished) since her last fetch — she's no
+        // longer "currently managing" it, so drop it from her list right
+        // away instead of just updating its status in place. Local-only:
+        // no server call, the state change already happened server-side.
+        if (row.state !== "ADMITTED" && row.state !== "IN_PROGRESS") {
+          runInAction(() => {
+            const existing = this.partogrammeList.find((p) => p.partogramme.id === row.id);
+            if (existing) this.partogrammeList.splice(this.partogrammeList.indexOf(existing), 1);
+          });
+          return;
+        }
+      }
       runInAction(() => {
         this.updatePartogrammeFromServer(row);
       });
@@ -368,8 +381,6 @@ export class Partogramme {
     refDoctorId: "",
   };
 
-  periodicInterval: any;
-
   store: PartogrammeStore;
   babyHeartFrequencyStore: BabyHeartFrequencyStore;
   dilationStore: DilationStore;
@@ -409,8 +420,6 @@ export class Partogramme {
       asJson: computed,
       partogramme: observable,
       Last10MinutesDataIds: computed,
-      isActive: computed,
-      startPeriodicCheckForPartogrammeState: false,
       isPartogrammeDataLocked: computed,
     });
     this.store = store;
@@ -510,11 +519,6 @@ export class Partogramme {
       hospitalId: hospitalId,
       refDoctorId: refDoctorId,
     };
-
-    if (!this.isActive) {
-      this.changeState("WORK_FINISHED");
-    }
-    this.startPeriodicCheckForPartogrammeState();
   }
 
   // This code returns a JSON representation of the partogramme.
@@ -635,8 +639,12 @@ export class Partogramme {
 
   async changeState(state: Database["public"]["Enums"]["PartogrammeState"]) {
     const data = this.asJson;
-    // If the partogramme is in progress, we set the workStartDateTime
-    if (state === "IN_PROGRESS") {
+    // Only default workStartDateTime here if it was never actually set —
+    // it's chosen at admission time and every elapsed-time calculation
+    // downstream (table rows, graph bands) depends on it staying fixed.
+    // Overwriting it on every transition to IN_PROGRESS reset the clock to
+    // "now" each time, making elapsed time look stuck near zero forever.
+    if (state === "IN_PROGRESS" && !data.workStartDateTime) {
       data.workStartDateTime = new Date().toISOString();
     }
     data.state = state;
@@ -655,29 +663,6 @@ export class Partogramme {
         logger.warn("changeState: updatePartogramme failed", { id: data.id, state, error: error?.message });
         return Promise.reject(error);
       });
-  }
-
-  // if more than 12 Hours since workStartDate, the partogramme is not active anymore
-  get isActive() {
-    if (this.partogramme.workStartDateTime) {
-      const workStartDateTime = new Date(this.partogramme.workStartDateTime);
-      const now = new Date();
-      const diff = now.getTime() - workStartDateTime.getTime();
-      const diffHours = Math.floor(diff / (1000 * 60 * 60));
-      if (diffHours > 12) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  startPeriodicCheckForPartogrammeState() {
-    this.periodicInterval = setInterval(() => {
-      if (!this.isActive) {
-        this.changeState("WORK_FINISHED");
-        clearInterval(this.periodicInterval);
-      }
-    }, 60000);
   }
 
   get isPartogrammeDataLocked() {
