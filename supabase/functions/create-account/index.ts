@@ -1,13 +1,11 @@
 import { corsHeaders, serviceClient, requireAdmin } from "../_shared/adminAuth.ts";
 
-// Admin-only: creates a NURSE or DOCTOR account, active immediately with a
-// generated temp password (no invite email — Supabase's built-in mailer is
-// rate-limited to a handful of sends/hour, which made account creation
-// itself unreliable). The admin relays the temp password to the person
-// out-of-band; userInfo.mustChangePassword forces them to set their own
-// password on first login (see Menu.tsx / DialogSetPassword). Minting an
-// ADMIN account is deliberately NOT possible through this function, that
-// stays a manual SQL-editor action.
+// Admin-only: creates a NURSE, DOCTOR, or ADMIN account, active immediately
+// with a generated temp password (no invite email — Supabase's built-in
+// mailer is rate-limited to a handful of sends/hour, which made account
+// creation itself unreliable). The admin relays the temp password to the
+// person out-of-band; userInfo.mustChangePassword forces them to set their
+// own password on first login (see Menu.tsx / DialogSetPassword).
 
 function generateTempPassword(): string {
   // Avoids visually ambiguous characters (0/O, 1/I/l) since this gets read
@@ -29,7 +27,7 @@ Deno.serve(async (req: Request) => {
     await requireAdmin(req, admin);
 
     const body = await req.json();
-    const { email, firstName, lastName, role, hospitalId, refDoctorId, phone } = body;
+    const { email, firstName, lastName, role, hospitalId, phone } = body;
 
     if (!email || !firstName || !lastName || !role) {
       return new Response(
@@ -37,9 +35,9 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    if (role !== "NURSE" && role !== "DOCTOR") {
+    if (role !== "NURSE" && role !== "DOCTOR" && role !== "ADMIN") {
       return new Response(
-        JSON.stringify({ error: "Only NURSE or DOCTOR accounts can be created here" }),
+        JSON.stringify({ error: "Invalid role" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -97,7 +95,6 @@ Deno.serve(async (req: Request) => {
       lastName,
       role,
       hospitalId: hospitalId ?? null,
-      refDoctorId: refDoctorId ?? null,
       phone: phone ?? "",
       isDeleted: false,
       mustChangePassword: true,

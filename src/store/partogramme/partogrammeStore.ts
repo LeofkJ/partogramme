@@ -277,7 +277,7 @@ export class PartogrammeStore {
     state: Database["public"]["Enums"]["PartogrammeState"],
     workStartDateTime: string | null,
     hospitalId?: string,
-    refDoctorId?: string
+    refDoctorId?: string | null
   ) {
     const partogramme = new Partogramme(
       this,
@@ -292,7 +292,13 @@ export class PartogrammeStore {
       false,
       workStartDateTime,
       hospitalId ? hospitalId : this.rootStore.userInfoStore.userInfo.hospitalId,
-      refDoctorId? refDoctorId : this.rootStore.userInfoStore.userInfo.refDoctorId,
+      // No longer inherited from the nurse's own assigned doctor — every
+      // doctor in the hospital can already see/claim any patient (see
+      // 2026-07-30_partogramme_ref_doctor_nullable.sql), so pre-assigning
+      // one here was friction without real access-control value. Starts
+      // empty; changeState sets it to whichever doctor actually claims or
+      // finishes the patient.
+      refDoctorId ?? null,
     );
     this.state = "pending";
     await this.transportLayer
@@ -412,7 +418,7 @@ export class Partogramme {
     isDeleted: boolean | null = false,
     workStartDateTime: string | null,
     hospitalId: string,
-    refDoctorId: string
+    refDoctorId: string | null
   ) {
     makeAutoObservable(this, {
       store: false,
@@ -646,6 +652,17 @@ export class Partogramme {
     // "now" each time, making elapsed time look stuck near zero forever.
     if (state === "IN_PROGRESS" && !data.workStartDateTime) {
       data.workStartDateTime = new Date().toISOString();
+    }
+    // Attributes the patient to whichever doctor actually claims
+    // (TRANSFERRED) or finishes (WORK_FINISHED) them — nothing picks a
+    // doctor up front anymore since every doctor in the hospital can
+    // already see/act on any patient (see
+    // 2026-07-30_partogramme_ref_doctor_nullable.sql). Always the current
+    // actor, so attribution follows whoever actually did the work even if
+    // a different doctor claimed it earlier.
+    const actingUser = this.store.rootStore.userInfoStore.userInfo;
+    if (actingUser.role === "DOCTOR" && (state === "TRANSFERRED" || state === "WORK_FINISHED")) {
+      data.refDoctorId = this.store.rootStore.profileStore.profile.id;
     }
     data.state = state;
     this.store.transportLayer

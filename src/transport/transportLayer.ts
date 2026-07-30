@@ -589,9 +589,8 @@ export class TransportLayer {
     email: string;
     firstName: string;
     lastName: string;
-    role: "NURSE" | "DOCTOR";
+    role: "NURSE" | "DOCTOR" | "ADMIN";
     hospitalId: string | null;
-    refDoctorId: string | null;
     phone?: string;
   }) {
     const { data, error } = await supabase.functions.invoke("create-account", {
@@ -608,6 +607,47 @@ export class TransportLayer {
     });
     if (error) { throw await unwrapFunctionError("remove-account", error); }
     if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    return data;
+  }
+
+  /** Name/phone/hospital, and optionally role — deliberately can't touch
+   * email (the Auth login identifier) from here, see update-account. */
+  async adminUpdateAccount(input: {
+    userInfoId: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    hospitalId: string | null;
+    role?: "NURSE" | "DOCTOR" | "ADMIN";
+  }) {
+    const { data, error } = await supabase.functions.invoke("update-account", {
+      body: input,
+    });
+    if (error) { throw await unwrapFunctionError("update-account", error); }
+    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    return data;
+  }
+
+  /** profileId -> ISO timestamp of last login, or null if they've never
+   * signed in. Needs the Admin API (service_role), so it's an Edge
+   * Function — last_sign_in_at lives on auth.users, not a table RLS
+   * can expose. */
+  async adminListLogins() {
+    const { data, error } = await supabase.functions.invoke("admin-list-logins");
+    if (error) { throw await unwrapFunctionError("admin-list-logins", error); }
+    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    return data.lastSignInByProfileId as Record<string, string | null>;
+  }
+
+  /** Every active (non-deleted) partogramme across every hospital — for the
+   * Admin accounts list's per-employee active-patient count. Only enough
+   * columns to compute that; not the full row like the nurse/doctor fetch. */
+  async fetchAllPartogrammesForAdmin() {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("id, nurseId, refDoctorId, state")
+      .eq("isDeleted", false);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
     return data;
   }
 }

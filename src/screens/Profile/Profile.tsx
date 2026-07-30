@@ -3,10 +3,10 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWin
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { rootStore } from "../../store/rootStore";
+import { PasswordInput } from "../../components/PasswordInput";
 import CustomButton from "../../components/CustomButton";
 import { IconUser, IconPlus } from "../../components/Icons";
 import { notify } from "../../lib/notify";
-import { normalizeBeninPhone } from "../../lib/phone";
 import { logger } from "../../lib/logger";
 import { reset } from "../../navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
@@ -48,12 +48,10 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
       notify.error("Erreur", "Le numéro de téléphone est obligatoire");
       return;
     }
-    const normalizedPhone = normalizeBeninPhone(phone);
-    setPhone(normalizedPhone);
     setIsSavingInfo(true);
     userInfoStore.userInfoFirstName = firstName;
     userInfoStore.userInfoLastName = lastName;
-    userInfoStore.userInfoPhone = normalizedPhone;
+    userInfoStore.userInfoPhone = phone;
     userInfoStore.userInfoAddress = address;
     profileStore.email = email;
     try {
@@ -185,7 +183,7 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
           disabled={isSavingInfo}
           style={styles.cardButton}
           onPressFunction={handleSaveInfo}
-          styleText={{ fontSize: 15, fontWeight: "bold" }}
+          styleText={{ fontSize: 13, fontWeight: "600", margin: 0 }}
         />
       </View>
 
@@ -194,20 +192,18 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
         <Text style={styles.cardTitle}>Mot de passe</Text>
 
         <Text style={styles.label}>Nouveau mot de passe</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordInput
+          inputStyle={styles.input}
           value={newPassword}
           onChangeText={setNewPassword}
-          secureTextEntry
           placeholderTextColor={colors.textMuted}
         />
 
         <Text style={styles.label}>Confirmer le mot de passe</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordInput
+          inputStyle={styles.input}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          secureTextEntry
           placeholderTextColor={colors.textMuted}
         />
 
@@ -217,7 +213,7 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
           disabled={isSavingPassword}
           style={styles.cardButton}
           onPressFunction={handleChangePassword}
-          styleText={{ fontSize: 15, fontWeight: "bold" }}
+          styleText={{ fontSize: 13, fontWeight: "600", margin: 0 }}
         />
       </View>
 
@@ -282,6 +278,7 @@ const styles = StyleSheet.create({
   },
   wideMain: {
     flex: 1,
+    maxWidth: 440,
   },
   identityBlock: {
     alignItems: "center",
@@ -353,13 +350,13 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text,
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: colors.textSecondary,
     marginTop: spacing.sm,
@@ -376,7 +373,8 @@ const styles = StyleSheet.create({
   },
   cardButton: {
     width: "100%",
-    height: layout.touchTarget,
+    height: 34,
+    margin: 0,
     borderRadius: radius.sm,
     justifyContent: "center",
     marginTop: spacing.lg,
@@ -386,7 +384,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   logoutLinkText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "600",
     color: colors.danger,
   },

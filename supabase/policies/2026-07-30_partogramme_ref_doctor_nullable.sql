@@ -1,0 +1,23 @@
+-- Doctor-attribution rework, part 1: schema change (not an RLS policy —
+-- lives in this folder anyway since that's the established place for
+-- manual SQL this repo needs run by hand, see the other files here).
+--
+-- Context: every doctor in a hospital can already see and act on every
+-- patient there — none of the doctor RLS policies
+-- (2026-07-14_fix_partogramme_doctor_update_scope.sql,
+-- 2026-07-28_doctor_claim_patient.sql) check refDoctorId, only role +
+-- hospitalId. So requiring a nurse to pick a reference doctor up front adds
+-- friction without adding real access control — it doesn't gate anything.
+--
+-- Going forward: a new patient's refDoctorId starts empty and gets set
+-- automatically to whichever doctor actually claims or finishes them (app
+-- changes to follow this SQL step). That means it needs to be nullable —
+-- today it's NOT NULL, so an insert with no ref doctor would fail outright.
+--
+-- No existing policy references refDoctorId at all (checked — this file
+-- only exists because of this), so nothing else needs to change here.
+--
+-- Apply manually via the Supabase SQL editor, same as the other files in
+-- this folder.
+
+alter table "Partogramme" alter column "refDoctorId" drop not null;

@@ -145,6 +145,18 @@ export class UserInfoStore {
         }
         return Promise.reject(error);
       });
+
+    // `hospitalName` above resolves against this list — without it, the
+    // hospital field on nurse/doctor-facing screens (e.g. AddPartogramme)
+    // silently renders as "—" even though hospitalId is set correctly.
+    if (isLoggedIn) {
+      this.transportLayer
+        .fetchAllHospitals()
+        .then((hospitals) => runInAction(() => this.setHospitals(hospitals)))
+        .catch((error: any) => {
+          logger.warn("fetchUserInfo: fetchAllHospitals failed", { error: error?.message });
+        });
+    }
   }
 
   async saveUserInfo() {

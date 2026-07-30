@@ -10,6 +10,7 @@ import {
 import "react-native-url-polyfill/auto";
 import { observer } from "mobx-react";
 import { useLogin } from "./useLogin";
+import { PasswordInput } from "../../components/PasswordInput";
 import { colors, spacing, radius, type, layout } from "../../theme";
 
 export type Props = {
@@ -44,12 +45,11 @@ export const ScreenLogin: React.FC<Props> = observer(({ navigation }) => {
         />
 
         <Text style={styles.inputLabel}>Mot de passe</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordInput
+          inputStyle={styles.input}
           placeholder="••••••••"
           placeholderTextColor={colors.textMuted}
           value={login.password}
-          secureTextEntry={true}
           autoComplete="password"
           returnKeyType="go"
           onSubmitEditing={login.submit}
@@ -130,17 +130,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   errorBanner: {
-    backgroundColor: colors.dangerSoft,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.danger,
-    borderRadius: radius.sm,
-    padding: spacing.md,
+    marginTop: -spacing.sm,
     marginBottom: spacing.lg,
   },
   errorText: {
     fontSize: 13,
     lineHeight: 18,
     color: colors.danger,
+    fontWeight: "500",
   },
   btnPrimary: {
     height: layout.touchTarget,

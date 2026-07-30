@@ -17,10 +17,12 @@ function getContainer(): any {
     Object.assign(el.style, {
       position: "fixed",
       top: "20px",
-      right: "20px",
+      left: "50%",
+      transform: "translateX(-50%)",
       zIndex: "9999",
       display: "flex",
       flexDirection: "column",
+      alignItems: "center",
       gap: "8px",
       maxWidth: "360px",
       width: "calc(100% - 40px)",
@@ -31,19 +33,17 @@ function getContainer(): any {
   return el;
 }
 
-// Minimal check/cross glyph. Colored icon carries the meaning, the card stays neutral.
-function iconSvg(kind: "success" | "error"): string {
-  return kind === "success"
-    ? `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.7L13 4.5" stroke="${colors.success}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-    : `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M12 4L4 12" stroke="${colors.danger}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-}
+// Success gets a minimal checkmark (no circle badge); error stays a plain
+// dot — kept intentionally asymmetric since a bold "X" read as too loud.
+const CHECK_SVG = (color: string) =>
+  `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.7L13 4.5" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 function showToast(
   text: string,
   kind: "success" | "error",
   timeoutMs: number,
 ): void {
-  const iconBg = kind === "success" ? colors.successSoft : colors.dangerSoft;
+  const dotColor = kind === "success" ? colors.success : colors.danger;
 
   const toast = document.createElement("div");
   toast.setAttribute("role", "alert");
@@ -52,36 +52,37 @@ function showToast(
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "9px",
     background: colors.surface,
     border: `1px solid ${colors.border}`,
-    borderRadius: `${radius.md}px`,
-    padding: "12px 14px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.04)",
-    font: `500 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+    borderRadius: "8px",
+    padding: "10px 13px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
+    font: `450 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
     color: colors.text,
     opacity: "0",
-    transform: "translateY(6px) scale(0.98)",
-    transition: "opacity 160ms ease, transform 160ms ease",
+    transform: "translateY(-4px)",
+    transition: "opacity 140ms ease, transform 140ms ease",
   });
 
-  const iconEl = document.createElement("div");
-  Object.assign(iconEl.style, {
-    flexShrink: "0",
-    width: "20px",
-    height: "20px",
-    borderRadius: "50%",
-    background: iconBg,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  });
-  iconEl.innerHTML = iconSvg(kind);
+  const dotEl = document.createElement("div");
+  if (kind === "success") {
+    Object.assign(dotEl.style, { flexShrink: "0", display: "flex" });
+    dotEl.innerHTML = CHECK_SVG(dotColor);
+  } else {
+    Object.assign(dotEl.style, {
+      flexShrink: "0",
+      width: "6px",
+      height: "6px",
+      borderRadius: "50%",
+      background: dotColor,
+    });
+  }
 
   const textEl = document.createElement("div");
   textEl.textContent = text;
 
-  toast.appendChild(iconEl);
+  toast.appendChild(dotEl);
   toast.appendChild(textEl);
 
   let dismissed = false;
@@ -90,16 +91,16 @@ function showToast(
     dismissed = true;
     Object.assign(toast.style, {
       opacity: "0",
-      transform: "translateY(6px) scale(0.98)",
+      transform: "translateY(-4px)",
     });
-    window.setTimeout(() => toast.remove(), 160);
+    window.setTimeout(() => toast.remove(), 140);
   };
   toast.addEventListener("click", dismiss);
   getContainer().appendChild(toast);
 
   // Next frame so the transition from the initial (hidden) state actually animates.
   window.requestAnimationFrame(() => {
-    Object.assign(toast.style, { opacity: "1", transform: "translateY(0) scale(1)" });
+    Object.assign(toast.style, { opacity: "1", transform: "translateY(0)" });
   });
 
   window.setTimeout(dismiss, timeoutMs);

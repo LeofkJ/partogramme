@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, Text, View, TouchableOpacity } from "react-native";
-import { IconUserCog, IconPlus } from "../../components/Icons";
+import { IconPlus } from "../../components/Icons";
 import { PartogrammeList } from "../../components/partogrammeList";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -60,13 +60,6 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
                 : "Médecin"}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => navigation.navigate("Screen_Profile")}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <IconUserCog size={19} color={colors.textSecondary} />
-          </TouchableOpacity>
         </View>
         <View style={styles.headerHairline} />
       </View>
@@ -134,14 +127,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 1,
-  },
-  settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.surfaceMuted,
-    justifyContent: "center",
-    alignItems: "center",
   },
   listContainer: {
     flex: 1,

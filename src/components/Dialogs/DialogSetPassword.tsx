@@ -10,13 +10,13 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
 import { observer } from "mobx-react";
 import { UserInfoStore } from "../../store/user/userInfoStore";
+import { PasswordInput } from "../PasswordInput";
 import { logger } from "../../lib/logger";
 import { colors } from "../../theme";
 
@@ -73,11 +73,10 @@ export const DialogSetPassword = observer(({ isVisible, userInfo, onDone }: IPro
           {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
           <Text style={styles.label}>Nouveau mot de passe</Text>
-          <TextInput
-            style={styles.input}
+          <PasswordInput
+            inputStyle={styles.input}
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="••••••••"
@@ -85,11 +84,10 @@ export const DialogSetPassword = observer(({ isVisible, userInfo, onDone }: IPro
           />
 
           <Text style={styles.label}>Confirmez le mot de passe</Text>
-          <TextInput
-            style={styles.input}
+          <PasswordInput
+            inputStyle={styles.input}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="••••••••"

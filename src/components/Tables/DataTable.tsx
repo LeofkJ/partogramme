@@ -19,7 +19,7 @@ interface Props {
   startTime?: string | null;
 }
 
-const HOUR_LABEL_WIDTH = 56;
+const HOUR_LABEL_WIDTH = 44;
 const ROW_HEIGHT = 46;
 const HEADER_HEIGHT = 44;
 const COL_MIN_WIDTH = 44;

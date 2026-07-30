@@ -10,20 +10,22 @@ import {
 } from "react-native";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
 import { rootStore } from "../../store/rootStore";
 import CustomButton from "../../components/CustomButton";
 import { CustomDropdown } from "../../components/Dialogs/CustomDropdown";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
 import { DialogAccountDetails, AccountDetails } from "../../components/Dialogs/DialogAccountDetails";
+import { DialogEditAccount, EditableAccount } from "../../components/Dialogs/DialogEditAccount";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import { IconTrash, IconPlus, IconUser, IconHome } from "../../components/Icons";
+import { IconTrash, IconPlus, IconUser, IconHome, IconUserCog, IconCopy, IconCheck } from "../../components/Icons";
 import { notify } from "../../lib/notify";
-import { normalizeBeninPhone } from "../../lib/phone";
 import { reset } from "../../navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
+import { formatDateOnly } from "../../tools/StringUtilitary";
 
 type RoleChoice = "NURSE" | "DOCTOR";
-type Page = "create" | "accounts" | "hospitals";
+type Page = "create" | "accounts" | "hospitals" | "admins";
 
 // Below this, the sidebar nav collapses into a segmented control above the
 // content instead of sitting fixed on the side. Comfortably below common
@@ -39,6 +41,13 @@ export const ScreenAdmin: React.FC = observer(() => {
 
   const [page, setPage] = useState<Page>("create");
   const [createdAccount, setCreatedAccount] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+
+  const handleCopyPassword = async (password: string) => {
+    await Clipboard.setStringAsync(password);
+    setPasswordCopied(true);
+    setTimeout(() => setPasswordCopied(false), 2000);
+  };
 
   useEffect(() => {
     // Route gating in the navigator only keeps this off the web nav. Direct
@@ -54,9 +63,16 @@ export const ScreenAdmin: React.FC = observer(() => {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<RoleChoice>("NURSE");
   const [hospitalId, setHospitalId] = useState("");
-  const [refDoctorId, setRefDoctorId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [accountFilter, setAccountFilter] = useState<"ALL" | "NURSE" | "DOCTOR">("ALL");
+
+  const [adminFirstName, setAdminFirstName] = useState("");
+  const [adminLastName, setAdminLastName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
+  const [adminHospitalId, setAdminHospitalId] = useState("");
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const [adminSearch, setAdminSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [hospitalSearch, setHospitalSearch] = useState("");
 
@@ -76,11 +92,6 @@ export const ScreenAdmin: React.FC = observer(() => {
     label: `${h.name}, ${h.city}`,
     value: h.id,
   }));
-  // refDoctorId points at the doctor's profileId, not their userInfo row id.
-  const doctorItems = adminStore.doctors.map((d) => ({
-    label: `${d.firstName} ${d.lastName}`,
-    value: d.profileId,
-  }));
 
   const hospitalName = (id: string | null) =>
     adminStore.hospitals.find((h) => h.id === id)?.name ?? "-";
@@ -88,6 +99,15 @@ export const ScreenAdmin: React.FC = observer(() => {
   const activeAccounts = adminStore.accounts.filter(
     (a) => a.role === "NURSE" || a.role === "DOCTOR",
   );
+  const adminAccounts = adminStore.accounts.filter((a) => a.role === "ADMIN");
+  const adminCount = adminAccounts.length;
+  const myProfileId = rootStore.profileStore.profile.id;
+  const filteredAdminAccounts = adminAccounts.filter((a) => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return true;
+    const haystack = `${a.firstName} ${a.lastName} ${hospitalName(a.hospitalId)}`.toLowerCase();
+    return haystack.includes(query);
+  });
   const filteredAccounts = activeAccounts
     .filter((a) => accountFilter === "ALL" || a.role === accountFilter)
     .filter((a) => {
@@ -108,7 +128,6 @@ export const ScreenAdmin: React.FC = observer(() => {
     setPhone("");
     setRole("NURSE");
     setHospitalId("");
-    setRefDoctorId("");
   };
 
   const handleCreate = async () => {
@@ -120,12 +139,6 @@ export const ScreenAdmin: React.FC = observer(() => {
       notify.error("Erreur", "Veuillez sélectionner un hôpital");
       return;
     }
-    if (role === "NURSE" && !refDoctorId) {
-      notify.error("Erreur", "Veuillez sélectionner un médecin de référence");
-      return;
-    }
-    const normalizedPhone = normalizeBeninPhone(phone);
-    setPhone(normalizedPhone);
     setIsCreating(true);
     try {
       const result = await adminStore.createAccount({
@@ -134,8 +147,7 @@ export const ScreenAdmin: React.FC = observer(() => {
         lastName: lastName.trim(),
         role,
         hospitalId,
-        refDoctorId: role === "NURSE" ? refDoctorId : null,
-        phone: normalizedPhone,
+        phone: phone.trim(),
       });
       setCreatedAccount({ email: email.trim(), tempPassword: result.tempPassword });
       resetForm();
@@ -144,6 +156,38 @@ export const ScreenAdmin: React.FC = observer(() => {
       // adminStore already surfaced the error via notify.error
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const resetAdminForm = () => {
+    setAdminFirstName("");
+    setAdminLastName("");
+    setAdminEmail("");
+    setAdminPhone("");
+    setAdminHospitalId("");
+  };
+
+  const handleCreateAdmin = async () => {
+    if (!adminFirstName.trim() || !adminLastName.trim() || !adminEmail.trim()) {
+      notify.error("Erreur", "Prénom, nom et email sont obligatoires");
+      return;
+    }
+    setIsCreatingAdmin(true);
+    try {
+      const result = await adminStore.createAccount({
+        email: adminEmail.trim(),
+        firstName: adminFirstName.trim(),
+        lastName: adminLastName.trim(),
+        role: "ADMIN",
+        hospitalId: adminHospitalId || null,
+        phone: adminPhone.trim(),
+      });
+      setCreatedAccount({ email: adminEmail.trim(), tempPassword: result.tempPassword });
+      resetAdminForm();
+    } catch {
+      // adminStore already surfaced the error via notify.error
+    } finally {
+      setIsCreatingAdmin(false);
     }
   };
 
@@ -206,15 +250,29 @@ export const ScreenAdmin: React.FC = observer(() => {
   const detailsAccount: AccountDetails | null = (() => {
     const account = adminStore.accounts.find((a) => a.id === detailsAccountId);
     if (!account) return null;
-    const refDoctor = adminStore.doctors.find((d) => d.profileId === account.refDoctorId);
     return {
       name: `${account.firstName} ${account.lastName}`,
-      role: account.role === "DOCTOR" ? "DOCTOR" : "NURSE",
+      role: account.role === "DOCTOR" ? "DOCTOR" : account.role === "ADMIN" ? "ADMIN" : "NURSE",
       email: adminStore.emailByProfileId[account.profileId] ?? null,
       phone: account.phone,
       address: account.address,
       hospitalName: hospitalName(account.hospitalId),
-      refDoctorName: refDoctor ? `${refDoctor.firstName} ${refDoctor.lastName}` : null,
+    };
+  })();
+
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+
+  const editableAccount: EditableAccount | null = (() => {
+    const account = adminStore.accounts.find((a) => a.id === editingAccountId);
+    if (!account) return null;
+    return {
+      userInfoId: account.id,
+      role: account.role === "DOCTOR" ? "DOCTOR" : account.role === "ADMIN" ? "ADMIN" : "NURSE",
+      firstName: account.firstName,
+      lastName: account.lastName,
+      phone: account.phone ?? "",
+      hospitalId: account.hospitalId ?? "",
+      isSelf: account.profileId === myProfileId,
     };
   })();
 
@@ -268,6 +326,19 @@ export const ScreenAdmin: React.FC = observer(() => {
         />
         <Text style={[styles.navButtonText, page === "hospitals" && styles.navButtonTextActive]}>
           Hôpitaux
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navButton, page === "admins" && styles.navButtonActive]}
+        onPress={() => setPage("admins")}
+      >
+        <IconUserCog
+          size={14}
+          color={page === "admins" ? colors.text : colors.textSecondary}
+        />
+        <Text style={[styles.navButtonText, page === "admins" && styles.navButtonTextActive]}>
+          Administrateurs
         </Text>
       </TouchableOpacity>
     </View>
@@ -340,7 +411,7 @@ export const ScreenAdmin: React.FC = observer(() => {
       </View>
 
       <View style={styles.fieldRow}>
-        <View style={styles.fieldHalf}>
+        <View style={styles.fieldNarrow}>
           {requiredLabel("Hôpital")}
           <CustomDropdown
             items={hospitalItems}
@@ -355,28 +426,6 @@ export const ScreenAdmin: React.FC = observer(() => {
             searchPlaceholder="Rechercher un hôpital…"
             clearable
           />
-        </View>
-        <View style={styles.fieldHalf}>
-          {role === "NURSE" ? (
-            <>
-              {requiredLabel("Médecin de référence")}
-              <CustomDropdown
-                items={doctorItems}
-                selectedValue={refDoctorId}
-                onValueChange={setRefDoctorId}
-                placeholder="Sélectionnez un médecin"
-                buttonStyle={styles.dropdownButton}
-                textStyle={styles.dropdownText}
-                menuItemStyle={styles.dropdownMenuItem}
-                menuItemTextStyle={styles.dropdownMenuItemText}
-                searchable
-                searchPlaceholder="Rechercher un médecin…"
-                clearable
-              />
-            </>
-          ) : (
-            <View />
-          )}
         </View>
       </View>
 
@@ -418,72 +467,113 @@ export const ScreenAdmin: React.FC = observer(() => {
 
       {filteredAccounts.length > 0 && isWide && (
         <View style={styles.tableHeaderRow}>
-          <Text style={[styles.tableHeaderText, styles.colName]}>Nom</Text>
+          <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
+          <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
           <Text style={[styles.tableHeaderText, styles.colRole]}>Rôle</Text>
           <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
+          <Text style={[styles.tableHeaderText, styles.colPatients]}>Patients</Text>
+          <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
           <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
         </View>
       )}
 
-      {filteredAccounts.map((account) => (
-        <TouchableOpacity
-          key={account.id}
-          style={styles.accountRow}
-          onPress={() => setDetailsAccountId(account.id)}
-          activeOpacity={0.6}
-        >
-          <View style={[styles.colName, styles.accountInfo]}>
-            <Text style={styles.accountName} numberOfLines={1}>
-              {account.firstName} {account.lastName}
-            </Text>
-            {!isWide && (
-              <Text style={styles.accountMeta}>
+      {filteredAccounts.map((account) => {
+        const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
+        const patientCount = adminStore.patientCounts(account);
+
+        return (
+          <TouchableOpacity
+            key={account.id}
+            style={styles.accountRow}
+            onPress={() => setDetailsAccountId(account.id)}
+            activeOpacity={0.6}
+          >
+            <View style={[styles.colName, styles.accountInfo]}>
+              <Text style={styles.accountName} numberOfLines={1}>
+                {account.firstName} {account.lastName}
+              </Text>
+              {!isWide && !!account.phone && (
+                <Text style={styles.accountMeta}>{account.phone}</Text>
+              )}
+              {!isWide && (
+                <Text style={styles.accountMeta}>
+                  {hospitalName(account.hospitalId)} · {patientCount.active} actif
+                  {patientCount.active !== 1 ? "s" : ""}, {patientCount.inactive} inactif
+                  {patientCount.inactive !== 1 ? "s" : ""} ·{" "}
+                  {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
+                </Text>
+              )}
+            </View>
+
+            {isWide && (
+              <Text style={[styles.colPhone, styles.accountMeta]}>
+                {account.phone || "—"}
+              </Text>
+            )}
+
+            <View style={styles.colRole}>
+              <View
+                style={[
+                  styles.roleBadge,
+                  account.role === "DOCTOR"
+                    ? styles.roleBadgeDoctor
+                    : styles.roleBadgeNurse,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.roleBadgeText,
+                    account.role === "DOCTOR"
+                      ? styles.roleBadgeTextDoctor
+                      : styles.roleBadgeTextNurse,
+                  ]}
+                >
+                  {account.role === "DOCTOR" ? "Médecin" : "Infirmière"}
+                </Text>
+              </View>
+            </View>
+
+            {isWide && (
+              <Text style={[styles.colHospital, styles.accountMeta]}>
                 {hospitalName(account.hospitalId)}
               </Text>
             )}
-          </View>
 
-          <View style={styles.colRole}>
-            <View
-              style={[
-                styles.roleBadge,
-                account.role === "DOCTOR"
-                  ? styles.roleBadgeDoctor
-                  : styles.roleBadgeNurse,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.roleBadgeText,
-                  account.role === "DOCTOR"
-                    ? styles.roleBadgeTextDoctor
-                    : styles.roleBadgeTextNurse,
-                ]}
-              >
-                {account.role === "DOCTOR" ? "Médecin" : "Infirmière"}
+            {isWide && (
+              <View style={[styles.colPatients, styles.patientBadgeRow]}>
+                <View style={[styles.patientBadge, styles.patientBadgeActive]}>
+                  <Text style={[styles.patientBadgeText, styles.patientBadgeTextActive]}>
+                    {patientCount.active}
+                  </Text>
+                </View>
+                <View style={[styles.patientBadge, styles.patientBadgeInactive]}>
+                  <Text style={[styles.patientBadgeText, styles.patientBadgeTextInactive]}>
+                    {patientCount.inactive}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {isWide && (
+              <Text style={[styles.colLastLogin, styles.accountMeta]}>
+                {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
               </Text>
+            )}
+
+            <View style={[styles.colAction, styles.actionCell]}>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() =>
+                  handleRemove(account.id, `${account.firstName} ${account.lastName}`)
+                }
+              >
+                <IconTrash size={13} color={colors.danger} />
+                {isWide && <Text style={styles.removeLink}>Retirer l'accès</Text>}
+              </TouchableOpacity>
             </View>
-          </View>
-
-          {isWide && (
-            <Text style={[styles.colHospital, styles.accountMeta]} numberOfLines={1}>
-              {hospitalName(account.hospitalId)}
-            </Text>
-          )}
-
-          <View style={[styles.colAction, styles.actionCell]}>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() =>
-                handleRemove(account.id, `${account.firstName} ${account.lastName}`)
-              }
-            >
-              <IconTrash size={13} color={colors.danger} />
-              {isWide && <Text style={styles.removeLink}>Retirer l'accès</Text>}
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        );
+      })}
 
       {filteredAccounts.length === 0 && (
         <Text style={styles.emptyText}>
@@ -619,19 +709,217 @@ export const ScreenAdmin: React.FC = observer(() => {
     </>
   );
 
+  const adminsPage = (
+    <>
+      <View style={styles.pageCard}>
+        <Text style={styles.pageTitle}>Nouvel administrateur</Text>
+        <Text style={styles.pageSubtitle}>
+          Un administrateur a accès à toute la gestion des comptes et des hôpitaux. Le compte est activé immédiatement avec un mot de passe temporaire que vous transmettez vous-même à la personne.
+        </Text>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldHalf}>
+            {requiredLabel("Prénom")}
+            <TextInput
+              style={styles.input}
+              value={adminFirstName}
+              onChangeText={setAdminFirstName}
+              placeholder="Aïcha"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+          <View style={styles.fieldHalf}>
+            {requiredLabel("Nom")}
+            <TextInput
+              style={styles.input}
+              value={adminLastName}
+              onChangeText={setAdminLastName}
+              placeholder="Sossou"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </View>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldHalf}>
+            {requiredLabel("Email")}
+            <TextInput
+              style={styles.input}
+              value={adminEmail}
+              onChangeText={setAdminEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="admin@hopital.bj"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+          <View style={styles.fieldHalf}>
+            <Text style={styles.label}>Téléphone (optionnel)</Text>
+            <TextInput
+              style={styles.input}
+              value={adminPhone}
+              onChangeText={setAdminPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </View>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldNarrow}>
+            <Text style={styles.label}>Hôpital (optionnel)</Text>
+            <CustomDropdown
+              items={hospitalItems}
+              selectedValue={adminHospitalId}
+              onValueChange={setAdminHospitalId}
+              placeholder="Sélectionnez un hôpital"
+              buttonStyle={styles.dropdownButton}
+              textStyle={styles.dropdownText}
+              menuItemStyle={styles.dropdownMenuItem}
+              menuItemTextStyle={styles.dropdownMenuItemText}
+              searchable
+              searchPlaceholder="Rechercher un hôpital…"
+              clearable
+            />
+          </View>
+        </View>
+
+        <CustomButton
+          title={isCreatingAdmin ? "Création…" : "Créer l'administrateur"}
+          color={colors.accent}
+          disabled={isCreatingAdmin}
+          style={styles.cardButton}
+          onPressFunction={handleCreateAdmin}
+          styleText={{ fontSize: 12, fontWeight: "600", margin: 0 }}
+        />
+      </View>
+
+      <View style={[styles.pageCard, styles.pageCardSpaced]}>
+        <View style={styles.listHeader}>
+          <Text style={styles.pageTitle}>Administrateurs</Text>
+        </View>
+
+        <TextInput
+          style={[styles.input, styles.searchInput]}
+          value={adminSearch}
+          onChangeText={setAdminSearch}
+          placeholder="Rechercher par nom ou hôpital…"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+        />
+
+        {filteredAdminAccounts.length > 0 && isWide && (
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
+            <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
+            <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
+            <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
+            <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
+          </View>
+        )}
+
+        {filteredAdminAccounts.map((account) => {
+          const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
+          const isSelf = account.profileId === myProfileId;
+
+          return (
+            <TouchableOpacity
+              key={account.id}
+              style={styles.accountRow}
+              onPress={() => setDetailsAccountId(account.id)}
+              activeOpacity={0.6}
+            >
+              <View style={[styles.colName, styles.accountInfo]}>
+                <Text style={styles.accountName} numberOfLines={1}>
+                  {account.firstName} {account.lastName}
+                  {isSelf ? " (vous)" : ""}
+                </Text>
+                {!isWide && !!account.phone && (
+                  <Text style={styles.accountMeta}>{account.phone}</Text>
+                )}
+                {!isWide && (
+                  <Text style={styles.accountMeta}>
+                    {hospitalName(account.hospitalId)} ·{" "}
+                    {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
+                  </Text>
+                )}
+              </View>
+
+              {isWide && (
+                <Text style={[styles.colPhone, styles.accountMeta]}>
+                  {account.phone || "—"}
+                </Text>
+              )}
+
+              {isWide && (
+                <Text style={[styles.colHospital, styles.accountMeta]}>
+                  {hospitalName(account.hospitalId)}
+                </Text>
+              )}
+
+              {isWide && (
+                <Text style={[styles.colLastLogin, styles.accountMeta]}>
+                  {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
+                </Text>
+              )}
+
+              <View style={[styles.colAction, styles.actionCell]}>
+                {!isSelf && adminCount > 1 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() =>
+                      handleRemove(account.id, `${account.firstName} ${account.lastName}`)
+                    }
+                  >
+                    <IconTrash size={13} color={colors.danger} />
+                    {isWide && <Text style={styles.removeLink}>Retirer l'accès</Text>}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+
+        {filteredAdminAccounts.length === 0 && (
+          <Text style={styles.emptyText}>
+            {adminAccounts.length === 0 ? "Aucun administrateur pour le moment" : "Aucun résultat"}
+          </Text>
+        )}
+      </View>
+    </>
+  );
+
   const tempPasswordBanner = createdAccount && (
     <View style={styles.tempPasswordBanner}>
       <Text style={styles.tempPasswordTitle}>
         Compte créé pour {createdAccount.email}
       </Text>
       <Text style={styles.tempPasswordLabel}>Mot de passe temporaire à transmettre :</Text>
-      <Text style={styles.tempPasswordValue} selectable>{createdAccount.tempPassword}</Text>
+      <View style={styles.tempPasswordRow}>
+        <Text style={styles.tempPasswordValue} selectable>{createdAccount.tempPassword}</Text>
+        <TouchableOpacity
+          style={styles.copyButton}
+          onPress={() => handleCopyPassword(createdAccount.tempPassword)}
+        >
+          {passwordCopied ? (
+            <IconCheck size={14} color={colors.success} />
+          ) : (
+            <IconCopy size={14} color={colors.textSecondary} />
+          )}
+          <Text style={styles.copyButtonText}>
+            {passwordCopied ? "Copié" : "Copier"}
+          </Text>
+        </TouchableOpacity>
+      </View>
       <Text style={styles.tempPasswordHint}>
         La personne devra le changer à sa première connexion.
       </Text>
       <TouchableOpacity
         style={styles.tempPasswordDismiss}
-        onPress={() => setCreatedAccount(null)}
+        onPress={() => {
+          setCreatedAccount(null);
+          setPasswordCopied(false);
+        }}
       >
         <Text style={styles.tempPasswordDismissText}>J'ai noté le mot de passe</Text>
       </TouchableOpacity>
@@ -641,7 +929,13 @@ export const ScreenAdmin: React.FC = observer(() => {
   const pageContent = (
     <>
       {tempPasswordBanner}
-      {page === "create" ? createPage : page === "accounts" ? accountsPage : hospitalsPage}
+      {page === "create"
+        ? createPage
+        : page === "accounts"
+          ? accountsPage
+          : page === "hospitals"
+            ? hospitalsPage
+            : adminsPage}
       <DialogConfirm
         isVisible={!!removeTarget}
         setIsVisible={(value) => {
@@ -661,6 +955,20 @@ export const ScreenAdmin: React.FC = observer(() => {
         isVisible={!!detailsAccountId}
         account={detailsAccount}
         onClose={() => setDetailsAccountId(null)}
+        onEdit={() => {
+          setEditingAccountId(detailsAccountId);
+          setDetailsAccountId(null);
+        }}
+      />
+      <DialogEditAccount
+        isVisible={!!editingAccountId}
+        account={editableAccount}
+        hospitalItems={hospitalItems}
+        onClose={() => setEditingAccountId(null)}
+        onSave={async (input) => {
+          await adminStore.updateAccount(input);
+          setEditingAccountId(null);
+        }}
       />
     </>
   );
@@ -785,12 +1093,32 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.sm,
   },
+  tempPasswordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: 4,
+  },
   tempPasswordValue: {
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 1,
     color: colors.success,
-    marginTop: 4,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.success,
+  },
+  copyButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.success,
   },
   tempPasswordHint: {
     fontSize: 11,
@@ -838,6 +1166,9 @@ const styles = StyleSheet.create({
   },
   fieldHalf: {
     flex: 1,
+  },
+  fieldNarrow: {
+    width: 220,
   },
   label: {
     fontSize: 11,
@@ -902,7 +1233,8 @@ const styles = StyleSheet.create({
   tableHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingBottom: spacing.xs,
+    gap: spacing.lg,
+    paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -914,27 +1246,40 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   colName: {
-    flex: 1.2,
+    width: 200,
     minWidth: 0,
+  },
+  colPhone: {
+    width: 150,
   },
   colRole: {
-    width: 90,
+    width: 80,
   },
   colHospital: {
-    flex: 1,
-    minWidth: 0,
+    width: 200,
+  },
+  colPatients: {
+    width: 90,
+    alignItems: "flex-start",
+  },
+  patientBadgeRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  colLastLogin: {
+    width: 140,
   },
   colAction: {
-    width: 140,
+    width: 120,
     alignItems: "flex-end",
   },
   accountRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
+    alignItems: "flex-start",
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.hairline,
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   accountInfo: {
     minWidth: 0,
@@ -1002,6 +1347,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  patientBadge: {
+    alignSelf: "flex-start",
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    alignItems: "center",
+  },
+  patientBadgeActive: {
+    backgroundColor: colors.successSoft,
+  },
+  patientBadgeInactive: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  patientBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  patientBadgeTextActive: {
+    color: colors.success,
+  },
+  patientBadgeTextInactive: {
+    color: colors.textMuted,
   },
   actionCell: {
     alignItems: "flex-end",

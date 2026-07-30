@@ -53,3 +53,14 @@ export async function requireAdmin(req: Request, admin: SupabaseClient) {
 
   return userData.user;
 }
+
+/** How many non-deleted ADMIN accounts currently exist — used to block
+ * demoting/removing the last one and locking everyone out of the panel. */
+export async function countActiveAdmins(admin: SupabaseClient): Promise<number> {
+  const { count } = await admin
+    .from("userInfo")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "ADMIN")
+    .eq("isDeleted", false);
+  return count ?? 0;
+}

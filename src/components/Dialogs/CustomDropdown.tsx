@@ -130,7 +130,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.clearButton}
           >
-            <IconX size={13} color={colors.danger} />
+            <IconX size={13} color={colors.textMuted} />
           </TouchableOpacity>
         )}
         <Animated.View style={{ marginLeft: 8, transform: [{ rotate: chevronRotate }] }}>

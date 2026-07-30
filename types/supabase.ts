@@ -461,7 +461,7 @@ export type Database = {
           nurseId: string
           patientFirstName: string | null
           patientLastName: string | null
-          refDoctorId: string
+          refDoctorId: string | null
           state: Database["public"]["Enums"]["PartogrammeState"]
           workStartDateTime: string | null
         }
@@ -475,7 +475,7 @@ export type Database = {
           nurseId: string
           patientFirstName?: string | null
           patientLastName?: string | null
-          refDoctorId: string
+          refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
           workStartDateTime?: string | null
         }
@@ -489,7 +489,7 @@ export type Database = {
           nurseId?: string
           patientFirstName?: string | null
           patientLastName?: string | null
-          refDoctorId?: string
+          refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
           workStartDateTime?: string | null
         }
@@ -609,6 +609,7 @@ export type Database = {
       }
       get_my_claim: { Args: { claim: string }; Returns: Json }
       get_my_claims: { Args: never; Returns: Json }
+      is_admin: { Args: never; Returns: boolean }
       is_claims_admin: { Args: never; Returns: boolean }
       set_claim: {
         Args: { claim: string; uid: string; value: Json }

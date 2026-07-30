@@ -1,24 +1,27 @@
 /**
  * Read-only detail popup for the Admin accounts list — shows the fields the
- * row itself doesn't have room for (email, phone, address, ref doctor).
+ * row itself doesn't have room for (email, phone, address).
  */
 import { Modal, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { colors, radius, spacing } from "../../theme";
 
 export interface AccountDetails {
   name: string;
-  role: "NURSE" | "DOCTOR";
+  role: "NURSE" | "DOCTOR" | "ADMIN";
   email: string | null;
   phone: string | null;
   address: string | null;
   hospitalName: string;
-  refDoctorName: string | null;
 }
+
+const roleLabel = (role: AccountDetails["role"]) =>
+  role === "DOCTOR" ? "Médecin" : role === "ADMIN" ? "Administrateur" : "Infirmière";
 
 interface Props {
   isVisible: boolean;
   account: AccountDetails | null;
   onClose: () => void;
+  onEdit: () => void;
 }
 
 const Row = ({ label, value }: { label: string; value: string }) => (
@@ -28,7 +31,7 @@ const Row = ({ label, value }: { label: string; value: string }) => (
   </View>
 );
 
-export const DialogAccountDetails = ({ isVisible, account, onClose }: Props) => {
+export const DialogAccountDetails = ({ isVisible, account, onClose, onEdit }: Props) => {
   const { width } = useWindowDimensions();
   if (!account) return null;
 
@@ -40,7 +43,7 @@ export const DialogAccountDetails = ({ isVisible, account, onClose }: Props) => 
             <Text style={styles.name} numberOfLines={1}>{account.name}</Text>
             <View style={styles.roleBadge}>
               <Text style={styles.roleBadgeText}>
-                {account.role === "DOCTOR" ? "Médecin" : "Infirmière"}
+                {roleLabel(account.role)}
               </Text>
             </View>
           </View>
@@ -50,14 +53,16 @@ export const DialogAccountDetails = ({ isVisible, account, onClose }: Props) => 
             <Row label="Téléphone" value={account.phone || "—"} />
             <Row label="Adresse" value={account.address || "—"} />
             <Row label="Hôpital" value={account.hospitalName} />
-            {account.role === "NURSE" && (
-              <Row label="Médecin de référence" value={account.refDoctorName ?? "—"} />
-            )}
           </View>
 
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Fermer</Text>
-          </TouchableOpacity>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Fermer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+              <Text style={styles.editButtonText}>Modifier</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -134,9 +139,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right",
   },
-  closeButton: {
+  footer: {
+    flexDirection: "row",
+    gap: spacing.sm,
     margin: spacing.md,
     marginTop: spacing.sm,
+  },
+  closeButton: {
+    flex: 1,
     paddingVertical: 8,
     borderRadius: radius.sm,
     borderWidth: 1,
@@ -147,5 +157,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: colors.text,
+  },
+  editButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+  },
+  editButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.onAccent,
   },
 });

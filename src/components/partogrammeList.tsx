@@ -1,8 +1,7 @@
-import { faUser } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 import {
+  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -19,7 +18,16 @@ import {
 import { getStringByEnum, partogrammeStates } from "../../types/constants";
 import { logger } from "../lib/logger";
 import { notify } from "../lib/notify";
-import { colors, spacing, radius, layout, statusColors } from "../theme";
+import { colors, spacing, radius, layout } from "../theme";
+
+// Digits get a monospace face — a small nod to a bedside monitor readout —
+// while labels stay on the system sans for calm legibility.
+const monoFontFamily = Platform.select({
+  ios: "Menlo",
+  android: "monospace",
+  web: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  default: "monospace",
+});
 
 // Same green/yellow/red WHO banding logic as the dilation graph, condensed
 // to a single point-in-time classification for the latest reading — no
@@ -48,11 +56,21 @@ function getDilationBand(
   return "yellow";
 }
 
-const BAND_COLORS: Record<DilationBand, string> = {
-  green: colors.success,
-  yellow: colors.warning,
-  red: colors.danger,
-};
+// Status dot color follows the same three buckets as the section grouping
+// (Admis / En cours / Terminée) rather than the finer-grained partogramme
+// state, so the dot always agrees with the section the card sits in.
+function statusDotColor(state: Partogramme_t["Row"]["state"]): string {
+  if (state === "WORK_FINISHED") return colors.success;
+  if (state === "IN_PROGRESS" || state === "TRANSFERRED") return colors.warning;
+  return colors.textMuted;
+}
+
+// Normal fetal heart rate baseline is 110-160 bpm — bradycardia below,
+// tachycardia above (standard obstetric reference range, not WHO-partograph
+// specific like the dilation band).
+function isBpmAlert(bpm: number): boolean {
+  return bpm < 110 || bpm > 160;
+}
 
 export interface PartogrammeListProps {
   title?: string;
@@ -85,9 +103,31 @@ const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
   return patientName;
 };
 
+// A miniature version of the partograph's own alert/action line, standing
+// in for the plain number: dilation is the one reading that's already a
+// plot on the real chart, not just a value.
+const DilationGauge = ({ valueCm, alert }: { valueCm: number; alert: boolean }) => {
+  const pct = Math.min(100, Math.max(0, (valueCm / 10) * 100));
+  return (
+    <View style={styles.gaugeWrap}>
+      <View style={styles.gaugeTrack}>
+        <View style={[styles.gaugeZone, { flex: 55, backgroundColor: colors.success }]} />
+        <View style={[styles.gaugeZone, { flex: 23, backgroundColor: colors.warning }]} />
+        <View style={[styles.gaugeZone, { flex: 22, backgroundColor: colors.danger }]} />
+      </View>
+      <View
+        style={[
+          styles.gaugeMarker,
+          { left: `${pct}%`, backgroundColor: alert ? colors.danger : colors.text },
+        ]}
+      />
+    </View>
+  );
+};
+
 // At-a-glance vitals for an "en cours" row — latest BPM, latest dilation
-// (colored like the graph), and the assigned nurse's phone number, so a
-// doctor can scan the whole list without opening every patient.
+// (with its alert/action gauge), and the assigned nurse's phone number, so
+// a doctor can scan the whole list without opening every patient.
 const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
   const [nursePhone, setNursePhone] = useState<string | null>(null);
 
@@ -112,62 +152,56 @@ const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
   const dilationList = item.dilationStore.sortedDilationList;
   const latestDilation = dilationList.length > 0 ? dilationList[dilationList.length - 1].data.value : null;
   const band = getDilationBand(item.dilationStore, item.asJson.workStartDateTime);
+  const dilationAlert = band === "red";
+  const bpmAlert = latestBpm != null && isBpmAlert(latestBpm);
 
   if (latestBpm == null && latestDilation == null && !nursePhone) return null;
 
-  const stats = [
-    latestBpm != null && {
-      key: "bpm",
-      icon: <IconHeart size={15} color={colors.textSecondary} />,
-      value: `${latestBpm} bpm`,
-      label: "Fréq. cardiaque",
-    },
-    latestDilation != null && {
-      key: "dilation",
-      icon: <View style={[styles.bandDot, { backgroundColor: band ? BAND_COLORS[band] : colors.borderStrong }]} />,
-      value: `${latestDilation} cm`,
-      label: "Dilatation",
-    },
-    !!nursePhone && {
-      key: "nurse",
-      icon: <IconPhone size={15} color={colors.textSecondary} />,
-      value: nursePhone,
-      label: "Infirmière",
-    },
-  ].filter(Boolean) as { key: string; icon: React.ReactNode; value: string; label: string }[];
-
   return (
-    <View style={styles.summaryRow}>
-      {stats.map((stat, i) => (
-        <View key={stat.key} style={[styles.summaryStat, i > 0 && styles.summaryStatBorder]}>
-          <View style={styles.summaryStatLeft}>
-            {stat.icon}
-            <Text style={styles.summaryStatLabel}>{stat.label}</Text>
+    <View style={styles.vitals}>
+      {latestBpm != null && (
+        <View style={[styles.vital, bpmAlert && styles.vitalAlert]}>
+          <View style={styles.vitalLabelRow}>
+            <IconHeart size={10} color={bpmAlert ? colors.danger : colors.textMuted} />
+            <Text style={[styles.vitalLabel, bpmAlert && styles.vitalLabelAlert]}>BPM</Text>
           </View>
-          <Text style={styles.summaryStatValue} numberOfLines={1}>{stat.value}</Text>
+          <Text style={[styles.vitalValue, bpmAlert && styles.vitalValueAlert]}>
+            {latestBpm}
+          </Text>
         </View>
-      ))}
+      )}
+      {latestDilation != null && (
+        <View style={[styles.vital, dilationAlert && styles.vitalAlert]}>
+          <Text style={[styles.vitalLabel, dilationAlert && styles.vitalLabelAlert]}>
+            Dilatation
+          </Text>
+          <Text style={[styles.vitalValue, dilationAlert && styles.vitalValueAlert]}>
+            {latestDilation} cm
+          </Text>
+          <DilationGauge valueCm={latestDilation} alert={dilationAlert} />
+        </View>
+      )}
+      {!!nursePhone && (
+        <View style={styles.vital}>
+          <View style={styles.vitalLabelRow}>
+            <IconPhone size={10} color={colors.textMuted} />
+            <Text style={styles.vitalLabel}>Infirmière</Text>
+          </View>
+          <Text style={[styles.vitalValue, styles.vitalValueSub]}>{nursePhone}</Text>
+        </View>
+      )}
     </View>
   );
 });
 
 const Item = observer(({ item, onPress, onDeleteButtonPress }: ItemProps) => {
-  const status = statusColors(item.partogramme.state);
   const isEnCours = item.partogramme.state === "IN_PROGRESS" || item.partogramme.state === "TRANSFERRED";
   const isDoctor = rootStore.userInfoStore.userInfo.role === "DOCTOR";
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.card} activeOpacity={0.6}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatarCircle}>
-          <FontAwesomeIcon
-            icon={faUser}
-            size={14}
-            color={colors.textSecondary}
-            style={{}}
-          />
-        </View>
-        <View style={styles.nameBlock}>
+      <View style={styles.cardTop}>
+        <View style={styles.idBlock}>
           <Text style={styles.patientName} numberOfLines={1}>
             {renderPatientTextElement(item.partogramme)}
           </Text>
@@ -175,18 +209,21 @@ const Item = observer(({ item, onPress, onDeleteButtonPress }: ItemProps) => {
             Dossier #{Number(item.partogramme.noFile)}
           </Text>
         </View>
-        <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
-          <Text style={[styles.statusChipText, { color: status.fg }]}>
-            {getStringByEnum(partogrammeStates, item.partogramme.state)}
-          </Text>
+        <View style={styles.rightCluster}>
+          <View style={styles.statusTag}>
+            <View style={[styles.statusDot, { backgroundColor: statusDotColor(item.partogramme.state) }]} />
+            <Text style={styles.statusTagText}>
+              {getStringByEnum(partogrammeStates, item.partogramme.state)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={onDeleteButtonPress}
+            style={styles.deleteButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <IconTrash size={16} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={onDeleteButtonPress}
-          style={styles.deleteButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <IconTrash size={18} color={colors.danger} />
-        </TouchableOpacity>
       </View>
 
       {!!item.partogramme.commentary && (
@@ -328,21 +365,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
-  cardHeader: {
+  cardTop: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
   },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceMuted,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  nameBlock: {
+  idBlock: {
     flex: 1,
+    minWidth: 0,
   },
   patientName: {
     fontSize: 16,
@@ -350,70 +381,118 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   fileNumber: {
-    fontSize: 12,
-    color: colors.textSecondary,
+    fontSize: 11,
+    color: colors.textMuted,
     marginTop: 2,
-    fontVariant: ["tabular-nums"],
+    fontFamily: monoFontFamily,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
-  statusChip: {
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+  rightCluster: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexShrink: 0,
   },
-  statusChipText: {
+  statusTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusTagText: {
     fontSize: 11,
     fontWeight: "600",
-    letterSpacing: 0.2,
+    color: colors.textSecondary,
   },
   deleteButton: {
-    width: 32,
-    height: 32,
+    width: 26,
+    height: 26,
     alignItems: "center",
     justifyContent: "center",
   },
   commentLine: {
     marginTop: spacing.md,
-    fontSize: 13.5,
-    lineHeight: 19,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  summaryRow: {
-    marginTop: spacing.md,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.hairline,
-  },
-  summaryStat: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-  },
-  summaryStatBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.hairline,
-  },
-  summaryStatLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  summaryStatValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-    fontVariant: ["tabular-nums"],
-  },
-  summaryStatLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontStyle: "italic",
     color: colors.textSecondary,
   },
-  bandDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
+  vitals: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairline,
+    flexDirection: "row",
+  },
+  vital: {
+    flex: 1,
+    paddingHorizontal: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.hairline,
+  },
+  vitalAlert: {
+    backgroundColor: colors.dangerSoft,
+    borderLeftColor: "transparent",
+    borderRadius: radius.sm,
+    marginVertical: -4,
+    paddingVertical: 6,
+  },
+  vitalLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  vitalLabel: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  vitalLabelAlert: {
+    color: colors.danger,
+  },
+  vitalValue: {
+    marginTop: 3,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
+    fontFamily: monoFontFamily,
+  },
+  vitalValueSub: {
+    fontSize: 12,
+  },
+  vitalValueAlert: {
+    color: colors.danger,
+  },
+  gaugeWrap: {
+    height: 11,
+    justifyContent: "center",
+    marginTop: 5,
+  },
+  gaugeTrack: {
+    height: 5,
+    borderRadius: 3,
+    overflow: "hidden",
+    flexDirection: "row",
+  },
+  gaugeZone: {
+    opacity: 0.35,
+  },
+  gaugeMarker: {
+    position: "absolute",
+    top: 0,
+    width: 3,
+    height: 11,
+    marginLeft: -1.5,
+    borderRadius: 1,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
   },
   emptyText: {
     marginTop: spacing.xxxl,

@@ -47,6 +47,7 @@
     "babel-preset-expo": "~54.0.10",
     "dateformat": "^5.0.3",
     "expo": "^54.0.35",
+    "expo-clipboard": "~8.0.8",
     "expo-dev-client": "~6.0.21",
     "expo-image-picker": "~17.0.11",
     "expo-localization": "~17.0.9",
