@@ -99,6 +99,18 @@ export const svgFontFamily = Platform.select({
   default: undefined,
 });
 
+/**
+ * Monospace face for clinical readings (BPM, dilation, dossier numbers) —
+ * a small nod to a bedside monitor readout, used wherever a number is a
+ * measured value rather than plain body text.
+ */
+export const monoFontFamily = Platform.select({
+  ios: "Menlo",
+  android: "monospace",
+  web: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  default: "monospace",
+});
+
 export const layout = {
   /** Minimum touch target (gloved hands, stress). */
   touchTarget: 48,

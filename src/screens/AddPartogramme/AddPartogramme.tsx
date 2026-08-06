@@ -80,9 +80,15 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           navigation.navigate("Screen_Menu");
         })
         .catch((error) => {
-          logger.warn("createPartogramme failed", { noFile: trimmedNoFile, error: error?.message });
+          logger.warn("createPartogramme failed", { noFile: trimmedNoFile, error: error?.message, code: error?.code });
           setIsSubmitting(false);
-          setErrorMessage("Impossible de créer le partogramme. Veuillez réessayer.");
+          // 23505 = Postgres unique_violation — the (hospitalId, noFile)
+          // constraint (see 2026-08-07_unique_dossier_per_hospital.sql).
+          setErrorMessage(
+            error?.code === "23505"
+              ? "Ce numéro de dossier est déjà utilisé dans cet hôpital. Veuillez en choisir un autre."
+              : "Impossible de créer le partogramme. Veuillez réessayer.",
+          );
         });
     };
 

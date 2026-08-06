@@ -1,7 +1,6 @@
 import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 import {
-  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -9,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { IconTrash, IconHeart, IconPhone } from "./Icons";
+import { IconHeart, IconPhone } from "./Icons";
 import { rootStore } from "../store/rootStore";
 import {
   Partogramme,
@@ -17,44 +16,8 @@ import {
 } from "../store/partogramme/partogrammeStore";
 import { getStringByEnum, partogrammeStates } from "../../types/constants";
 import { logger } from "../lib/logger";
-import { notify } from "../lib/notify";
-import { colors, spacing, radius, layout } from "../theme";
-
-// Digits get a monospace face — a small nod to a bedside monitor readout —
-// while labels stay on the system sans for calm legibility.
-const monoFontFamily = Platform.select({
-  ios: "Menlo",
-  android: "monospace",
-  web: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  default: "monospace",
-});
-
-// Same green/yellow/red WHO banding logic as the dilation graph, condensed
-// to a single point-in-time classification for the latest reading — no
-// color until the patient has actually reached active phase (>=4cm).
-type DilationBand = "green" | "yellow" | "red";
-
-function getDilationBand(
-  dilationStore: Partogramme["dilationStore"],
-  workStartDateTime: string | null,
-): DilationBand | null {
-  const sorted = dilationStore.sortedDilationList;
-  if (sorted.length === 0 || !workStartDateTime) return null;
-  const anchor = sorted.find((p) => p.data.value >= 4);
-  if (!anchor) return null;
-
-  const startMs = new Date(workStartDateTime).getTime();
-  const latest = sorted[sorted.length - 1];
-  const bandOffset = (new Date(anchor.data.created_at).getTime() - startMs) / (1000 * 60 * 60);
-  const x = (new Date(latest.data.created_at).getTime() - startMs) / (1000 * 60 * 60);
-  const h = x - bandOffset;
-  const y = latest.data.value;
-
-  const alertLine = Math.min(10, 4 + h);
-  if (y > alertLine) return "green";
-  if (h >= 4 && y < h) return "red";
-  return "yellow";
-}
+import { getDilationBand, isBpmAlert } from "../lib/clinicalAlerts";
+import { colors, spacing, radius, layout, monoFontFamily } from "../theme";
 
 // Status dot color follows the same three buckets as the section grouping
 // (Admis / En cours / Terminée) rather than the finer-grained partogramme
@@ -65,13 +28,6 @@ function statusDotColor(state: Partogramme_t["Row"]["state"]): string {
   return colors.textMuted;
 }
 
-// Normal fetal heart rate baseline is 110-160 bpm — bradycardia below,
-// tachycardia above (standard obstetric reference range, not WHO-partograph
-// specific like the dilation band).
-function isBpmAlert(bpm: number): boolean {
-  return bpm < 110 || bpm > 160;
-}
-
 export interface PartogrammeListProps {
   title?: string;
   navigation: any;
@@ -80,7 +36,6 @@ export interface PartogrammeListProps {
 export interface ItemProps {
   item: Partogramme;
   onPress: () => void;
-  onDeleteButtonPress: () => void;
 }
 
 const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
@@ -151,7 +106,10 @@ const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
 
   const dilationList = item.dilationStore.sortedDilationList;
   const latestDilation = dilationList.length > 0 ? dilationList[dilationList.length - 1].data.value : null;
-  const band = getDilationBand(item.dilationStore, item.asJson.workStartDateTime);
+  const band = getDilationBand(
+    dilationList.map((d) => d.data),
+    item.asJson.workStartDateTime,
+  );
   const dilationAlert = band === "red";
   const bpmAlert = latestBpm != null && isBpmAlert(latestBpm);
 
@@ -194,7 +152,7 @@ const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
   );
 });
 
-const Item = observer(({ item, onPress, onDeleteButtonPress }: ItemProps) => {
+const Item = observer(({ item, onPress }: ItemProps) => {
   const isEnCours = item.partogramme.state === "IN_PROGRESS" || item.partogramme.state === "TRANSFERRED";
   const isDoctor = rootStore.userInfoStore.userInfo.role === "DOCTOR";
 
@@ -209,20 +167,11 @@ const Item = observer(({ item, onPress, onDeleteButtonPress }: ItemProps) => {
             Dossier #{Number(item.partogramme.noFile)}
           </Text>
         </View>
-        <View style={styles.rightCluster}>
-          <View style={styles.statusTag}>
-            <View style={[styles.statusDot, { backgroundColor: statusDotColor(item.partogramme.state) }]} />
-            <Text style={styles.statusTagText}>
-              {getStringByEnum(partogrammeStates, item.partogramme.state)}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={onDeleteButtonPress}
-            style={styles.deleteButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <IconTrash size={16} color={colors.textMuted} />
-          </TouchableOpacity>
+        <View style={styles.statusTag}>
+          <View style={[styles.statusDot, { backgroundColor: statusDotColor(item.partogramme.state) }]} />
+          <Text style={styles.statusTagText}>
+            {getStringByEnum(partogrammeStates, item.partogramme.state)}
+          </Text>
         </View>
       </View>
 
@@ -274,23 +223,10 @@ export const PartogrammeList = observer(
       navigation.navigate("Screen_Graph");
     };
 
-    const handleDeletePress = async (item: Partogramme) => {
-      const confirmed = await notify.confirm({
-        message: "Êtes-vous sûre de vouloir supprimer ce partogramme?",
-        confirmText: "Supprimer",
-        cancelText: "Annuler",
-        destructive: true,
-      });
-      if (confirmed) {
-        rootStore.partogrammeStore.removePartogramme(item);
-      }
-    };
-
     const renderItem = ({ item }: { item: Partogramme }) => (
       <Item
         item={item}
         onPress={() => partogrammeSelected(item.partogramme.id)}
-        onDeleteButtonPress={() => handleDeletePress(item)}
       />
     );
 
@@ -388,12 +324,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },
-  rightCluster: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    flexShrink: 0,
-  },
   statusTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -408,12 +338,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: colors.textSecondary,
-  },
-  deleteButton: {
-    width: 26,
-    height: 26,
-    alignItems: "center",
-    justifyContent: "center",
   },
   commentLine: {
     marginTop: spacing.md,

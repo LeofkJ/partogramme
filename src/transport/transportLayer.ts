@@ -62,15 +62,6 @@ export class TransportLayer {
     }
   }
 
-  async deletePartogramme(id: string) {
-    const { data, error } = await supabase
-      .from("Partogramme")
-      .update({ isDeleted: true })
-      .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
-    return data;
-  }
-
   async updatePartogramme(partogramme: Partogramme_t["Row"]) {
     const { data, error } = await supabase
       .from("Partogramme")
@@ -639,15 +630,42 @@ export class TransportLayer {
     return data.lastSignInByProfileId as Record<string, string | null>;
   }
 
-  /** Every active (non-deleted) partogramme across every hospital — for the
-   * Admin accounts list's per-employee active-patient count. Only enough
-   * columns to compute that; not the full row like the nurse/doctor fetch. */
+  /** Every non-deleted partogramme across every hospital — feeds both the
+   * Admin accounts list's per-employee active-patient count and the
+   * Dashboard's census/throughput widgets. Only enough columns for those,
+   * not the full row like the nurse/doctor fetch. */
   async fetchAllPartogrammesForAdmin() {
     const { data, error } = await supabase
       .from("Partogramme")
-      .select("id, nurseId, refDoctorId, state")
+      .select(
+        "id, nurseId, refDoctorId, state, hospitalId, admissionDateTime, workStartDateTime, workFinishedDateTime, noFile, patientFirstName, patientLastName, commentary",
+      )
       .eq("isDeleted", false);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
     return data;
+  }
+
+  /** Latest dilation + BPM reading per partogramme, for the Dashboard's
+   * "needs attention" widget (see 2026-08-06_admin_vitals_select.sql for
+   * the RLS this needs). Fetches every reading for the given ids and lets
+   * the caller reduce to "latest per id" — same client-side pattern the
+   * rest of the app already uses for a single patient's history. */
+  async fetchLatestVitalsForAdmin(partogrammeIds: string[]) {
+    if (partogrammeIds.length === 0) return { dilations: [], bpms: [] };
+    const [dilationRes, bpmRes] = await Promise.all([
+      supabase
+        .from("Dilation")
+        .select("partogrammeId, value, created_at")
+        .in("partogrammeId", partogrammeIds)
+        .eq("isDeleted", false),
+      supabase
+        .from("BabyHeartFrequency")
+        .select("partogrammeId, value, created_at")
+        .in("partogrammeId", partogrammeIds)
+        .eq("isDeleted", false),
+    ]);
+    if (dilationRes.error) { logger.error(dilationRes.error.message, { code: dilationRes.error.code }); throw dilationRes.error; }
+    if (bpmRes.error) { logger.error(bpmRes.error.message, { code: bpmRes.error.code }); throw bpmRes.error; }
+    return { dilations: dilationRes.data, bpms: bpmRes.data };
   }
 }

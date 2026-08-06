@@ -18,20 +18,25 @@ import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
 import { DialogAccountDetails, AccountDetails } from "../../components/Dialogs/DialogAccountDetails";
 import { DialogEditAccount, EditableAccount } from "../../components/Dialogs/DialogEditAccount";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import { IconTrash, IconPlus, IconUser, IconHome, IconUserCog, IconCopy, IconCheck } from "../../components/Icons";
+import { IconTrash, IconPlus, IconUser, IconHome, IconUserCog, IconCopy, IconCheck, IconChartBar } from "../../components/Icons";
+import { AdminDashboard } from "./Dashboard";
 import { notify } from "../../lib/notify";
 import { reset } from "../../navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
 import { formatDateOnly } from "../../tools/StringUtilitary";
 
 type RoleChoice = "NURSE" | "DOCTOR";
-type Page = "create" | "accounts" | "hospitals" | "admins";
+type Page = "dashboard" | "create" | "accounts" | "hospitals" | "admins";
 
 // Below this, the sidebar nav collapses into a segmented control above the
 // content instead of sitting fixed on the side. Comfortably below common
 // budget-laptop resolutions (1366x768, 1280x800 and up keep the sidebar).
 const WIDE_BREAKPOINT = 900;
 const SIDEBAR_WIDTH = 220;
+// Sum of every wide-mode column's minWidth + its gaps — below this the
+// table can't fit even at the columns' own floors, so it scrolls
+// horizontally instead of clipping/squishing further.
+const TABLE_MIN_WIDTH = 860;
 
 export const ScreenAdmin: React.FC = observer(() => {
   const adminStore = rootStore.adminStore;
@@ -39,7 +44,7 @@ export const ScreenAdmin: React.FC = observer(() => {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= WIDE_BREAKPOINT;
 
-  const [page, setPage] = useState<Page>("create");
+  const [page, setPage] = useState<Page>("dashboard");
   const [createdAccount, setCreatedAccount] = useState<{ email: string; tempPassword: string } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
 
@@ -84,8 +89,17 @@ export const ScreenAdmin: React.FC = observer(() => {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeletingHospital, setIsDeletingHospital] = useState(false);
 
+  // Same "no manual refresh needed" behavior as the Dashboard, but at the
+  // top level here since accounts/hospitals/administrators/dashboard all
+  // read from this one adminStore — one interval instead of duplicating it
+  // per tab. Initial load keeps its error toast; the recurring background
+  // refreshes stay silent (see fetchAll's `silent` param).
   useEffect(() => {
     adminStore.fetchAll();
+    const interval = setInterval(() => {
+      adminStore.fetchAll(true);
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const hospitalItems = adminStore.hospitals.map((h) => ({
@@ -289,9 +303,22 @@ export const ScreenAdmin: React.FC = observer(() => {
   );
 
   const navButtons = (
-    <View style={styles.navList}>
+    <View style={[styles.navList, !isWide && styles.navListNarrow]}>
       <TouchableOpacity
-        style={[styles.navButton, page === "create" && styles.navButtonActive]}
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "dashboard" && styles.navButtonActive]}
+        onPress={() => setPage("dashboard")}
+      >
+        <IconChartBar
+          size={14}
+          color={page === "dashboard" ? colors.text : colors.textSecondary}
+        />
+        <Text style={[styles.navButtonText, page === "dashboard" && styles.navButtonTextActive]}>
+          Tableau de bord
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "create" && styles.navButtonActive]}
         onPress={() => setPage("create")}
       >
         <IconPlus
@@ -304,7 +331,7 @@ export const ScreenAdmin: React.FC = observer(() => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navButton, page === "accounts" && styles.navButtonActive]}
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "accounts" && styles.navButtonActive]}
         onPress={() => setPage("accounts")}
       >
         <IconUser
@@ -317,7 +344,7 @@ export const ScreenAdmin: React.FC = observer(() => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navButton, page === "hospitals" && styles.navButtonActive]}
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "hospitals" && styles.navButtonActive]}
         onPress={() => setPage("hospitals")}
       >
         <IconHome
@@ -330,7 +357,7 @@ export const ScreenAdmin: React.FC = observer(() => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navButton, page === "admins" && styles.navButtonActive]}
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "admins" && styles.navButtonActive]}
         onPress={() => setPage("admins")}
       >
         <IconUserCog
@@ -463,31 +490,38 @@ export const ScreenAdmin: React.FC = observer(() => {
         placeholder="Rechercher par nom ou hôpital…"
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
+        autoComplete="new-password"
+        autoCorrect={false}
+        textContentType="none"
+        importantForAutofill="no"
       />
 
-      {filteredAccounts.length > 0 && isWide && (
-        <View style={styles.tableHeaderRow}>
-          <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
-          <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
-          <Text style={[styles.tableHeaderText, styles.colRole]}>Rôle</Text>
-          <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
-          <Text style={[styles.tableHeaderText, styles.colPatients]}>Patients</Text>
-          <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
-          <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
-        </View>
-      )}
+      {(() => {
+        const accountsTable = (
+          <>
+            {filteredAccounts.length > 0 && isWide && (
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
+                <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
+                <Text style={[styles.tableHeaderText, styles.colRole]}>Rôle</Text>
+                <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
+                <Text style={[styles.tableHeaderText, styles.colPatients]}>Patients</Text>
+                <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
+                <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
+              </View>
+            )}
 
-      {filteredAccounts.map((account) => {
-        const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
-        const patientCount = adminStore.patientCounts(account);
+            {filteredAccounts.map((account) => {
+              const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
+              const patientCount = adminStore.patientCounts(account);
 
-        return (
-          <TouchableOpacity
-            key={account.id}
-            style={styles.accountRow}
-            onPress={() => setDetailsAccountId(account.id)}
-            activeOpacity={0.6}
-          >
+              return (
+                <TouchableOpacity
+                  key={account.id}
+                  style={styles.accountRow}
+                  onPress={() => setDetailsAccountId(account.id)}
+                  activeOpacity={0.6}
+                >
             <View style={[styles.colName, styles.accountInfo]}>
               <Text style={styles.accountName} numberOfLines={1}>
                 {account.firstName} {account.lastName}
@@ -560,20 +594,31 @@ export const ScreenAdmin: React.FC = observer(() => {
               </Text>
             )}
 
-            <View style={[styles.colAction, styles.actionCell]}>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() =>
-                  handleRemove(account.id, `${account.firstName} ${account.lastName}`)
-                }
-              >
-                <IconTrash size={13} color={colors.danger} />
-                {isWide && <Text style={styles.removeLink}>Retirer l'accès</Text>}
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+                  <View style={[styles.colAction, styles.actionCell]}>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() =>
+                        handleRemove(account.id, `${account.firstName} ${account.lastName}`)
+                      }
+                    >
+                      <IconTrash size={13} color={colors.danger} />
+                      {isWide && <Text style={styles.removeLink} numberOfLines={1}>Retirer l'accès</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </>
         );
-      })}
+
+        return isWide ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableScroll}>
+            <View style={styles.tableScrollContent}>{accountsTable}</View>
+          </ScrollView>
+        ) : (
+          accountsTable
+        );
+      })()}
 
       {filteredAccounts.length === 0 && (
         <Text style={styles.emptyText}>
@@ -639,6 +684,10 @@ export const ScreenAdmin: React.FC = observer(() => {
           placeholder="Rechercher par nom ou ville…"
           placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
+          autoComplete="new-password"
+          autoCorrect={false}
+          textContentType="none"
+          importantForAutofill="no"
         />
 
         {filteredHospitals.map((hospital) => (
@@ -806,17 +855,24 @@ export const ScreenAdmin: React.FC = observer(() => {
           placeholder="Rechercher par nom ou hôpital…"
           placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
+          autoComplete="new-password"
+          autoCorrect={false}
+          textContentType="none"
+          importantForAutofill="no"
         />
 
-        {filteredAdminAccounts.length > 0 && isWide && (
-          <View style={styles.tableHeaderRow}>
-            <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
-            <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
-            <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
-            <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
-            <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
-          </View>
-        )}
+        {(() => {
+          const adminsTable = (
+            <>
+              {filteredAdminAccounts.length > 0 && isWide && (
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
+                  <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
+                  <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
+                  <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
+                  <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
+                </View>
+              )}
 
         {filteredAdminAccounts.map((account) => {
           const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
@@ -872,13 +928,24 @@ export const ScreenAdmin: React.FC = observer(() => {
                     }
                   >
                     <IconTrash size={13} color={colors.danger} />
-                    {isWide && <Text style={styles.removeLink}>Retirer l'accès</Text>}
+                    {isWide && <Text style={styles.removeLink} numberOfLines={1}>Retirer l'accès</Text>}
                   </TouchableOpacity>
                 )}
               </View>
             </TouchableOpacity>
           );
         })}
+            </>
+          );
+
+          return isWide ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableScroll}>
+              <View style={styles.tableScrollContent}>{adminsTable}</View>
+            </ScrollView>
+          ) : (
+            adminsTable
+          );
+        })()}
 
         {filteredAdminAccounts.length === 0 && (
           <Text style={styles.emptyText}>
@@ -929,13 +996,15 @@ export const ScreenAdmin: React.FC = observer(() => {
   const pageContent = (
     <>
       {tempPasswordBanner}
-      {page === "create"
-        ? createPage
-        : page === "accounts"
-          ? accountsPage
-          : page === "hospitals"
-            ? hospitalsPage
-            : adminsPage}
+      {page === "dashboard"
+        ? <AdminDashboard />
+        : page === "create"
+          ? createPage
+          : page === "accounts"
+            ? accountsPage
+            : page === "hospitals"
+              ? hospitalsPage
+              : adminsPage}
       <DialogConfirm
         isVisible={!!removeTarget}
         setIsVisible={(value) => {
@@ -975,18 +1044,37 @@ export const ScreenAdmin: React.FC = observer(() => {
 
   return (
     <SafeAreaView style={styles.body}>
-      <View style={styles.wideLayout}>
-        <View style={styles.sidebar}>
-          {navHeader}
-          {navButtons}
+      {isWide ? (
+        <View style={styles.wideLayout}>
+          <View style={styles.sidebar}>
+            {navHeader}
+            {navButtons}
+          </View>
+          <ScrollView
+            style={styles.mainArea}
+            contentContainerStyle={styles.mainAreaContent}
+          >
+            <View style={styles.mainAreaInner}>{pageContent}</View>
+          </ScrollView>
         </View>
-        <ScrollView
-          style={styles.mainArea}
-          contentContainerStyle={styles.mainAreaContent}
-        >
-          <View style={styles.mainAreaInner}>{pageContent}</View>
-        </ScrollView>
-      </View>
+      ) : (
+        <View style={styles.narrowLayout}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.narrowNavBar}
+            contentContainerStyle={styles.narrowNavBarContent}
+          >
+            {navButtons}
+          </ScrollView>
+          <ScrollView
+            style={styles.mainArea}
+            contentContainerStyle={styles.mainAreaContentNarrow}
+          >
+            <View style={styles.mainAreaInner}>{pageContent}</View>
+          </ScrollView>
+        </View>
+      )}
     </SafeAreaView>
   );
 });
@@ -1011,11 +1099,32 @@ const styles = StyleSheet.create({
     borderRightColor: colors.border,
     padding: spacing.md,
   },
+  // Below WIDE_BREAKPOINT: no fixed-width sidebar at all (it would eat a
+  // huge share of a phone-width screen) — nav becomes a horizontally
+  // scrollable bar above the content instead.
+  narrowLayout: {
+    flex: 1,
+  },
+  narrowNavBar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  narrowNavBarContent: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   mainArea: {
     flex: 1,
   },
   mainAreaContent: {
     padding: spacing.xxl,
+    alignItems: "center",
+  },
+  mainAreaContentNarrow: {
+    padding: spacing.lg,
     alignItems: "center",
   },
   mainAreaInner: {
@@ -1040,6 +1149,13 @@ const styles = StyleSheet.create({
   navList: {
     gap: 2,
   },
+  // Horizontal instead of stacked, and each button sized to its own
+  // content instead of stretching to fill (navButton's flex:1 makes sense
+  // in a vertical sidebar list, not in a horizontal scrolling bar).
+  navListNarrow: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
   navButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1048,6 +1164,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: radius.sm,
     flex: 1,
+  },
+  navButtonNarrow: {
+    flex: 0,
   },
   navButtonActive: {
     backgroundColor: colors.surfaceMuted,
@@ -1161,14 +1280,17 @@ const styles = StyleSheet.create({
   },
   fieldRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.lg,
     maxWidth: layout.maxFormWidth,
   },
   fieldHalf: {
     flex: 1,
+    minWidth: 140,
   },
   fieldNarrow: {
     width: 220,
+    maxWidth: "100%",
   },
   label: {
     fontSize: 11,
@@ -1230,6 +1352,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
+  tableScroll: {
+    // No fixed width — lets the browser decide whether a horizontal
+    // scrollbar is actually needed at the current viewport, instead of
+    // always reserving space for one.
+  },
+  tableScrollContent: {
+    minWidth: TABLE_MIN_WIDTH,
+    width: "100%",
+  },
   tableHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1245,21 +1376,31 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
+  // Flex-based (not fixed px) so columns actually scale with the available
+  // width instead of summing to more than the container can ever offer —
+  // the old fixed widths totaled ~1076px against a 960px max content area,
+  // guaranteed overflow at every "wide" viewport. minWidth is a floor;
+  // TABLE_MIN_WIDTH below + the horizontal ScrollView wrapper is the
+  // fallback once even the floors don't fit.
   colName: {
-    width: 200,
-    minWidth: 0,
+    flex: 1.7,
+    minWidth: 130,
   },
   colPhone: {
-    width: 150,
+    flex: 1.1,
+    minWidth: 100,
   },
   colRole: {
-    width: 80,
+    flex: 0.7,
+    minWidth: 80,
   },
   colHospital: {
-    width: 200,
+    flex: 1.4,
+    minWidth: 120,
   },
   colPatients: {
-    width: 90,
+    flex: 0.7,
+    minWidth: 80,
     alignItems: "flex-start",
   },
   patientBadgeRow: {
@@ -1267,10 +1408,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   colLastLogin: {
-    width: 140,
+    flex: 1,
+    minWidth: 110,
   },
   colAction: {
-    width: 120,
+    flex: 0.9,
+    minWidth: 140,
     alignItems: "flex-end",
   },
   accountRow: {

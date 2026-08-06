@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { colors } from "../../theme";
+import { colors, radius, spacing } from "../../theme";
 import {
   View,
   TouchableOpacity,
@@ -14,7 +14,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { IconChevronDown, IconX } from "../Icons";
+import { IconChevronDown, IconX, IconCheck } from "../Icons";
 
 interface DropdownItem {
   label: string;
@@ -171,6 +171,14 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoFocus
+                // "off" is explicitly ignored by Chrome/Safari on anything
+                // they heuristically guess is login-related — "new-password"
+                // is the one value they actually respect for suppressing
+                // saved-credential suggestions on a non-password field.
+                autoComplete="new-password"
+                autoCorrect={false}
+                textContentType="none"
+                importantForAutofill="no"
               />
             )}
             <FlatList
@@ -197,7 +205,11 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     >
                       {item.label}
                     </Text>
-                    {selected && <Text style={styles.checkmark}>✓</Text>}
+                    {selected && (
+                      <View style={styles.checkmark}>
+                        <IconCheck size={13} color={colors.accent} />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               }}
@@ -215,27 +227,24 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 12,
-  },
+  // No baked-in margin — spacing is the caller's job, not this component's;
+  // a fixed marginBottom here was throwing off vertical alignment wherever
+  // this sits next to other inline elements (e.g. the Dashboard header).
+  container: {},
   button: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
-    borderRadius: 12,
-    backgroundColor: "#f9f8fd",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   buttonText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 13,
     color: colors.text,
     fontWeight: "500",
   },
@@ -245,14 +254,14 @@ const styles = StyleSheet.create({
   menu: {
     position: "absolute",
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: "#ECE9F7",
+    borderColor: colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
     overflow: "hidden",
   },
   // Without this, the list stretches to fill the menu's maxHeight on web
@@ -261,39 +270,38 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   menuItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#F0EEF9",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
   },
   menuItemSelected: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.accentSoft,
   },
   menuItemText: {
-    fontSize: 15,
+    fontSize: 13,
     color: colors.text,
     flex: 1,
   },
   menuItemTextSelected: {
     fontWeight: "600",
+    color: colors.accent,
   },
   checkmark: {
-    color: colors.text,
-    fontWeight: "700",
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   clearButton: {
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   searchInput: {
-    margin: 8,
+    margin: spacing.sm,
     marginBottom: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.background,
@@ -301,7 +309,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   emptyText: {
-    padding: 10,
+    padding: spacing.md,
     textAlign: "center",
     fontSize: 12,
     color: colors.textMuted,

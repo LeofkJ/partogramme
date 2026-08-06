@@ -220,3 +220,9 @@ export const IconCheck: React.FC<IconProps> = ({ size = 24, color = "#000" }) =>
     />
   </Svg>
 );
+
+export const IconChartBar: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M5 21V10M12 21V4M19 21v-7" stroke={color} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);

@@ -463,6 +463,7 @@ export type Database = {
           patientLastName: string | null
           refDoctorId: string | null
           state: Database["public"]["Enums"]["PartogrammeState"]
+          workFinishedDateTime: string | null
           workStartDateTime: string | null
         }
         Insert: {
@@ -477,6 +478,7 @@ export type Database = {
           patientLastName?: string | null
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
+          workFinishedDateTime?: string | null
           workStartDateTime?: string | null
         }
         Update: {
@@ -491,6 +493,7 @@ export type Database = {
           patientLastName?: string | null
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
+          workFinishedDateTime?: string | null
           workStartDateTime?: string | null
         }
         Relationships: [

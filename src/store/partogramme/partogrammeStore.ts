@@ -244,24 +244,20 @@ export class PartogrammeStore {
         json.workStartDateTime,
         json.hospitalId,
         json.refDoctorId,
+        json.workFinishedDateTime,
       );
       partogramme ? this.partogrammeList.push(partogramme) : null;
     }
     if (json.isDeleted) {
-      await this.removePartogramme(partogramme)
-        .then(() => {
-          runInAction(() => {
-            this.state = "done";
-          });
-        }
-        )
-        .catch((error) => {
-          runInAction(() => {
-            this.state = "error";
-          });
-          logger.warn("updatePartogrammeFromServer: removePartogramme failed", { id: json.id, error: error?.message });
-          return Promise.reject(error);
-        });
+      // The server already has isDeleted = true here (this only runs off a
+      // fetch or realtime payload) — patients can no longer be deleted from
+      // the app itself (see the auto soft-delete cron job), so this is
+      // strictly local list cleanup, never a write back to the server.
+      runInAction(() => {
+        const index = this.partogrammeList.indexOf(partogramme);
+        if (index !== -1) this.partogrammeList.splice(index, 1);
+        this.state = "done";
+      });
     } else {
       partogramme.updateFromjson(json);
     }
@@ -321,28 +317,6 @@ export class PartogrammeStore {
     return partogramme;
   }
 
-  // Delete a partogramme from the store
-  async removePartogramme(partogramme: Partogramme) {
-    partogramme.partogramme.isDeleted = true;
-    await this.transportLayer
-      .updatePartogramme(partogramme.partogramme)
-      .then(() => {
-        runInAction(() => {
-          this.state = "done";
-          this.partogrammeList.splice(this.partogrammeList.indexOf(partogramme), 1);
-        });
-        logger.info("Partogramme deleted", { id: partogramme.partogramme.id, noFile: Number(partogramme.partogramme.noFile) });
-        return Promise.resolve(partogramme);
-      })
-      .catch((error) => {
-        runInAction(() => {
-          this.state = "error";
-        });
-        logger.error("Partogramme deletion failed", { error: error?.message });
-        return Promise.reject(error);
-      });
-  }
-
   // Update the focused partogramme
   updateSelectedPartogramme(id: string) {
     this.selectedPartogrammeId = id;
@@ -382,6 +356,7 @@ export class Partogramme {
     nurseId: "",
     state: "ADMITTED",
     workStartDateTime: null,
+    workFinishedDateTime: null,
     isDeleted: false,
     hospitalId:  "",
     refDoctorId: "",
@@ -418,7 +393,8 @@ export class Partogramme {
     isDeleted: boolean | null = false,
     workStartDateTime: string | null,
     hospitalId: string,
-    refDoctorId: string | null
+    refDoctorId: string | null,
+    workFinishedDateTime: string | null = null
   ) {
     makeAutoObservable(this, {
       store: false,
@@ -521,16 +497,11 @@ export class Partogramme {
       nurseId: nurseId,
       state: state,
       workStartDateTime: workStartDateTime,
+      workFinishedDateTime: workFinishedDateTime,
       isDeleted: isDeleted,
       hospitalId: hospitalId,
       refDoctorId: refDoctorId,
     };
-  }
-
-  // This code returns a JSON representation of the partogramme.
-  delete() {
-    this.partogramme.isDeleted = true;
-    this.store.removePartogramme(this);
   }
 
   // This code returns a JSON representation of the partogramme.
@@ -663,6 +634,12 @@ export class Partogramme {
     const actingUser = this.store.rootStore.userInfoStore.userInfo;
     if (actingUser.role === "DOCTOR" && (state === "TRANSFERRED" || state === "WORK_FINISHED")) {
       data.refDoctorId = this.store.rootStore.profileStore.profile.id;
+    }
+    // Starts the 30-day auto soft-delete clock (see
+    // 2026-08-05_auto_softdelete_finished_partogrammes.sql) — only set once,
+    // the same guard reasoning as workStartDateTime above.
+    if (state === "WORK_FINISHED" && !data.workFinishedDateTime) {
+      data.workFinishedDateTime = new Date().toISOString();
     }
     data.state = state;
     this.store.transportLayer
