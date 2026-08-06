@@ -13,7 +13,9 @@ import { logger } from "../../lib/logger";
 
 export type UserInfo = Database["public"]["Tables"]["userInfo"];
 export type Role = Database["public"]["Enums"]["Role"];
+export type NurseType = Database["public"]["Enums"]["NurseType"];
 export type Hospital = Database["public"]["Tables"]["hospital"];
+export type Maternity = Database["public"]["Tables"]["maternity"];
 
 export class UserInfoStore {
   userInfo: UserInfo["Row"] = {
@@ -25,6 +27,8 @@ export class UserInfoStore {
     refDoctorId: "",
     role: "NURSE",
     hospitalId: "",
+    maternityId: null,
+    nurseType: null,
     phone: "",
     address: null,
     mustChangePassword: false,
@@ -32,6 +36,7 @@ export class UserInfoStore {
 
   doctorIds: string[] = [];
   hospitals: Hospital["Row"][] = [];
+  maternities: Maternity["Row"][] = [];
   doctorInfos: UserInfo["Row"][] = [];
 
   state = "pending";
@@ -40,6 +45,13 @@ export class UserInfoStore {
   ProfileStore: ProfileStore;
   in_sync = false;
   saveHandler: any;
+  // Resolves once the AsyncStorage rehydration below has applied its
+  // (possibly stale) snapshot to `userInfo`. Hydration and fetchUserInfo's
+  // network call both race to write `userInfo` with no ordering guarantee —
+  // whichever finishes last wins, so on a slow network the old cached copy
+  // could silently clobber a just-fetched one. fetchUserInfo awaits this
+  // first so hydration always writes before the fetch does, never after.
+  hydrated: Promise<unknown>;
 
   constructor(rootStore: RootStore) {
     makeAutoObservable(this);
@@ -47,7 +59,7 @@ export class UserInfoStore {
     this.ProfileStore = rootStore.profileStore;
     this.transportLayer = rootStore.transportLayer;
 
-    makePersistable(this, {
+    this.hydrated = makePersistable(this, {
       name: "UserInfoStore",
       properties: ["userInfo"],
       storage: AsyncStorage,
@@ -63,6 +75,18 @@ export class UserInfoStore {
       );
       if (hospital) {
         return hospital.name;
+      }
+    }
+    return "";
+  }
+
+  get maternityName() {
+    if (this.userInfo.maternityId) {
+      const maternity = this.maternities.find(
+        (maternity) => maternity.id === this.userInfo.maternityId,
+      );
+      if (maternity) {
+        return maternity.name;
       }
     }
     return "";
@@ -116,7 +140,15 @@ export class UserInfoStore {
     this.hospitals = hospitals;
   }
 
+  setMaternities(maternities: Maternity["Row"][]) {
+    this.maternities = maternities;
+  }
+
   async fetchUserInfo() {
+    // See `hydrated`'s comment — guarantees the AsyncStorage snapshot below
+    // can never overwrite this call's fresh server data after the fact.
+    await this.hydrated.catch(() => {});
+
     let isLoggedIn = false;
     const { data: sessionData } = await supabase.auth.getSession();
     const profileId =
@@ -155,6 +187,15 @@ export class UserInfoStore {
         .then((hospitals) => runInAction(() => this.setHospitals(hospitals)))
         .catch((error: any) => {
           logger.warn("fetchUserInfo: fetchAllHospitals failed", { error: error?.message });
+        });
+
+      // Only maternity nurses ever need this (see `maternityName` above),
+      // but it's cheap and keeps the fetch symmetric with hospitals.
+      this.transportLayer
+        .fetchAllMaternities()
+        .then((maternities) => runInAction(() => this.setMaternities(maternities)))
+        .catch((error: any) => {
+          logger.warn("fetchUserInfo: fetchAllMaternities failed", { error: error?.message });
         });
     }
   }
@@ -231,6 +272,8 @@ export class UserInfoStore {
       refDoctorId: "",
       role: "NURSE",
       hospitalId: "",
+      maternityId: null,
+      nurseType: null,
       phone: "",
       address: null,
       mustChangePassword: false,

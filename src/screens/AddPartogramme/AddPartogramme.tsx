@@ -121,10 +121,14 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Hôpital</Text>
+            <Text style={styles.label}>
+              {userInfoStore.userInfo.nurseType === "MATERNITY" ? "Maternité" : "Hôpital"}
+            </Text>
             <View style={styles.readonlyInput}>
               <Text style={styles.readonlyText}>
-                {userInfoStore.hospitalName || "—"}
+                {(userInfoStore.userInfo.nurseType === "MATERNITY"
+                  ? userInfoStore.maternityName
+                  : userInfoStore.hospitalName) || "—"}
               </Text>
             </View>
           </View>

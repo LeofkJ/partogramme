@@ -135,8 +135,12 @@ export class PartogrammeStore {
   // fetch partogrammes from the server and update the store
   async fetchFromServer(nurseId?: string) {
     this.state = "pending";
-    await this.transportLayer
-      .fetchPartogrammes(this.rootStore.userInfoStore.userInfo.hospitalId, nurseId)
+    const userInfo = this.rootStore.userInfoStore.userInfo;
+    const isMaternityNurse = userInfo.role === "NURSE" && userInfo.nurseType === "MATERNITY";
+    const fetchPromise = isMaternityNurse && nurseId && userInfo.maternityId
+      ? this.transportLayer.fetchPartogrammesForMaternityNurse(userInfo.maternityId, nurseId)
+      : this.transportLayer.fetchPartogrammes(userInfo.hospitalId as string, nurseId);
+    await fetchPromise
       .then((fetchedPartogrammes) => {
         runInAction(() => {
           if (fetchedPartogrammes) {
@@ -245,6 +249,9 @@ export class PartogrammeStore {
         json.hospitalId,
         json.refDoctorId,
         json.workFinishedDateTime,
+        json.maternityId,
+        json.transferReason,
+        json.urgencyLevel,
       );
       partogramme ? this.partogrammeList.push(partogramme) : null;
     }
@@ -275,6 +282,12 @@ export class PartogrammeStore {
     hospitalId?: string,
     refDoctorId?: string | null
   ) {
+    const creator = this.rootStore.userInfoStore.userInfo;
+    // A maternity nurse's patient starts at the maternity, with no
+    // hospital yet — she picks one when she actually transfers (see
+    // Partogramme.transferToHospital). A hospital nurse's patient keeps
+    // the existing behavior exactly as before.
+    const isMaternityNurse = creator.role === "NURSE" && creator.nurseType === "MATERNITY";
     const partogramme = new Partogramme(
       this,
       uuid.v4().toString(),
@@ -287,7 +300,7 @@ export class PartogrammeStore {
       state,
       false,
       workStartDateTime,
-      hospitalId ? hospitalId : this.rootStore.userInfoStore.userInfo.hospitalId,
+      isMaternityNurse ? null : (hospitalId ? hospitalId : creator.hospitalId),
       // No longer inherited from the nurse's own assigned doctor — every
       // doctor in the hospital can already see/claim any patient (see
       // 2026-07-30_partogramme_ref_doctor_nullable.sql), so pre-assigning
@@ -295,6 +308,8 @@ export class PartogrammeStore {
       // empty; changeState sets it to whichever doctor actually claims or
       // finishes the patient.
       refDoctorId ?? null,
+      null,
+      isMaternityNurse ? creator.maternityId : null,
     );
     this.state = "pending";
     await this.transportLayer
@@ -359,7 +374,10 @@ export class Partogramme {
     workFinishedDateTime: null,
     isDeleted: false,
     hospitalId:  "",
+    maternityId: null,
     refDoctorId: "",
+    transferReason: null,
+    urgencyLevel: null,
   };
 
   store: PartogrammeStore;
@@ -392,9 +410,12 @@ export class Partogramme {
     state: Database["public"]["Enums"]["PartogrammeState"],
     isDeleted: boolean | null = false,
     workStartDateTime: string | null,
-    hospitalId: string,
+    hospitalId: string | null,
     refDoctorId: string | null,
-    workFinishedDateTime: string | null = null
+    workFinishedDateTime: string | null = null,
+    maternityId: string | null = null,
+    transferReason: string | null = null,
+    urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"] | null = null
   ) {
     makeAutoObservable(this, {
       store: false,
@@ -500,7 +521,10 @@ export class Partogramme {
       workFinishedDateTime: workFinishedDateTime,
       isDeleted: isDeleted,
       hospitalId: hospitalId,
+      maternityId: maternityId,
       refDoctorId: refDoctorId,
+      transferReason: transferReason,
+      urgencyLevel: urgencyLevel,
     };
   }
 
@@ -655,6 +679,40 @@ export class Partogramme {
           this.store.state = "error";
         });
         logger.warn("changeState: updatePartogramme failed", { id: data.id, state, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
+  // Maternity nurse → hospital referral (see MATERNITY_TRANSFER_PLAN.md).
+  // Deliberately separate from changeState rather than folded into it —
+  // this is the maternity nurse handing the patient to a hospital for the
+  // first time, not a doctor claim/finish, and reuses none of that
+  // method's attribution logic. State becomes TRANSFERRED with no
+  // refDoctorId yet, same as an unclaimed referral — a doctor at the
+  // target hospital claims it via the existing RÉCLAMER flow from there.
+  async transferToHospital(
+    hospitalId: string,
+    reason: string,
+    urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"],
+  ) {
+    const data = this.asJson;
+    data.hospitalId = hospitalId;
+    data.state = "TRANSFERRED";
+    data.transferReason = reason;
+    data.urgencyLevel = urgencyLevel;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("transferToHospital: updatePartogramme failed", { id: data.id, hospitalId, error: error?.message });
         return Promise.reject(error);
       });
   }

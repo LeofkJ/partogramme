@@ -2,19 +2,24 @@ import { makeAutoObservable, runInAction } from "mobx";
 import uuid from "react-native-uuid";
 import { RootStore } from "../rootStore";
 import { TransportLayer } from "../../transport/transportLayer";
-import { UserInfo, Hospital, Role } from "../user/userInfoStore";
+import { UserInfo, Hospital, Maternity, Role } from "../user/userInfoStore";
 import { notify } from "../../lib/notify";
 import { logger } from "../../lib/logger";
 import { getDilationBand, isBpmAlert, TimedReading } from "../../lib/clinicalAlerts";
 
 export type PartogrammeState = "ADMITTED" | "IN_PROGRESS" | "TRANSFERRED" | "WORK_FINISHED";
 
+/** What the Dashboard is scoped to — one hospital, one maternity, or the
+ * aggregate (null) across everything. */
+export type DashboardScope = { hospitalId: string } | { maternityId: string } | null;
+
 export type PartogrammeSummary = {
   id: string;
   nurseId: string;
   refDoctorId: string | null;
   state: string;
-  hospitalId: string;
+  hospitalId: string | null;
+  maternityId: string | null;
   admissionDateTime: string;
   workStartDateTime: string | null;
   workFinishedDateTime: string | null;
@@ -22,6 +27,8 @@ export type PartogrammeSummary = {
   patientFirstName: string | null;
   patientLastName: string | null;
   commentary: string;
+  transferReason: string | null;
+  urgencyLevel: string | null;
 };
 
 // Full dilation history (getDilationBand needs the whole curve to find the
@@ -51,6 +58,7 @@ function isToday(iso: string | null): boolean {
 export class AdminStore {
   accounts: UserInfo["Row"][] = [];
   hospitals: Hospital["Row"][] = [];
+  maternities: Maternity["Row"][] = [];
   // profileId -> email. Separate from `accounts` since email lives on
   // Profile, not userInfo (see 2026-07-28_admin_profile_select.sql).
   emailByProfileId: Record<string, string> = {};
@@ -109,14 +117,25 @@ export class AdminStore {
     return { active: 0, inactive: 0 };
   }
 
-  private scoped(hospitalId?: string | null) {
-    return hospitalId ? this.partogrammes.filter((p) => p.hospitalId === hospitalId) : this.partogrammes;
+  private scoped(scope?: DashboardScope) {
+    if (!scope) return this.partogrammes;
+    return "hospitalId" in scope
+      ? this.partogrammes.filter((p) => p.hospitalId === scope.hospitalId)
+      : this.partogrammes.filter((p) => p.maternityId === scope.maternityId);
   }
 
-  /** Live count by state — the Dashboard's census cards. Pass a hospitalId
-   * to scope to one hospital, or omit for the aggregate across all of them. */
-  censusByState(hospitalId?: string | null): Record<PartogrammeState, number> {
-    const rows = this.scoped(hospitalId);
+  private scopedAccounts(scope?: DashboardScope) {
+    if (!scope) return this.accounts;
+    return "hospitalId" in scope
+      ? this.accounts.filter((a) => a.hospitalId === scope.hospitalId)
+      : this.accounts.filter((a) => a.maternityId === scope.maternityId);
+  }
+
+  /** Live count by state — the Dashboard's census cards. Pass a scope
+   * (one hospital or one maternity) or omit for the aggregate across
+   * everything. */
+  censusByState(scope?: DashboardScope): Record<PartogrammeState, number> {
+    const rows = this.scoped(scope);
     return {
       ADMITTED: rows.filter((p) => p.state === "ADMITTED").length,
       IN_PROGRESS: rows.filter((p) => p.state === "IN_PROGRESS").length,
@@ -126,8 +145,8 @@ export class AdminStore {
   }
 
   /** Today's throughput — how many patients were admitted vs finished today. */
-  todayThroughput(hospitalId?: string | null): { admittedToday: number; finishedToday: number } {
-    const rows = this.scoped(hospitalId);
+  todayThroughput(scope?: DashboardScope): { admittedToday: number; finishedToday: number } {
+    const rows = this.scoped(scope);
     return {
       admittedToday: rows.filter((p) => isToday(p.admissionDateTime)).length,
       finishedToday: rows.filter((p) => isToday(p.workFinishedDateTime)).length,
@@ -136,25 +155,25 @@ export class AdminStore {
 
   /** The actual rows behind censusByState/todayThroughput — for the
    * Dashboard's click-through detail popup on a stat count. */
-  patientsInState(state: PartogrammeState, hospitalId?: string | null): PartogrammeSummary[] {
-    return this.scoped(hospitalId).filter((p) => p.state === state);
+  patientsInState(state: PartogrammeState, scope?: DashboardScope): PartogrammeSummary[] {
+    return this.scoped(scope).filter((p) => p.state === state);
   }
 
-  patientsAdmittedToday(hospitalId?: string | null): PartogrammeSummary[] {
-    return this.scoped(hospitalId).filter((p) => isToday(p.admissionDateTime));
+  patientsAdmittedToday(scope?: DashboardScope): PartogrammeSummary[] {
+    return this.scoped(scope).filter((p) => isToday(p.admissionDateTime));
   }
 
-  patientsFinishedToday(hospitalId?: string | null): PartogrammeSummary[] {
-    return this.scoped(hospitalId).filter((p) => isToday(p.workFinishedDateTime));
+  patientsFinishedToday(scope?: DashboardScope): PartogrammeSummary[] {
+    return this.scoped(scope).filter((p) => isToday(p.workFinishedDateTime));
   }
 
   /** Nurses/doctors assigned to the scope vs how many have logged in
    * recently (see loggedInRecently) — a rough "who's actually around". */
-  staffSnapshot(hospitalId?: string | null): {
+  staffSnapshot(scope?: DashboardScope): {
     totalNurses: number; activeNurses: number;
     totalDoctors: number; activeDoctors: number;
   } {
-    const staff = hospitalId ? this.accounts.filter((a) => a.hospitalId === hospitalId) : this.accounts;
+    const staff = this.scopedAccounts(scope);
     const nurses = staff.filter((a) => a.role === "NURSE");
     const doctors = staff.filter((a) => a.role === "DOCTOR");
     return {
@@ -167,9 +186,8 @@ export class AdminStore {
 
   /** The accounts behind staffSnapshot's active/total counts — for the
    * Dashboard's click-through detail popup. */
-  staffList(role: "NURSE" | "DOCTOR", hospitalId?: string | null): UserInfo["Row"][] {
-    const staff = hospitalId ? this.accounts.filter((a) => a.hospitalId === hospitalId) : this.accounts;
-    return staff.filter((a) => a.role === role);
+  staffList(role: "NURSE" | "DOCTOR", scope?: DashboardScope): UserInfo["Row"][] {
+    return this.scopedAccounts(scope).filter((a) => a.role === role);
   }
 
   /** One row per hospital with its own census + staffing — the root
@@ -177,8 +195,17 @@ export class AdminStore {
   hospitalBreakdown(): { hospital: Hospital["Row"]; census: Record<PartogrammeState, number>; staff: ReturnType<AdminStore["staffSnapshot"]> }[] {
     return this.hospitals.map((hospital) => ({
       hospital,
-      census: this.censusByState(hospital.id),
-      staff: this.staffSnapshot(hospital.id),
+      census: this.censusByState({ hospitalId: hospital.id }),
+      staff: this.staffSnapshot({ hospitalId: hospital.id }),
+    }));
+  }
+
+  /** Same as hospitalBreakdown, one row per maternity. */
+  maternityBreakdown(): { maternity: Maternity["Row"]; census: Record<PartogrammeState, number>; staff: ReturnType<AdminStore["staffSnapshot"]> }[] {
+    return this.maternities.map((maternity) => ({
+      maternity,
+      census: this.censusByState({ maternityId: maternity.id }),
+      staff: this.staffSnapshot({ maternityId: maternity.id }),
     }));
   }
 
@@ -188,8 +215,8 @@ export class AdminStore {
    * just which one triggered) so the UI can show the real number instead
    * of a generic "abnormal" label. Requires fetchDashboardVitals to have
    * run first; returns nothing until it has. */
-  needsAttention(hospitalId?: string | null): (PartogrammeSummary & { reason: "dilation" | "bpm"; value: number })[] {
-    const rows = this.scoped(hospitalId).filter((p) => p.state !== "WORK_FINISHED");
+  needsAttention(scope?: DashboardScope): (PartogrammeSummary & { reason: "dilation" | "bpm"; value: number })[] {
+    const rows = this.scoped(scope).filter((p) => p.state !== "WORK_FINISHED");
     const flagged: (PartogrammeSummary & { reason: "dilation" | "bpm"; value: number })[] = [];
     for (const p of rows) {
       const vitals = this.vitalsByPartogrammeId[p.id];
@@ -256,9 +283,10 @@ export class AdminStore {
   async fetchAll(silent = false) {
     this.state = "pending";
     try {
-      const [accounts, hospitals, profiles, lastLoginByProfileId, partogrammes] = await Promise.all([
+      const [accounts, hospitals, maternities, profiles, lastLoginByProfileId, partogrammes] = await Promise.all([
         this.transportLayer.fetchAllUserInfo(),
         this.transportLayer.fetchAllHospitals(),
+        this.transportLayer.fetchAllMaternities(),
         this.transportLayer.fetchAllProfiles(),
         this.transportLayer.adminListLogins(),
         this.transportLayer.fetchAllPartogrammesForAdmin(),
@@ -266,6 +294,7 @@ export class AdminStore {
       runInAction(() => {
         this.accounts = accounts;
         this.hospitals = hospitals;
+        this.maternities = maternities;
         this.emailByProfileId = Object.fromEntries(
           profiles.filter((p) => p.email).map((p) => [p.id, p.email as string]),
         );
@@ -286,6 +315,8 @@ export class AdminStore {
     lastName: string;
     role: "NURSE" | "DOCTOR" | "ADMIN";
     hospitalId: string | null;
+    maternityId?: string | null;
+    nurseType?: "HOSPITAL" | "MATERNITY" | null;
     phone?: string;
   }) {
     try {
@@ -299,12 +330,13 @@ export class AdminStore {
     }
   }
 
-  async createHospital(input: { name: string; city: string }) {
+  async createHospital(input: { name: string; city: string; region?: string }) {
     try {
       await this.transportLayer.createHospital({
         id: uuid.v4().toString(),
         name: input.name,
         city: input.city,
+        region: input.region || null,
       });
       notify.success("Hôpital ajouté");
       await this.fetchAll();
@@ -325,6 +357,37 @@ export class AdminStore {
     } catch (error: any) {
       logger.warn("AdminStore: removeHospital failed", { error: error?.message });
       notify.error("Erreur", error?.message ?? "Impossible de supprimer l'hôpital");
+      throw error;
+    }
+  }
+
+  async createMaternity(input: { name: string; region: string; address?: string }) {
+    try {
+      await this.transportLayer.createMaternity({
+        id: uuid.v4().toString(),
+        name: input.name,
+        region: input.region,
+        address: input.address ?? null,
+      });
+      notify.success("Maternité ajoutée");
+      await this.fetchAll();
+    } catch (error: any) {
+      logger.warn("AdminStore: createMaternity failed", { error: error?.message });
+      notify.error("Erreur", error?.message ?? "Impossible d'ajouter la maternité");
+      throw error;
+    }
+  }
+
+  async removeMaternity(maternityId: string) {
+    try {
+      await this.transportLayer.removeMaternity(maternityId);
+      runInAction(() => {
+        this.maternities = this.maternities.filter((m) => m.id !== maternityId);
+      });
+      notify.success("Maternité supprimée");
+    } catch (error: any) {
+      logger.warn("AdminStore: removeMaternity failed", { error: error?.message });
+      notify.error("Erreur", error?.message ?? "Impossible de supprimer la maternité");
       throw error;
     }
   }

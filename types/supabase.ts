@@ -225,18 +225,45 @@ export type Database = {
           id: string
           isDeleted: boolean | null
           name: string
+          region: string | null
         }
         Insert: {
           city: string
           id: string
           isDeleted?: boolean | null
           name: string
+          region?: string | null
         }
         Update: {
           city?: string
           id?: string
           isDeleted?: boolean | null
           name?: string
+          region?: string | null
+        }
+        Relationships: []
+      }
+      maternity: {
+        Row: {
+          address: string | null
+          id: string
+          isDeleted: boolean | null
+          name: string
+          region: string
+        }
+        Insert: {
+          address?: string | null
+          id: string
+          isDeleted?: boolean | null
+          name: string
+          region: string
+        }
+        Update: {
+          address?: string | null
+          id?: string
+          isDeleted?: boolean | null
+          name?: string
+          region?: string
         }
         Relationships: []
       }
@@ -454,45 +481,54 @@ export type Database = {
         Row: {
           admissionDateTime: string
           commentary: string
-          hospitalId: string
+          hospitalId: string | null
           id: string
           isDeleted: boolean | null
+          maternityId: string | null
           noFile: number
           nurseId: string
           patientFirstName: string | null
           patientLastName: string | null
           refDoctorId: string | null
           state: Database["public"]["Enums"]["PartogrammeState"]
+          transferReason: string | null
+          urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime: string | null
           workStartDateTime: string | null
         }
         Insert: {
           admissionDateTime: string
           commentary: string
-          hospitalId: string
+          hospitalId?: string | null
           id: string
           isDeleted?: boolean | null
+          maternityId?: string | null
           noFile: number
           nurseId: string
           patientFirstName?: string | null
           patientLastName?: string | null
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
+          transferReason?: string | null
+          urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null
         }
         Update: {
           admissionDateTime?: string
           commentary?: string
-          hospitalId?: string
+          hospitalId?: string | null
           id?: string
           isDeleted?: boolean | null
+          maternityId?: string | null
           noFile?: number
           nurseId?: string
           patientFirstName?: string | null
           patientLastName?: string | null
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
+          transferReason?: string | null
+          urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null
         }
@@ -502,6 +538,13 @@ export type Database = {
             columns: ["hospitalId"]
             isOneToOne: false
             referencedRelation: "hospital"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Partogramme_maternityId_fkey"
+            columns: ["maternityId"]
+            isOneToOne: false
+            referencedRelation: "maternity"
             referencedColumns: ["id"]
           },
           {
@@ -539,7 +582,9 @@ export type Database = {
           id: string
           isDeleted: boolean | null
           lastName: string
+          maternityId: string | null
           mustChangePassword: boolean
+          nurseType: Database["public"]["Enums"]["NurseType"] | null
           phone: string
           profileId: string
           refDoctorId: string | null
@@ -552,7 +597,9 @@ export type Database = {
           id: string
           isDeleted?: boolean | null
           lastName: string
+          maternityId?: string | null
           mustChangePassword?: boolean
+          nurseType?: Database["public"]["Enums"]["NurseType"] | null
           phone?: string
           profileId: string
           refDoctorId?: string | null
@@ -565,7 +612,9 @@ export type Database = {
           id?: string
           isDeleted?: boolean | null
           lastName?: string
+          maternityId?: string | null
           mustChangePassword?: boolean
+          nurseType?: Database["public"]["Enums"]["NurseType"] | null
           phone?: string
           profileId?: string
           refDoctorId?: string | null
@@ -577,6 +626,13 @@ export type Database = {
             columns: ["hospitalId"]
             isOneToOne: false
             referencedRelation: "hospital"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "userInfo_maternityId_fkey"
+            columns: ["maternityId"]
+            isOneToOne: false
+            referencedRelation: "maternity"
             referencedColumns: ["id"]
           },
           {
@@ -633,6 +689,8 @@ export type Database = {
         | "TRANSFERRED"
         | "WORK_FINISHED"
       Role: "NURSE" | "DOCTOR" | "ADMIN"
+      NurseType: "HOSPITAL" | "MATERNITY"
+      UrgencyLevel: "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -775,6 +833,8 @@ export const Constants = {
         "WORK_FINISHED",
       ],
       Role: ["NURSE", "DOCTOR", "ADMIN"],
+      NurseType: ["HOSPITAL", "MATERNITY"],
+      UrgencyLevel: ["LOW", "MEDIUM", "HIGH", "EMERGENCY"],
     },
   },
 } as const

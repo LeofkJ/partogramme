@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: target, error: fetchError } = await admin
       .from("userInfo")
-      .select("id, role, profileId")
+      .select("id, role, profileId, nurseType")
       .eq("id", userInfoId)
       .single();
     if (fetchError || !target) {
@@ -66,13 +66,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // nurseType/maternityId aren't editable from this form yet (maternity
+    // nurses have no maternity picker here) — leave them untouched for an
+    // existing maternity nurse staying a nurse. If the role is changed away
+    // from NURSE, drop nurseType/maternityId since they only apply to nurses.
+    const effectiveRole = role !== undefined ? role : target.role;
+    const isMaternityNurse = effectiveRole === "NURSE" && target.nurseType === "MATERNITY";
+
     const { error: updateError } = await admin
       .from("userInfo")
       .update({
         firstName,
         lastName,
         phone: phone ?? "",
-        hospitalId: hospitalId ?? null,
+        ...(isMaternityNurse
+          ? {}
+          : {
+              hospitalId: hospitalId ?? null,
+              ...(effectiveRole !== "NURSE" ? { nurseType: null, maternityId: null } : {}),
+            }),
         ...(role !== undefined ? { role } : {}),
       })
       .eq("id", userInfoId);

@@ -4,7 +4,8 @@ import { PartogrammeList } from "../../components/partogrammeList";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DialogSetPassword } from "../../components/Dialogs/DialogSetPassword";
-import { useEffect } from "react";
+import { useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { rootStore } from "../../store/rootStore";
 import { logger } from "../../lib/logger";
 import { colors, spacing, layout } from "../../theme";
@@ -37,14 +38,33 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
     }
   };
 
-  useEffect(() => {
+  const refresh = () => {
     rootStore.userInfoStore
       .fetchUserInfo()
       .then(checkOnboarding)
       .catch((error) => {
         logger.warn("Menu: fetchUserInfo failed", { code: error?.code, message: error?.message });
       });
-  }, []);
+  };
+
+  // useFocusEffect (not a plain mount-only useEffect) so this reruns every
+  // time the screen regains focus, not just on first mount — otherwise
+  // navigating back here (or the tab regaining focus, e.g. after a token
+  // refresh) leaves both userInfo and the patient list frozen at whatever
+  // they were on the very first load, with no way to recover short of a
+  // full page refresh. The interval on top of that means new/updated
+  // patients (e.g. someone else's edit, or a maternity transfer landing)
+  // show up on their own, without needing a manual pull-to-refresh —
+  // cleared on blur so it isn't still polling in the background once the
+  // nurse navigates away.
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+      const interval = setInterval(refresh, 18000);
+      return () => clearInterval(interval);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.body}>
@@ -56,7 +76,9 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
             </Text>
             <Text style={styles.headerRole}>
               {rootStore.userInfoStore.userInfo.role === "NURSE"
-                ? "Infirmière"
+                ? rootStore.userInfoStore.userInfo.nurseType === "MATERNITY"
+                  ? "Infirmière de maternité"
+                  : "Infirmière"
                 : "Médecin"}
             </Text>
           </View>

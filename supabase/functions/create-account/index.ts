@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
     await requireAdmin(req, admin);
 
     const body = await req.json();
-    const { email, firstName, lastName, role, hospitalId, phone } = body;
+    const { email, firstName, lastName, role, hospitalId, maternityId, nurseType, phone } = body;
 
     if (!email || !firstName || !lastName || !role) {
       return new Response(
@@ -38,6 +38,18 @@ Deno.serve(async (req: Request) => {
     if (role !== "NURSE" && role !== "DOCTOR" && role !== "ADMIN") {
       return new Response(
         JSON.stringify({ error: "Invalid role" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (nurseType !== undefined && nurseType !== null && nurseType !== "HOSPITAL" && nurseType !== "MATERNITY") {
+      return new Response(
+        JSON.stringify({ error: "Invalid nurseType" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (role === "NURSE" && nurseType === "MATERNITY" && !maternityId) {
+      return new Response(
+        JSON.stringify({ error: "maternityId is required for a maternity nurse" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -88,13 +100,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const isMaternityNurse = role === "NURSE" && nurseType === "MATERNITY";
+
     const { error: userInfoError } = await admin.from("userInfo").insert({
       id: crypto.randomUUID(),
       profileId: newUserId,
       firstName,
       lastName,
       role,
-      hospitalId: hospitalId ?? null,
+      hospitalId: isMaternityNurse ? null : (hospitalId ?? null),
+      maternityId: isMaternityNurse ? maternityId : null,
+      nurseType: role === "NURSE" ? (nurseType ?? "HOSPITAL") : null,
       phone: phone ?? "",
       isDeleted: false,
       mustChangePassword: true,

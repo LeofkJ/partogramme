@@ -13,10 +13,10 @@ import { rootStore } from "../../store/rootStore";
 import { navigate } from "../../navigationRef";
 import { CustomDropdown } from "../../components/Dialogs/CustomDropdown";
 import { DialogSimpleList, SimpleListRow } from "../../components/Dialogs/DialogSimpleList";
-import { PartogrammeSummary, loggedInRecently } from "../../store/admin/adminStore";
+import { DashboardScope, PartogrammeSummary, loggedInRecently } from "../../store/admin/adminStore";
 import { Partogramme_t } from "../../store/partogramme/partogrammeStore";
 import { colors, spacing, radius } from "../../theme";
-import { formatDateOnly } from "../../tools/StringUtilitary";
+import { formatDateString } from "../../tools/StringUtilitary";
 
 // Bordered box, same as the rest of the Admin panel's boxed content
 // (dropdownButton, pageCard) — not the patient card's flat vitals-row style.
@@ -42,10 +42,25 @@ const StaffItem = ({ label, active, total, onPress }: { label: string; active: n
   />
 );
 
+type ScopeType = "HOSPITAL" | "MATERNITY";
+
 export const AdminDashboard: React.FC = observer(() => {
   const adminStore = rootStore.adminStore;
-  const [hospitalId, setHospitalId] = useState("");
-  const scope = hospitalId || null;
+  const [scopeType, setScopeType] = useState<ScopeType>("HOSPITAL");
+  const [locationId, setLocationId] = useState("");
+  const scope: DashboardScope = locationId
+    ? scopeType === "HOSPITAL"
+      ? { hospitalId: locationId }
+      : { maternityId: locationId }
+    : null;
+
+  // The two dropdowns are independent controls, but a hospital id and a
+  // maternity id aren't comparable — switching type without resetting the
+  // second dropdown would leave it holding an id from the wrong table.
+  const handleScopeTypeChange = (type: ScopeType) => {
+    setScopeType(type);
+    setLocationId("");
+  };
 
   // Live-ish without a manual refresh: the accounts/hospitals/partogrammes
   // data itself already polls every 30s at the Admin.tsx level (shared
@@ -64,13 +79,29 @@ export const AdminDashboard: React.FC = observer(() => {
   const staff = adminStore.staffSnapshot(scope);
   const attention = adminStore.needsAttention(scope);
   const breakdown = adminStore.hospitalBreakdown();
+  const maternityBreakdown = adminStore.maternityBreakdown();
 
-  const hospitalItems = [
-    { label: "Tous les hôpitaux", value: "" },
-    ...adminStore.hospitals.map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id })),
+  const scopeTypeItems = [
+    { label: "Hôpital", value: "HOSPITAL" },
+    { label: "Maternité", value: "MATERNITY" },
   ];
 
+  const locationItems = scopeType === "HOSPITAL"
+    ? [
+        { label: "Tous les hôpitaux", value: "" },
+        ...adminStore.hospitals.map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id })),
+      ]
+    : [
+        { label: "Toutes les maternités", value: "" },
+        ...adminStore.maternities.map((m) => ({ label: m.name, value: m.id })),
+      ];
+
   const hospitalName = (id: string | null) => adminStore.hospitals.find((h) => h.id === id)?.name ?? "—";
+  const maternityName = (id: string | null) => adminStore.maternities.find((m) => m.id === id)?.name ?? "—";
+  // A patient has exactly one of hospitalId/maternityId set — used in the
+  // aggregate view to label which one a row belongs to, regardless of type.
+  const facilityName = (p: { hospitalId: string | null; maternityId: string | null }) =>
+    p.maternityId ? maternityName(p.maternityId) : hospitalName(p.hospitalId);
 
   const [detail, setDetail] = useState<{ title: string; rows: SimpleListRow[] } | null>(null);
 
@@ -86,6 +117,7 @@ export const AdminDashboard: React.FC = observer(() => {
       admissionDateTime: p.admissionDateTime,
       commentary: p.commentary,
       hospitalId: p.hospitalId,
+      maternityId: p.maternityId,
       isDeleted: false,
       noFile: p.noFile,
       nurseId: p.nurseId,
@@ -93,6 +125,8 @@ export const AdminDashboard: React.FC = observer(() => {
       patientLastName: p.patientLastName,
       refDoctorId: p.refDoctorId,
       state: p.state as Partogramme_t["Row"]["state"],
+      transferReason: p.transferReason,
+      urgencyLevel: p.urgencyLevel as Partogramme_t["Row"]["urgencyLevel"],
       workFinishedDateTime: p.workFinishedDateTime,
       workStartDateTime: p.workStartDateTime,
     };
@@ -103,11 +137,11 @@ export const AdminDashboard: React.FC = observer(() => {
     });
   };
 
-  const patientRows = (patients: PartogrammeSummary[], showHospital = !scope): SimpleListRow[] =>
+  const patientRows = (patients: PartogrammeSummary[], showFacility = !scope): SimpleListRow[] =>
     patients.map((p) => ({
       key: p.id,
       primary: `${p.patientFirstName ?? "Sans prénom"} ${p.patientLastName ?? ""} · Dossier #${p.noFile}`,
-      secondary: showHospital ? hospitalName(p.hospitalId) : undefined,
+      secondary: showFacility ? facilityName(p) : undefined,
       onPress: () => openPatientDetail(p),
     }));
 
@@ -122,13 +156,15 @@ export const AdminDashboard: React.FC = observer(() => {
       return {
         key: a.id,
         primary: `${a.firstName} ${a.lastName}`,
-        secondary: !scope && a.hospitalId ? hospitalName(a.hospitalId) : undefined,
+        secondary: !scope ? (a.maternityId ? maternityName(a.maternityId) : a.hospitalId ? hospitalName(a.hospitalId) : undefined) : undefined,
+        // Always shows the actual timestamp (not just "récemment"), so an
+        // admin can see exactly when someone last logged in, not just
+        // whether it was within the last 24h — the tone still carries that
+        // active/inactive distinction visually.
         status: {
-          text: active
-            ? "Connecté(e) récemment"
-            : lastLogin
-              ? `Dernière connexion le ${formatDateOnly(lastLogin)}`
-              : "Jamais connecté(e)",
+          text: lastLogin
+            ? `Dernière connexion : ${formatDateString(lastLogin)}`
+            : "Jamais connecté(e)",
           tone: active ? "success" : "muted",
         },
       };
@@ -142,20 +178,32 @@ export const AdminDashboard: React.FC = observer(() => {
         <View style={styles.headerText}>
           <Text style={styles.pageTitle}>Tableau de bord</Text>
           <Text style={styles.pageSubtitle}>
-            {scope ? "Vue d'un seul hôpital." : "Vue agrégée, tous hôpitaux confondus."}
+            {scope && "hospitalId" in scope
+              ? "Vue d'un seul hôpital."
+              : scope
+                ? "Vue d'une seule maternité."
+                : "Vue agrégée, tous hôpitaux et maternités confondus."}
           </Text>
         </View>
-        <CustomDropdown
-          items={hospitalItems}
-          selectedValue={hospitalId}
-          onValueChange={setHospitalId}
-          placeholder="Tous les hôpitaux"
-          buttonStyle={styles.dropdownButton}
-          textStyle={styles.dropdownText}
-          searchable
-          searchPlaceholder="Rechercher un hôpital…"
-          clearable
-        />
+        <View style={styles.dropdownGroup}>
+          <CustomDropdown
+            items={scopeTypeItems}
+            selectedValue={scopeType}
+            onValueChange={(value) => handleScopeTypeChange(value as ScopeType)}
+            placeholder="Hôpital"
+            buttonStyle={styles.dropdownButtonNarrow}
+            textStyle={styles.dropdownText}
+          />
+          <CustomDropdown
+            items={locationItems}
+            selectedValue={locationId}
+            onValueChange={setLocationId}
+            placeholder={scopeType === "HOSPITAL" ? "Tous les hôpitaux" : "Toutes les maternités"}
+            buttonStyle={styles.dropdownButton}
+            textStyle={styles.dropdownText}
+            clearable
+          />
+        </View>
       </View>
 
       <View style={[styles.section, styles.sectionFirst]}>
@@ -182,7 +230,7 @@ export const AdminDashboard: React.FC = observer(() => {
                   {p.patientFirstName ?? "Sans prénom"} {p.patientLastName ?? ""}
                 </Text>
                 <Text style={styles.attentionMeta} numberOfLines={1}>
-                  Dossier #{p.noFile}{!scope ? ` · ${hospitalName(p.hospitalId)}` : ""}
+                  Dossier #{p.noFile}{!scope ? ` · ${facilityName(p)}` : ""}
                 </Text>
               </View>
               <View style={styles.attentionValueBlock}>
@@ -292,6 +340,42 @@ export const AdminDashboard: React.FC = observer(() => {
         </View>
       )}
 
+      {!scope && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Par maternité</Text>
+          <View style={styles.breakdownHeaderRow}>
+            <Text style={[styles.breakdownHeaderText, styles.colHospitalName]} />
+            <Text style={[styles.breakdownHeaderText, styles.colActive]}>Patientes actives</Text>
+            <Text style={[styles.breakdownHeaderText, styles.colStat]}>Infirmières connectées (24h)</Text>
+          </View>
+          {maternityBreakdown.map(({ maternity, census: mCensus, staff: mStaff }) => {
+            const active = mCensus.ADMITTED + mCensus.IN_PROGRESS;
+            const activePatients = adminStore.partogrammes.filter(
+              (p) => p.maternityId === maternity.id && p.state !== "WORK_FINISHED",
+            );
+            return (
+              <TouchableOpacity
+                key={maternity.id}
+                style={styles.breakdownRow}
+                activeOpacity={0.6}
+                onPress={() => setDetail({ title: `Patientes actives — ${maternity.name}`, rows: patientRows(activePatients, false) })}
+              >
+                <Text style={[styles.colHospitalName, styles.hospitalNameText]} numberOfLines={1}>
+                  {maternity.name}
+                </Text>
+                <Text style={[styles.breakdownCell, styles.colActive]}>{active}</Text>
+                <Text style={[styles.breakdownCell, styles.colStat]}>
+                  {mStaff.activeNurses}/{mStaff.totalNurses}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {maternityBreakdown.length === 0 && (
+            <Text style={styles.emptyText}>Aucune maternité pour le moment</Text>
+          )}
+        </View>
+      )}
+
       <DialogSimpleList
         isVisible={!!detail}
         title={detail?.title ?? ""}
@@ -333,6 +417,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  dropdownGroup: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
   dropdownButton: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
@@ -341,6 +429,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 7,
     minWidth: 200,
+  },
+  dropdownButtonNarrow: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    minWidth: 120,
   },
   dropdownText: {
     fontSize: 12,

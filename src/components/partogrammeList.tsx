@@ -206,6 +206,12 @@ export const PartogrammeList = observer(
     const onRefresh = async () => {
       setRefreshing(true);
       try {
+        // Also re-pulls the nurse/doctor's own userInfo (role, nurseType,
+        // hospitalId/maternityId) — without this, an admin edit made while
+        // this screen is open (e.g. reassigning a hospital) never shows up
+        // until the app is force-quit and relaunched, since nothing else on
+        // this screen re-fetches it.
+        await rootStore.userInfoStore.fetchUserInfo();
         if (rootStore.userInfoStore.userInfo.role === "NURSE") {
           await rootStore.partogrammeStore.fetchFromServer(rootStore.profileStore.profile.id);
         } else {

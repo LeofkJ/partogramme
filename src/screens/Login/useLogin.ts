@@ -15,10 +15,27 @@ export function useLogin(onLoggedIn: () => void) {
     // Clear any previous user's data before the new session's data is fetched,
     // so a different user logging in on the same device never sees stale
     // partogrammes/info left over from the last session.
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+    //
+    // This listener never actually unmounts — Login stays mounted under
+    // Menu forever (see Login.tsx: `navigation.navigate`, not `reset`), so
+    // it's still live for the rest of the session. Supabase re-fires
+    // SIGNED_IN whenever the browser tab regains focus and revalidates an
+    // already-valid session — same user, same session, nothing changed —
+    // so treating every SIGNED_IN as "a new login happened" was wiping both
+    // stores on every single tab switch. Only wipe when the session's user
+    // actually differs from whichever profile is currently loaded.
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
+        return;
+      }
+      if (event === "SIGNED_IN") {
+        const previousProfileId = rootStore.userInfoStore.userInfo.profileId;
+        if (previousProfileId && session?.user?.id && session.user.id !== previousProfileId) {
+          rootStore.partogrammeStore.cleanUp();
+          rootStore.userInfoStore.cleanUp();
+        }
       }
     });
     return () => data.subscription.unsubscribe();

@@ -62,6 +62,22 @@ export class TransportLayer {
     }
   }
 
+  /** Same scope as fetchPartogrammes' nurse branch (her own ADMITTED/
+   * IN_PROGRESS patients), just keyed on maternityId instead of
+   * hospitalId — a separate method rather than overloading
+   * fetchPartogrammes, since a maternity nurse has no hospitalId at all. */
+  async fetchPartogrammesForMaternityNurse(maternityId: string, nurseId: string) {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("*")
+      .eq("nurseId", nurseId)
+      .eq("maternityId", maternityId)
+      .eq("isDeleted", false)
+      .in("state", ["ADMITTED", "IN_PROGRESS"]);
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return data;
+  }
+
   async updatePartogramme(partogramme: Partogramme_t["Row"]) {
     const { data, error } = await supabase
       .from("Partogramme")
@@ -526,7 +542,7 @@ export class TransportLayer {
 
   // Admin-only, gated by the "Admins can create hospitals" RLS policy
   // (supabase/policies/2026-07-27_admin_hospital_insert.sql).
-  async createHospital(hospital: { id: string; name: string; city: string }) {
+  async createHospital(hospital: { id: string; name: string; city: string; region?: string | null }) {
     const { data, error } = await supabase
       .from("hospital")
       .insert({ ...hospital, isDeleted: false });
@@ -542,6 +558,37 @@ export class TransportLayer {
       .from("hospital")
       .update({ isDeleted: true })
       .eq("id", hospitalId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  async fetchAllMaternities() {
+    const { data, error } = await supabase
+      .from("maternity")
+      .select("*")
+      .neq("isDeleted", true);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // Admin-only, gated by the "Admins can create maternities" RLS policy
+  // (supabase/policies/2026-08-09_maternity_nurses_and_transfer.sql).
+  async createMaternity(maternity: { id: string; name: string; region: string; address?: string | null }) {
+    const { data, error } = await supabase
+      .from("maternity")
+      .insert({ ...maternity, isDeleted: false });
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // Soft-delete, same pattern as removeHospital. Admin-only, gated by the
+  // "Admins can update maternities" RLS policy
+  // (supabase/policies/2026-08-09_maternity_nurses_and_transfer.sql).
+  async removeMaternity(maternityId: string) {
+    const { data, error } = await supabase
+      .from("maternity")
+      .update({ isDeleted: true })
+      .eq("id", maternityId);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
     return data;
   }
@@ -582,6 +629,8 @@ export class TransportLayer {
     lastName: string;
     role: "NURSE" | "DOCTOR" | "ADMIN";
     hospitalId: string | null;
+    maternityId?: string | null;
+    nurseType?: "HOSPITAL" | "MATERNITY" | null;
     phone?: string;
   }) {
     const { data, error } = await supabase.functions.invoke("create-account", {
@@ -638,7 +687,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Partogramme")
       .select(
-        "id, nurseId, refDoctorId, state, hospitalId, admissionDateTime, workStartDateTime, workFinishedDateTime, noFile, patientFirstName, patientLastName, commentary",
+        "id, nurseId, refDoctorId, state, hospitalId, maternityId, admissionDateTime, workStartDateTime, workFinishedDateTime, noFile, patientFirstName, patientLastName, commentary, transferReason, urgencyLevel",
       )
       .eq("isDeleted", false);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }

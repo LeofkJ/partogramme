@@ -39,6 +39,7 @@ import { DialogEditText } from "../../components/Dialogs/DialogEditText";
 import { formatDateOnly, formatTimeOnly } from "../../tools/StringUtilitary";
 import { getStringByEnum, partogrammeStates } from "../../../types/constants";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
+import { DialogTransferPatient } from "../../components/Dialogs/DialogTransferPatient";
 import { logger } from "../../lib/logger";
 import { notify } from "../../lib/notify";
 import { colors, spacing, radius, layout, statusColors } from "../../theme";
@@ -65,6 +66,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     useState(false);
   const [isChangeStateDialogVisible, setChangeStateDialogVisible] =
     useState(false);
+  const [isTransferDialogVisible, setTransferDialogVisible] = useState(false);
   const [isErrorDialogVisible, setIsErrorDialogVisible] = useState(false);
   const [errorCode, setErrorCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -121,6 +123,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const status = partogramme?.partogramme.state;
   const isNurse = userRole === "NURSE";
   const isDoctor = userRole === "DOCTOR";
+  const isMaternityNurse = isNurse && rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+
+  // Hospitals within the maternity nurse's own region — the transfer
+  // dialog's target list (see MATERNITY_TRANSFER_PLAN.md §5). Hospitals
+  // without a region set yet just never show up here.
+  const ownMaternity = rootStore.userInfoStore.maternities.find(
+    (m) => m.id === rootStore.userInfoStore.userInfo.maternityId,
+  );
+  const transferHospitalItems = ownMaternity
+    ? rootStore.userInfoStore.hospitals
+        .filter((h) => h.region && h.region === ownMaternity.region)
+        .map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id }))
+    : [];
 
   // Nurse can edit when EN COURS, doctor can edit when TRANSFERÉ
   const canEdit =
@@ -450,8 +465,11 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   </TouchableOpacity>
                 )}
 
-                {/* TRANSFERÉ — nurse only, when IN_PROGRESS */}
-                {isNurse && (
+                {/* TRANSFERÉ — hospital nurse only, when IN_PROGRESS. Not for
+                    maternity nurses: this just flips the state without
+                    picking a target hospital, which is meaningless for them
+                    — they use "Transférer" below instead. */}
+                {isNurse && !isMaternityNurse && (
                   <TouchableOpacity
                     disabled={partogramme!.asJson.state !== "IN_PROGRESS"}
                     activeOpacity={0.2}
@@ -478,11 +496,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   </TouchableOpacity>
                 )}
 
-                {/* RÉCLAMER — doctor only, before TRANSFERRED. Lets a
-                    doctor pull a patient under her care directly (e.g. during
-                    rounds) instead of waiting on the nurse to push it via
-                    TRANSFERÉ. Both lead to the same TRANSFERRED state. */}
-                {isDoctor && (status === "ADMITTED" || status === "IN_PROGRESS") && (
+                {/* RÉCLAMER — doctor only, before TRANSFERRED, or on an
+                    unclaimed TRANSFERRED patient (a maternity referral that
+                    arrived with no refDoctorId yet — see
+                    MATERNITY_TRANSFER_PLAN.md). Lets a doctor pull a patient
+                    under her care directly (e.g. during rounds) instead of
+                    waiting on the nurse to push it via TRANSFERÉ. Both lead
+                    to the same TRANSFERRED state; changeState sets
+                    refDoctorId either way, so tapping this on an already-
+                    TRANSFERRED referral is what actually claims it. */}
+                {isDoctor &&
+                  (status === "ADMITTED" ||
+                    status === "IN_PROGRESS" ||
+                    (status === "TRANSFERRED" && !partogramme!.asJson.refDoctorId)) && (
                   <TouchableOpacity
                     activeOpacity={0.2}
                     onPress={() => {
@@ -501,6 +527,30 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       style={[styles.infoText, { padding: 2, color: "white" }]}
                     >
                       {"RÉCLAMER"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Transférer — maternity nurse only, before TRANSFERRED.
+                    Sends the patient to a hospital in her region (see
+                    MATERNITY_TRANSFER_PLAN.md). */}
+                {isMaternityNurse && (status === "ADMITTED" || status === "IN_PROGRESS") && (
+                  <TouchableOpacity
+                    activeOpacity={0.2}
+                    onPress={() => setTransferDialogVisible(true)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: colors.accent,
+                      borderRadius: radius.sm,
+                      padding: 2,
+                      marginLeft: 5,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: "white" }]}
+                    >
+                      {"TRANSFÉRER"}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -551,13 +601,15 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               </Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Hôpital</Text>
+              <Text style={styles.infoLabel}>
+                {isMaternityNurse ? "Maternité" : "Hôpital"}
+              </Text>
               <Text style={styles.infoValue}>
-                {
-                  rootStore.userInfoStore.hospitals.filter(
-                    (h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId,
-                  )[0]?.name
-                }
+                {isMaternityNurse
+                  ? ownMaternity?.name
+                  : rootStore.userInfoStore.hospitals.filter(
+                      (h) => h.id === rootStore.userInfoStore.userInfo?.hospitalId,
+                    )[0]?.name}
               </Text>
             </View>
             <View style={styles.infoRow}>
@@ -601,6 +653,24 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               setChangeStateDialogVisible(false);
             }}
             InfoText={`Voulez-vous vraiment changer l'état du partogramme vers ${partogrammeStates[newState as keyof typeof partogrammeStates]} ?`}
+          />
+
+          <DialogTransferPatient
+            isVisible={isTransferDialogVisible}
+            hospitalItems={transferHospitalItems}
+            onClose={() => setTransferDialogVisible(false)}
+            onSubmit={({ hospitalId, reason, urgencyLevel }) =>
+              partogramme!
+                .transferToHospital(hospitalId, reason, urgencyLevel)
+                .then(() => {
+                  setTransferDialogVisible(false);
+                  navigation.goBack();
+                })
+                .catch((error: any) => {
+                  logger.warn("Graph: transferToHospital failed", { error: error?.message });
+                  return Promise.reject(error);
+                })
+            }
           />
 
           <View style={styles.sectionTitleRow}>

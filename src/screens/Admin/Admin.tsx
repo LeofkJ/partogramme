@@ -26,7 +26,8 @@ import { colors, spacing, radius, layout } from "../../theme";
 import { formatDateOnly } from "../../tools/StringUtilitary";
 
 type RoleChoice = "NURSE" | "DOCTOR";
-type Page = "dashboard" | "create" | "accounts" | "hospitals" | "admins";
+type NurseTypeChoice = "HOSPITAL" | "MATERNITY";
+type Page = "dashboard" | "create" | "accounts" | "hospitals" | "maternities" | "admins";
 
 // Below this, the sidebar nav collapses into a segmented control above the
 // content instead of sitting fixed on the side. Comfortably below common
@@ -68,6 +69,8 @@ export const ScreenAdmin: React.FC = observer(() => {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<RoleChoice>("NURSE");
   const [hospitalId, setHospitalId] = useState("");
+  const [nurseType, setNurseType] = useState<NurseTypeChoice>("HOSPITAL");
+  const [maternityId, setMaternityId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [accountFilter, setAccountFilter] = useState<"ALL" | "NURSE" | "DOCTOR">("ALL");
 
@@ -83,11 +86,22 @@ export const ScreenAdmin: React.FC = observer(() => {
 
   const [newHospitalName, setNewHospitalName] = useState("");
   const [newHospitalCity, setNewHospitalCity] = useState("");
+  const [newHospitalRegion, setNewHospitalRegion] = useState("");
   const [isAddingHospital, setIsAddingHospital] = useState(false);
 
   const [deletingHospitalId, setDeletingHospitalId] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeletingHospital, setIsDeletingHospital] = useState(false);
+
+  const [newMaternityName, setNewMaternityName] = useState("");
+  const [newMaternityRegion, setNewMaternityRegion] = useState("");
+  const [newMaternityAddress, setNewMaternityAddress] = useState("");
+  const [isAddingMaternity, setIsAddingMaternity] = useState(false);
+  const [maternitySearch, setMaternitySearch] = useState("");
+
+  const [deletingMaternityId, setDeletingMaternityId] = useState<string | null>(null);
+  const [maternityDeleteConfirmText, setMaternityDeleteConfirmText] = useState("");
+  const [isDeletingMaternity, setIsDeletingMaternity] = useState(false);
 
   // Same "no manual refresh needed" behavior as the Dashboard, but at the
   // top level here since accounts/hospitals/administrators/dashboard all
@@ -107,8 +121,21 @@ export const ScreenAdmin: React.FC = observer(() => {
     value: h.id,
   }));
 
+  const maternityItems = adminStore.maternities.map((m) => ({
+    label: `${m.name}, ${m.region}`,
+    value: m.id,
+  }));
+
   const hospitalName = (id: string | null) =>
     adminStore.hospitals.find((h) => h.id === id)?.name ?? "-";
+
+  const maternityName = (id: string | null) =>
+    adminStore.maternities.find((m) => m.id === id)?.name ?? "-";
+
+  // A maternity nurse has no hospitalId — show her maternity instead,
+  // everywhere the account list would otherwise display "Hôpital".
+  const facilityName = (account: { hospitalId: string | null; maternityId: string | null; nurseType: string | null }) =>
+    account.nurseType === "MATERNITY" ? maternityName(account.maternityId) : hospitalName(account.hospitalId);
 
   const activeAccounts = adminStore.accounts.filter(
     (a) => a.role === "NURSE" || a.role === "DOCTOR",
@@ -127,12 +154,16 @@ export const ScreenAdmin: React.FC = observer(() => {
     .filter((a) => {
       const query = accountSearch.trim().toLowerCase();
       if (!query) return true;
-      const haystack = `${a.firstName} ${a.lastName} ${hospitalName(a.hospitalId)}`.toLowerCase();
+      const haystack = `${a.firstName} ${a.lastName} ${facilityName(a)}`.toLowerCase();
       return haystack.includes(query);
     });
 
   const filteredHospitals = adminStore.hospitals.filter((h) =>
     `${h.name} ${h.city}`.toLowerCase().includes(hospitalSearch.trim().toLowerCase()),
+  );
+
+  const filteredMaternities = adminStore.maternities.filter((m) =>
+    `${m.name} ${m.region}`.toLowerCase().includes(maternitySearch.trim().toLowerCase()),
   );
 
   const resetForm = () => {
@@ -142,15 +173,19 @@ export const ScreenAdmin: React.FC = observer(() => {
     setPhone("");
     setRole("NURSE");
     setHospitalId("");
+    setNurseType("HOSPITAL");
+    setMaternityId("");
   };
+
+  const isMaternityNurse = role === "NURSE" && nurseType === "MATERNITY";
 
   const handleCreate = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       notify.error("Erreur", "Prénom, nom et email sont obligatoires");
       return;
     }
-    if (!hospitalId) {
-      notify.error("Erreur", "Veuillez sélectionner un hôpital");
+    if (isMaternityNurse ? !maternityId : !hospitalId) {
+      notify.error("Erreur", isMaternityNurse ? "Veuillez sélectionner une maternité" : "Veuillez sélectionner un hôpital");
       return;
     }
     setIsCreating(true);
@@ -160,7 +195,9 @@ export const ScreenAdmin: React.FC = observer(() => {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         role,
-        hospitalId,
+        hospitalId: isMaternityNurse ? null : hospitalId,
+        maternityId: isMaternityNurse ? maternityId : null,
+        nurseType: role === "NURSE" ? nurseType : null,
         phone: phone.trim(),
       });
       setCreatedAccount({ email: email.trim(), tempPassword: result.tempPassword });
@@ -215,9 +252,11 @@ export const ScreenAdmin: React.FC = observer(() => {
       await adminStore.createHospital({
         name: newHospitalName.trim(),
         city: newHospitalCity.trim(),
+        region: newHospitalRegion.trim(),
       });
       setNewHospitalName("");
       setNewHospitalCity("");
+      setNewHospitalRegion("");
     } catch {
       // adminStore already surfaced the error via notify.error
     } finally {
@@ -248,6 +287,51 @@ export const ScreenAdmin: React.FC = observer(() => {
     }
   };
 
+  const handleAddMaternity = async () => {
+    if (!newMaternityName.trim() || !newMaternityRegion.trim()) {
+      notify.error("Erreur", "Nom et région sont obligatoires");
+      return;
+    }
+    setIsAddingMaternity(true);
+    try {
+      await adminStore.createMaternity({
+        name: newMaternityName.trim(),
+        region: newMaternityRegion.trim(),
+        address: newMaternityAddress.trim() || undefined,
+      });
+      setNewMaternityName("");
+      setNewMaternityRegion("");
+      setNewMaternityAddress("");
+    } catch {
+      // adminStore already surfaced the error via notify.error
+    } finally {
+      setIsAddingMaternity(false);
+    }
+  };
+
+  const startDeleteMaternity = (maternityId: string) => {
+    setDeletingMaternityId(maternityId);
+    setMaternityDeleteConfirmText("");
+  };
+
+  const cancelDeleteMaternity = () => {
+    setDeletingMaternityId(null);
+    setMaternityDeleteConfirmText("");
+  };
+
+  const confirmDeleteMaternity = async (maternityId: string) => {
+    setIsDeletingMaternity(true);
+    try {
+      await adminStore.removeMaternity(maternityId);
+      setDeletingMaternityId(null);
+      setMaternityDeleteConfirmText("");
+    } catch {
+      // adminStore already surfaced the error via notify.error
+    } finally {
+      setIsDeletingMaternity(false);
+    }
+  };
+
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleRemove = (userInfoId: string, name: string) => {
@@ -264,13 +348,16 @@ export const ScreenAdmin: React.FC = observer(() => {
   const detailsAccount: AccountDetails | null = (() => {
     const account = adminStore.accounts.find((a) => a.id === detailsAccountId);
     if (!account) return null;
+    const isMaternityNurse = account.nurseType === "MATERNITY";
     return {
       name: `${account.firstName} ${account.lastName}`,
       role: account.role === "DOCTOR" ? "DOCTOR" : account.role === "ADMIN" ? "ADMIN" : "NURSE",
+      isMaternityNurse,
       email: adminStore.emailByProfileId[account.profileId] ?? null,
       phone: account.phone,
       address: account.address,
-      hospitalName: hospitalName(account.hospitalId),
+      facilityLabel: isMaternityNurse ? "Maternité" : "Hôpital",
+      facilityName: facilityName(account),
     };
   })();
 
@@ -357,6 +444,19 @@ export const ScreenAdmin: React.FC = observer(() => {
       </TouchableOpacity>
 
       <TouchableOpacity
+        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "maternities" && styles.navButtonActive]}
+        onPress={() => setPage("maternities")}
+      >
+        <IconHome
+          size={14}
+          color={page === "maternities" ? colors.text : colors.textSecondary}
+        />
+        <Text style={[styles.navButtonText, page === "maternities" && styles.navButtonTextActive]}>
+          Maternités
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "admins" && styles.navButtonActive]}
         onPress={() => setPage("admins")}
       >
@@ -388,6 +488,19 @@ export const ScreenAdmin: React.FC = observer(() => {
         style={styles.roleFilterRow}
         chipStyle={styles.roleFilterChip}
       />
+
+      {role === "NURSE" && (
+        <SegmentedControl
+          options={[
+            { key: "HOSPITAL", label: "Hôpital" },
+            { key: "MATERNITY", label: "Maternité" },
+          ]}
+          value={nurseType}
+          onChange={setNurseType}
+          style={styles.roleFilterRow}
+          chipStyle={styles.roleFilterChip}
+        />
+      )}
 
       <View style={styles.fieldRow}>
         <View style={styles.fieldHalf}>
@@ -439,20 +552,41 @@ export const ScreenAdmin: React.FC = observer(() => {
 
       <View style={styles.fieldRow}>
         <View style={styles.fieldNarrow}>
-          {requiredLabel("Hôpital")}
-          <CustomDropdown
-            items={hospitalItems}
-            selectedValue={hospitalId}
-            onValueChange={setHospitalId}
-            placeholder="Sélectionnez un hôpital"
-            buttonStyle={styles.dropdownButton}
-            textStyle={styles.dropdownText}
-            menuItemStyle={styles.dropdownMenuItem}
-            menuItemTextStyle={styles.dropdownMenuItemText}
-            searchable
-            searchPlaceholder="Rechercher un hôpital…"
-            clearable
-          />
+          {isMaternityNurse ? (
+            <>
+              {requiredLabel("Maternité")}
+              <CustomDropdown
+                items={maternityItems}
+                selectedValue={maternityId}
+                onValueChange={setMaternityId}
+                placeholder="Sélectionnez une maternité"
+                buttonStyle={styles.dropdownButton}
+                textStyle={styles.dropdownText}
+                menuItemStyle={styles.dropdownMenuItem}
+                menuItemTextStyle={styles.dropdownMenuItemText}
+                searchable
+                searchPlaceholder="Rechercher une maternité…"
+                clearable
+              />
+            </>
+          ) : (
+            <>
+              {requiredLabel("Hôpital")}
+              <CustomDropdown
+                items={hospitalItems}
+                selectedValue={hospitalId}
+                onValueChange={setHospitalId}
+                placeholder="Sélectionnez un hôpital"
+                buttonStyle={styles.dropdownButton}
+                textStyle={styles.dropdownText}
+                menuItemStyle={styles.dropdownMenuItem}
+                menuItemTextStyle={styles.dropdownMenuItemText}
+                searchable
+                searchPlaceholder="Rechercher un hôpital…"
+                clearable
+              />
+            </>
+          )}
         </View>
       </View>
 
@@ -504,7 +638,7 @@ export const ScreenAdmin: React.FC = observer(() => {
                 <Text style={[styles.tableHeaderText, styles.colName]}>Employé</Text>
                 <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
                 <Text style={[styles.tableHeaderText, styles.colRole]}>Rôle</Text>
-                <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital</Text>
+                <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital / Maternité</Text>
                 <Text style={[styles.tableHeaderText, styles.colPatients]}>Patients</Text>
                 <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
                 <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
@@ -531,7 +665,7 @@ export const ScreenAdmin: React.FC = observer(() => {
               )}
               {!isWide && (
                 <Text style={styles.accountMeta}>
-                  {hospitalName(account.hospitalId)} · {patientCount.active} actif
+                  {facilityName(account)} · {patientCount.active} actif
                   {patientCount.active !== 1 ? "s" : ""}, {patientCount.inactive} inactif
                   {patientCount.inactive !== 1 ? "s" : ""} ·{" "}
                   {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
@@ -551,7 +685,9 @@ export const ScreenAdmin: React.FC = observer(() => {
                   styles.roleBadge,
                   account.role === "DOCTOR"
                     ? styles.roleBadgeDoctor
-                    : styles.roleBadgeNurse,
+                    : account.nurseType === "MATERNITY"
+                      ? styles.roleBadgeMaternity
+                      : styles.roleBadgeNurse,
                 ]}
               >
                 <Text
@@ -559,17 +695,24 @@ export const ScreenAdmin: React.FC = observer(() => {
                     styles.roleBadgeText,
                     account.role === "DOCTOR"
                       ? styles.roleBadgeTextDoctor
-                      : styles.roleBadgeTextNurse,
+                      : account.nurseType === "MATERNITY"
+                        ? styles.roleBadgeTextMaternity
+                        : styles.roleBadgeTextNurse,
                   ]}
+                  numberOfLines={1}
                 >
-                  {account.role === "DOCTOR" ? "Médecin" : "Infirmière"}
+                  {account.role === "DOCTOR"
+                    ? "Médecin"
+                    : account.nurseType === "MATERNITY"
+                      ? "Maternité"
+                      : "Infirmière"}
                 </Text>
               </View>
             </View>
 
             {isWide && (
               <Text style={[styles.colHospital, styles.accountMeta]}>
-                {hospitalName(account.hospitalId)}
+                {facilityName(account)}
               </Text>
             )}
 
@@ -662,6 +805,19 @@ export const ScreenAdmin: React.FC = observer(() => {
           </View>
         </View>
 
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldNarrow}>
+            <Text style={styles.label}>Région (optionnel)</Text>
+            <TextInput
+              style={styles.input}
+              value={newHospitalRegion}
+              onChangeText={setNewHospitalRegion}
+              placeholder="Littoral"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </View>
+
         <CustomButton
           title={isAddingHospital ? "Ajout en cours…" : "Ajouter l'hôpital"}
           color={colors.accent}
@@ -695,7 +851,9 @@ export const ScreenAdmin: React.FC = observer(() => {
             <View style={styles.hospitalRow}>
               <View>
                 <Text style={styles.accountName}>{hospital.name}</Text>
-                <Text style={styles.accountMeta}>{hospital.city}</Text>
+                <Text style={styles.accountMeta}>
+                  {hospital.city}{hospital.region ? ` · ${hospital.region}` : ""}
+                </Text>
               </View>
               {deletingHospitalId !== hospital.id && (
                 <TouchableOpacity
@@ -751,6 +909,145 @@ export const ScreenAdmin: React.FC = observer(() => {
           <Text style={styles.emptyText}>
             {adminStore.hospitals.length === 0
               ? "Aucun hôpital pour le moment"
+              : "Aucun résultat"}
+          </Text>
+        )}
+      </View>
+    </>
+  );
+
+  const maternitiesPage = (
+    <>
+      <View style={styles.pageCard}>
+        <Text style={styles.pageTitle}>Ajouter une maternité</Text>
+        <Text style={styles.pageSubtitle}>
+          Les maternités n'ont pas d'espace dédié dans l'application — elles servent à rattacher les infirmières de maternité, qui utilisent l'interface infirmière habituelle et peuvent transférer leurs patientes vers un hôpital.
+        </Text>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldHalf}>
+            {requiredLabel("Nom")}
+            <TextInput
+              style={styles.input}
+              value={newMaternityName}
+              onChangeText={setNewMaternityName}
+              placeholder="Maternité de Sèmè-Kpodji"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+          <View style={styles.fieldHalf}>
+            {requiredLabel("Région")}
+            <TextInput
+              style={styles.input}
+              value={newMaternityRegion}
+              onChangeText={setNewMaternityRegion}
+              placeholder="Ouémé"
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </View>
+
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldNarrow}>
+            <Text style={styles.label}>Adresse (optionnel)</Text>
+            <TextInput
+              style={styles.input}
+              value={newMaternityAddress}
+              onChangeText={setNewMaternityAddress}
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+        </View>
+
+        <CustomButton
+          title={isAddingMaternity ? "Ajout en cours…" : "Ajouter la maternité"}
+          color={colors.accent}
+          disabled={isAddingMaternity}
+          style={styles.cardButton}
+          onPressFunction={handleAddMaternity}
+          styleText={{ fontSize: 12, fontWeight: "600", margin: 0 }}
+        />
+      </View>
+
+      <View style={[styles.pageCard, styles.pageCardSpaced]}>
+        <View style={styles.listHeader}>
+          <Text style={styles.pageTitle}>Maternités</Text>
+        </View>
+
+        <TextInput
+          style={[styles.input, styles.searchInput]}
+          value={maternitySearch}
+          onChangeText={setMaternitySearch}
+          placeholder="Rechercher par nom ou région…"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoComplete="new-password"
+          autoCorrect={false}
+          textContentType="none"
+          importantForAutofill="no"
+        />
+
+        {filteredMaternities.map((maternity) => (
+          <View key={maternity.id}>
+            <View style={styles.hospitalRow}>
+              <View>
+                <Text style={styles.accountName}>{maternity.name}</Text>
+                <Text style={styles.accountMeta}>{maternity.region}</Text>
+              </View>
+              {deletingMaternityId !== maternity.id && (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => startDeleteMaternity(maternity.id)}
+                >
+                  <IconTrash size={13} color={colors.danger} />
+                  <Text style={styles.removeLink}>Supprimer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {deletingMaternityId === maternity.id && (
+              <View style={styles.deleteConfirmBox}>
+                <Text style={styles.deleteConfirmLabel}>
+                  Tapez "{maternity.name}" pour confirmer la suppression
+                </Text>
+                <View style={styles.deleteConfirmRow}>
+                  <TextInput
+                    style={[styles.input, styles.deleteConfirmInput]}
+                    value={maternityDeleteConfirmText}
+                    onChangeText={setMaternityDeleteConfirmText}
+                    placeholder={maternity.name}
+                    placeholderTextColor={colors.textMuted}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    style={styles.cancelDeleteButton}
+                    onPress={cancelDeleteMaternity}
+                  >
+                    <Text style={styles.cancelDeleteButtonText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.confirmDeleteButton,
+                      maternityDeleteConfirmText.trim() !== maternity.name &&
+                        styles.confirmDeleteButtonDisabled,
+                    ]}
+                    disabled={maternityDeleteConfirmText.trim() !== maternity.name || isDeletingMaternity}
+                    onPress={() => confirmDeleteMaternity(maternity.id)}
+                  >
+                    <Text style={styles.confirmDeleteButtonText}>
+                      {isDeletingMaternity ? "Suppression…" : "Confirmer"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        ))}
+
+        {filteredMaternities.length === 0 && (
+          <Text style={styles.emptyText}>
+            {adminStore.maternities.length === 0
+              ? "Aucune maternité pour le moment"
               : "Aucun résultat"}
           </Text>
         )}
@@ -1004,7 +1301,9 @@ export const ScreenAdmin: React.FC = observer(() => {
             ? accountsPage
             : page === "hospitals"
               ? hospitalsPage
-              : adminsPage}
+              : page === "maternities"
+                ? maternitiesPage
+                : adminsPage}
       <DialogConfirm
         isVisible={!!removeTarget}
         setIsVisible={(value) => {
@@ -1549,6 +1848,14 @@ const styles = StyleSheet.create({
   },
   roleBadgeTextNurse: {
     color: colors.textSecondary,
+  },
+  roleBadgeMaternity: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  roleBadgeTextMaternity: {
+    color: colors.accent,
   },
   emptyText: {
     fontSize: 12,

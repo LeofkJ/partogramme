@@ -8,14 +8,22 @@ import { colors, radius, spacing } from "../../theme";
 export interface AccountDetails {
   name: string;
   role: "NURSE" | "DOCTOR" | "ADMIN";
+  isMaternityNurse: boolean;
   email: string | null;
   phone: string | null;
   address: string | null;
-  hospitalName: string;
+  facilityLabel: string;
+  facilityName: string;
 }
 
-const roleLabel = (role: AccountDetails["role"]) =>
-  role === "DOCTOR" ? "Médecin" : role === "ADMIN" ? "Administrateur" : "Infirmière";
+const roleLabel = (account: AccountDetails) =>
+  account.role === "DOCTOR"
+    ? "Médecin"
+    : account.role === "ADMIN"
+      ? "Administrateur"
+      : account.isMaternityNurse
+        ? "Maternité"
+        : "Infirmière";
 
 interface Props {
   isVisible: boolean;
@@ -41,9 +49,9 @@ export const DialogAccountDetails = ({ isVisible, account, onClose, onEdit }: Pr
         <View style={[styles.card, { width: Math.min(width * 0.9, 340) }]}>
           <View style={styles.header}>
             <Text style={styles.name} numberOfLines={1}>{account.name}</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>
-                {roleLabel(account.role)}
+            <View style={[styles.roleBadge, account.isMaternityNurse && styles.roleBadgeMaternity]}>
+              <Text style={[styles.roleBadgeText, account.isMaternityNurse && styles.roleBadgeTextMaternity]}>
+                {roleLabel(account)}
               </Text>
             </View>
           </View>
@@ -52,7 +60,7 @@ export const DialogAccountDetails = ({ isVisible, account, onClose, onEdit }: Pr
             <Row label="Email" value={account.email ?? "—"} />
             <Row label="Téléphone" value={account.phone || "—"} />
             <Row label="Adresse" value={account.address || "—"} />
-            <Row label="Hôpital" value={account.hospitalName} />
+            <Row label={account.facilityLabel} value={account.facilityName} />
           </View>
 
           <View style={styles.footer}>
@@ -114,6 +122,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     color: colors.textSecondary,
+  },
+  roleBadgeMaternity: {
+    borderColor: colors.accent,
+  },
+  roleBadgeTextMaternity: {
+    color: colors.accent,
   },
   body: {
     paddingHorizontal: spacing.lg,

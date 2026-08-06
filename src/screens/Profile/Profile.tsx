@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { rootStore } from "../../store/rootStore";
 import { PasswordInput } from "../../components/PasswordInput";
 import CustomButton from "../../components/CustomButton";
@@ -36,8 +37,38 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
   const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  // The useState calls above only capture whatever userInfoStore/profileStore
+  // held at the moment this screen first mounted — if that happened before
+  // fetchUserInfo() had resolved (e.g. navigating straight here), these
+  // fields silently stay empty forever even once the store gets real data,
+  // since nothing else re-seeds them. Re-sync whenever the loaded row
+  // actually changes (id flips from "" to the real one, or to a different
+  // user's), without stomping on an in-progress edit on every render.
+  useEffect(() => {
+    setFirstName(userInfoStore.userInfo.firstName);
+    setLastName(userInfoStore.userInfo.lastName);
+    setPhone(userInfoStore.userInfo.phone ?? "");
+    setAddress(userInfoStore.userInfo.address ?? "");
+    setEmail(profileStore.profile.email ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userInfoStore.userInfo.id, profileStore.profile.id]);
+
+  // Re-pulls userInfo every time this screen gains focus (see Menu.tsx's
+  // identical fix) — this screen can be reached without Menu having run
+  // first, and even when it can't, data shouldn't go stale just because
+  // nothing remounted this screen since the last visit.
+  useFocusEffect(
+    useCallback(() => {
+      userInfoStore.fetchUserInfo().catch((error: any) => {
+        logger.warn("Profile: fetchUserInfo failed", { code: error?.code, message: error?.message });
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
   const isDoctor = userInfoStore.userInfo.role === "DOCTOR";
   const isAdmin = userInfoStore.userInfo.role === "ADMIN";
+  const isMaternityNurse = userInfoStore.userInfo.nurseType === "MATERNITY";
 
   const handleSaveInfo = async () => {
     if (firstName.trim() === "" || lastName.trim() === "") {
@@ -115,10 +146,18 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
         {firstName} {lastName}
       </Text>
       <Text style={styles.roleText}>
-        {isAdmin ? "Administrateur" : isDoctor ? "Médecin" : "Infirmière"}
+        {isAdmin
+          ? "Administrateur"
+          : isDoctor
+            ? "Médecin"
+            : isMaternityNurse
+              ? "Infirmière de maternité"
+              : "Infirmière"}
       </Text>
-      {!!userInfoStore.hospitalName && (
-        <Text style={styles.identityHospital}>{userInfoStore.hospitalName}</Text>
+      {!!(isMaternityNurse ? userInfoStore.maternityName : userInfoStore.hospitalName) && (
+        <Text style={styles.identityHospital}>
+          {isMaternityNurse ? userInfoStore.maternityName : userInfoStore.hospitalName}
+        </Text>
       )}
       {isWide && (
         <TouchableOpacity style={styles.logoutLink} onPress={handleLogout}>
