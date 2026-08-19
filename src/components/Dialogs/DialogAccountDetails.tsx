@@ -22,7 +22,7 @@ const roleLabel = (account: AccountDetails) =>
     : account.role === "ADMIN"
       ? "Administrateur"
       : account.isMaternityNurse
-        ? "Maternité"
+        ? "Sage-femme"
         : "Infirmière";
 
 interface Props {

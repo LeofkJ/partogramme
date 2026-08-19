@@ -6,7 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { rootStore } from "../../store/rootStore";
 import { PasswordInput } from "../../components/PasswordInput";
 import CustomButton from "../../components/CustomButton";
-import { IconUser, IconPlus } from "../../components/Icons";
+import { IconUser, IconPlus, IconMaternity } from "../../components/Icons";
 import { notify } from "../../lib/notify";
 import { logger } from "../../lib/logger";
 import { reset } from "../../navigationRef";
@@ -151,13 +151,16 @@ export const ScreenProfile: React.FC<Props> = observer(() => {
           : isDoctor
             ? "Médecin"
             : isMaternityNurse
-              ? "Infirmière de maternité"
+              ? "Sage-femme"
               : "Infirmière"}
       </Text>
       {!!(isMaternityNurse ? userInfoStore.maternityName : userInfoStore.hospitalName) && (
-        <Text style={styles.identityHospital}>
-          {isMaternityNurse ? userInfoStore.maternityName : userInfoStore.hospitalName}
-        </Text>
+        <View style={styles.identityHospitalRow}>
+          {isMaternityNurse && <IconMaternity size={18} color={colors.text} />}
+          <Text style={styles.identityHospital} numberOfLines={1}>
+            {isMaternityNurse ? userInfoStore.maternityName : userInfoStore.hospitalName}
+          </Text>
+        </View>
       )}
       {isWide && (
         <TouchableOpacity style={styles.logoutLink} onPress={handleLogout}>
@@ -369,10 +372,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.accent,
   },
-  identityHospital: {
+  identityHospitalRow: {
     marginTop: spacing.sm,
-    fontSize: 13,
-    color: colors.textSecondary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    maxWidth: "100%",
+  },
+  identityHospital: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.text,
     textAlign: "center",
   },
   card: {

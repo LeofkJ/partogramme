@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { colors } from "../../theme";
 import {
   Modal,
@@ -16,6 +16,7 @@ interface Props {
   startValue: number;
   endValue: number;
   step: number;
+  initialValue?: string;
   onClose: (data: string) => void;
   onCancel: () => void;
 }
@@ -27,10 +28,17 @@ const DialogDataInputGraph: React.FC<Props> = ({
   onCancel,
   startValue,
   endValue,
+  initialValue,
 }) => {
   const { width } = useWindowDimensions();
   const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setValue(initialValue ?? "");
+    setErrorMessage(null);
+  }, [visible, initialValue]);
 
   const handleCancel = () => {
     setValue("");

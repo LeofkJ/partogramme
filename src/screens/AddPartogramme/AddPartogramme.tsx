@@ -4,6 +4,7 @@ import { observer } from "mobx-react";
 import { rootStore } from "../../store/rootStore";
 import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
 import { logger } from "../../lib/logger";
+import { IconMaternity } from "../../components/Icons";
 import { colors, spacing, radius, type, layout } from "../../theme";
 
 export type Props = {
@@ -125,7 +126,10 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
               {userInfoStore.userInfo.nurseType === "MATERNITY" ? "Maternité" : "Hôpital"}
             </Text>
             <View style={styles.readonlyInput}>
-              <Text style={styles.readonlyText}>
+              {userInfoStore.userInfo.nurseType === "MATERNITY" && (
+                <IconMaternity size={18} color={colors.text} />
+              )}
+              <Text style={styles.readonlyText} numberOfLines={1}>
                 {(userInfoStore.userInfo.nurseType === "MATERNITY"
                   ? userInfoStore.maternityName
                   : userInfoStore.hospitalName) || "—"}
@@ -235,7 +239,9 @@ const styles = StyleSheet.create({
   },
   readonlyInput: {
     height: layout.touchTarget,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.sm,
@@ -243,6 +249,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   readonlyText: {
+    flex: 1,
     fontSize: type.body.fontSize,
     color: colors.textSecondary,
   },

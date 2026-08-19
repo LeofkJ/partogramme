@@ -46,3 +46,24 @@ export function getDilationBand(
 export function isBpmAlert(bpm: number): boolean {
   return bpm < 110 || bpm > 160;
 }
+
+// Same red-flag rule the hospital dashboard uses to sort a patient into "À
+// surveiller" — bpm out of range, the dilation band is red, or the midwife
+// raised at least one manual alert (independent of either threshold — see
+// ManualAlert, a patient can have several at once, this only cares whether
+// there's at least one). Factored out so any other alert-count consumer
+// flags the exact same patients without re-deriving the checks.
+export function isPatientFlagged(
+  dilationReadings: TimedReading[],
+  workStartDateTime: string | null,
+  latestBpm: number | null,
+  hasManualAlert: boolean = false,
+): boolean {
+  if (hasManualAlert) return true;
+  if (latestBpm != null && isBpmAlert(latestBpm)) return true;
+  if (dilationReadings.length > 0) {
+    const band = getDilationBand(dilationReadings, workStartDateTime);
+    if (band === "red") return true;
+  }
+  return false;
+}

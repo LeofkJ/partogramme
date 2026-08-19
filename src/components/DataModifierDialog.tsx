@@ -28,7 +28,7 @@ interface Props {
   /** No edit/delete actions, just the timestamped list — for viewers who can't edit this partogramme. */
   readOnly?: boolean;
   /**
-   * Group by row (15-minute slot / Rank) instead of a flat chronological
+   * Group by row (1-minute slot / Rank) instead of a flat chronological
    * list — for table data, where several independent values (temp, pulse,
    * etc.) can share the same row. Tap a row to see just its own values.
    */
@@ -82,7 +82,7 @@ const DataModifierDialog: React.FC<Props> = observer(({
     }
     const start = partogramme.asJson.workStartDateTime;
     if (!start) return `Créneau ${rank}`;
-    return new Date(new Date(start).getTime() + rank * 15 * 60000)
+    return new Date(new Date(start).getTime() + rank * 60000)
       .toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   };
 

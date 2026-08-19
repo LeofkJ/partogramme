@@ -15,7 +15,7 @@ interface Props {
   columns: DataTableColumn[];
   /** When false (viewer has no edit rights for this status), cells are inert. */
   editable?: boolean;
-  /** Labor start — rows are labeled with the real clock time, in 15-minute steps after it. */
+  /** Labor start — rows are labeled with the real clock time, one row per minute. */
   startTime?: string | null;
 }
 
@@ -48,11 +48,10 @@ const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => 
   const fontSize = colWidth < 50 ? 10 : 11;
   const lineHeight = Math.ceil(fontSize * 1.3);
 
-  // Rows are 15-minute slots, not hourly — anything entered within the same
-  // 15-minute window lands on the same row (`Rank` is the slot index). Only
-  // slots that actually have at least one value get a row, the table isn't
-  // a fixed grid of every possible slot across the whole span.
-  const SLOT_MINUTES = 15;
+  // Rows are 1-minute slots — same field in the same minute updates the
+  // cell; a new minute is a new row. Only minutes that actually have a
+  // value get a row.
+  const SLOT_MINUTES = 1;
   const hours = Array.from(
     new Set(
       columns

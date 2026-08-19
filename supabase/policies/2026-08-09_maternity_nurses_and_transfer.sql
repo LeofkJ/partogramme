@@ -131,3 +131,140 @@ create policy "Maternity nurses can update their own maternity patients"
     )
   )
   with check ("nurseId" = auth.uid());
+
+-- ============================================================
+-- 7. RLS: maternity nurses on the clinical data tables (added 2026-08-14).
+--    §6 above only ever covered "Partogramme" itself — the actual vitals
+--    tables (BPM, dilation, contractions, etc.) were never given a
+--    maternity-nurse policy, so a maternity nurse has never been able to
+--    save a single vital sign for her own patients (confirmed live: POST
+--    to BabyHeartFrequency → 403, code 42501, "new row violates row-level
+--    security policy"). Same scope as §6's Partogramme UPDATE policy (the
+--    nurse who created the patient, nurseId = auth.uid()).
+--
+--    This block is idempotent (drop-if-exists + create) and safe to re-run
+--    on its own — unlike §1-6 above, which have already been applied live
+--    and will error if pasted again. Only run this block, not the whole
+--    file.
+--
+--    Permissive policies — OR cleanly with whatever hospital-nurse
+--    policies already exist on these tables, no changes needed there. If
+--    any of these tables also has a RESTRICTIVE hospital-scoping policy
+--    (like Partogramme's "Users can only fetch data from the same
+--    hospital"), this alone won't be enough — that pattern has bitten this
+--    project three times already (maternity nurses, admins, doctors, all
+--    on that same restrictive Partogramme policy). Retest after applying
+--    and report back if still blocked.
+-- ============================================================
+
+do $$
+declare
+  vitals_tables text[] := array[
+    'BabyHeartFrequency', 'Dilation', 'BabyDescent', 'amnioticLiquid',
+    'MotherSystolicBloodPressure', 'MotherDiastolicBloodPressure',
+    'MotherContractionsFrequency', 'MotherHeartFrequency',
+    'MotherTemperature', 'MotherContractionDuration', 'Comment'
+  ];
+  t text;
+begin
+  foreach t in array vitals_tables loop
+    execute format(
+      'drop policy if exists %I on %I',
+      'Maternity nurses can add ' || t || ' for their patients', t
+    );
+    execute format(
+      'create policy %I on %I for insert with check (
+         exists (
+           select 1 from "Partogramme" p
+           join "userInfo" u on u."profileId" = auth.uid()
+           where p.id = %I."partogrammeId"
+             and p."nurseId" = auth.uid()
+             and u.role = ''NURSE''
+             and u."nurseType" = ''MATERNITY''
+         )
+       )',
+      'Maternity nurses can add ' || t || ' for their patients', t, t
+    );
+
+    execute format(
+      'drop policy if exists %I on %I',
+      'Maternity nurses can update ' || t || ' for their patients', t
+    );
+    execute format(
+      'create policy %I on %I for update using (
+         exists (
+           select 1 from "Partogramme" p
+           join "userInfo" u on u."profileId" = auth.uid()
+           where p.id = %I."partogrammeId"
+             and p."nurseId" = auth.uid()
+             and u.role = ''NURSE''
+             and u."nurseType" = ''MATERNITY''
+         )
+       ) with check (
+         exists (
+           select 1 from "Partogramme" p
+           join "userInfo" u on u."profileId" = auth.uid()
+           where p.id = %I."partogrammeId"
+             and p."nurseId" = auth.uid()
+             and u.role = ''NURSE''
+             and u."nurseType" = ''MATERNITY''
+         )
+       )',
+      'Maternity nurses can update ' || t || ' for their patients', t, t, t
+    );
+  end loop;
+end $$;
+
+-- ============================================================
+-- 8. RLS: maternity nurses need SELECT too (added 2026-08-14, same day).
+--    §7 above only added INSERT/UPDATE — turns out that's not enough even
+--    for a plain INSERT: the app's write path goes through
+--    `.upsert().eq("id", ...)`, which PostgREST/Postgres compiles to
+--    `INSERT ... ON CONFLICT (id) DO UPDATE`. Confirmed live via raw SQL:
+--    the exact same insert with no ON CONFLICT clause succeeded under her
+--    identity, but the ON CONFLICT DO UPDATE form failed with the same
+--    42501 — because Postgres needs SELECT-level RLS visibility to even
+--    scan for a conflicting row, regardless of whether one exists. She's
+--    had zero SELECT access to her own patients' vitals this whole time;
+--    it was just invisible because an RLS-filtered-empty result and a
+--    genuinely-empty result both return 200 with [].
+--
+--    Broader scope than §7's INSERT/UPDATE (nurseId = auth.uid(), only the
+--    nurse who created the patient) — this matches Partogramme's own
+--    maternity-nurse SELECT policy instead: any maternity nurse at the
+--    same maternity, not just the creator, per the "permanent visibility"
+--    rule already established for Partogramme itself.
+--
+--    Idempotent, safe to re-run on its own.
+-- ============================================================
+
+do $$
+declare
+  vitals_tables text[] := array[
+    'BabyHeartFrequency', 'Dilation', 'BabyDescent', 'amnioticLiquid',
+    'MotherSystolicBloodPressure', 'MotherDiastolicBloodPressure',
+    'MotherContractionsFrequency', 'MotherHeartFrequency',
+    'MotherTemperature', 'MotherContractionDuration', 'Comment'
+  ];
+  t text;
+begin
+  foreach t in array vitals_tables loop
+    execute format(
+      'drop policy if exists %I on %I',
+      'Maternity nurses can view ' || t || ' from their maternity patients', t
+    );
+    execute format(
+      'create policy %I on %I for select using (
+         exists (
+           select 1 from "Partogramme" p
+           join "userInfo" u on u."profileId" = auth.uid()
+           where p.id = %I."partogrammeId"
+             and u.role = ''NURSE''
+             and u."nurseType" = ''MATERNITY''
+             and u."maternityId" = p."maternityId"
+         )
+       )',
+      'Maternity nurses can view ' || t || ' from their maternity patients', t, t
+    );
+  end loop;
+end $$;

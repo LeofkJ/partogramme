@@ -90,9 +90,9 @@ export class AmnioticLiquidStore {
     );
   }
 
-  // Update an amniotic liquid with information from the server. Guarantees an amniotic liquid only
-  // exists once. Might either construct a new liquid, update an existing one,
-  // or remove a liquid if it has been deleted on the server.
+  // Apply a server row locally. Do not write back — hospital staff can
+  // SELECT amnioticLiquid but often cannot UPDATE it (read-only until
+  // transferred). The old upsert-on-fetch hid every value for them.
   async updateAmnioticLiquidFromServer(json: AmnioticLiquid_t["Row"]) {
     const existing = this.dataList.find(
       (liquid) => liquid.data.id === json.id
@@ -103,13 +103,7 @@ export class AmnioticLiquidStore {
     // second delete tap.
     if (json.isDeleted) {
       if (existing) {
-        this.removeAmnioticLiquid(existing)
-          .then(() => { })
-          .catch((error) => {
-            logger.warn("updateAmnioticLiquidFromServer: removeAmnioticLiquid failed", { id: json.id, error: error?.message });
-            notify.error("Erreur", "Impossible de supprimer les liquides amniotiques");
-            return Promise.reject(error);
-          });
+        this.dataList.splice(this.dataList.indexOf(existing), 1);
       }
       return;
     }
@@ -124,21 +118,8 @@ export class AmnioticLiquidStore {
         json.isDeleted,
         json.value
       );
-      this.transportLayer
-        .updateAmnioticLiquid(liquid.data)
-        .then(() => {
-          runInAction(() => {
-            this.dataList.push(liquid);
-            this.state = "done";
-          });
-        })
-        .catch((error:any) => {
-          runInAction(() => {
-            this.state = "error";
-          });
-          logger.warn("updateAmnioticLiquidFromServer: updateAmnioticLiquid failed", { id: json.id, error: error?.message });
-          return Promise.reject(error);
-        });
+      this.dataList.push(liquid);
+      this.state = "done";
     } else {
       existing.updateFromJson(json);
     }

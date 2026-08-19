@@ -51,6 +51,11 @@ const NavLink = ({
 
 export const NavBar = observer(({ currentRouteName }: NavBarProps) => {
   const isAdmin = rootStore.userInfoStore.userInfo.role === "ADMIN";
+  const isDoctor = rootStore.userInfoStore.userInfo.role === "DOCTOR";
+  const isNurse = rootStore.userInfoStore.userInfo.role === "NURSE";
+  const isMaternityNurse = isNurse && rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+  // Dashboard is shared by every doctor and hospital nurse (see task.md).
+  const isHospitalStaff = isDoctor || (isNurse && !isMaternityNurse);
   // currentRouteName is undefined for a brief moment on every web load/refresh,
   // until the navigation container reports it's ready. Rendering nothing in
   // that gap is what made this bar seem to "disappear". Default to the
@@ -93,6 +98,13 @@ export const NavBar = observer(({ currentRouteName }: NavBarProps) => {
             active={currentRouteName === "Screen_Profile"}
             onPress={() => navigate("Screen_Profile")}
           />
+          {isHospitalStaff && (
+            <NavLink
+              label="Tableau de bord"
+              active={currentRouteName === "Screen_HospitalDashboard"}
+              onPress={() => navigate("Screen_HospitalDashboard")}
+            />
+          )}
           {isAdmin && (
             <NavLink
               label="Administration"

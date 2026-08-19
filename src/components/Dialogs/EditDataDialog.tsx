@@ -15,6 +15,8 @@ import { BabyDescent } from "../../store/GraphData/BabyDescent/babyDescentStore"
 import { observer } from "mobx-react-lite";
 import { Comment } from "../../store/Comment/CommentStore";
 import { DialogEditText } from "./DialogEditText";
+import { AmnioticLiquid } from "../../store/TableData/AmnioticLiquid/amnioticLiquidStore";
+import { getStringByEnum, liquidStates } from "../../../types/constants";
 
 interface Props {
   // Put props here
@@ -59,6 +61,11 @@ const EditDataDialog: React.FC<Props> = observer( ({
           ]}
           preSelectedDataChoice={data.store}
           recordedAt={data.data.created_at}
+          initialValue={
+            data instanceof AmnioticLiquid
+              ? (getStringByEnum(liquidStates, data.data.value) ?? String(data.data.value))
+              : String(data.data.value)
+          }
         />
       )}
       {data instanceof BabyHeartFrequency && (
@@ -69,6 +76,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
           startValue={120}
           endValue={180}
           step={10}
+          initialValue={String(data.data.value)}
           dataName={"Fréquence cardiaque du bébé"}
         />
       )}
@@ -80,6 +88,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
           startValue={4}
           endValue={10}
           step={1}
+          initialValue={String(data.data.value)}
           dataName={"Dilatation du col de l'utérus"}
         />
       )}
@@ -91,6 +100,7 @@ const EditDataDialog: React.FC<Props> = observer( ({
           startValue={0}
           endValue={10}
           step={1}
+          initialValue={String(data.data.value)}
           dataName={"Descente du bébé"}
         />
       )}

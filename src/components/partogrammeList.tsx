@@ -1,5 +1,5 @@
 import { observer } from "mobx-react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   RefreshControl,
   SectionList,
@@ -8,25 +8,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { IconHeart, IconPhone } from "./Icons";
+import { IconEye, IconEyeOff, IconPhone } from "./Icons";
 import { rootStore } from "../store/rootStore";
 import {
   Partogramme,
   Partogramme_t,
 } from "../store/partogramme/partogrammeStore";
-import { getStringByEnum, partogrammeStates } from "../../types/constants";
+import { isPatientFlagged, TimedReading } from "../lib/clinicalAlerts";
 import { logger } from "../lib/logger";
-import { getDilationBand, isBpmAlert } from "../lib/clinicalAlerts";
-import { colors, spacing, radius, layout, monoFontFamily } from "../theme";
+import { callPhone } from "../lib/callPhone";
+import { colors, spacing, radius, layout, statusColors } from "../theme";
 
-// Status dot color follows the same three buckets as the section grouping
-// (Admis / En cours / Terminée) rather than the finer-grained partogramme
-// state, so the dot always agrees with the section the card sits in.
-function statusDotColor(state: Partogramme_t["Row"]["state"]): string {
-  if (state === "WORK_FINISHED") return colors.success;
-  if (state === "IN_PROGRESS" || state === "TRANSFERRED") return colors.warning;
-  return colors.textMuted;
-}
+// Quiet list labels — the ALL-CAPS constants on the chart page are too
+// loud for a row of cards.
+const LIST_STATUS_LABEL: Record<Partogramme_t["Row"]["state"], string> = {
+  ADMITTED: "Admis",
+  IN_PROGRESS: "En cours",
+  TRANSFERRED: "Transféré",
+  WORK_FINISHED: "Terminée",
+};
 
 export interface PartogrammeListProps {
   title?: string;
@@ -36,152 +36,98 @@ export interface PartogrammeListProps {
 export interface ItemProps {
   item: Partogramme;
   onPress: () => void;
+  isFlagged?: boolean;
 }
 
-const renderPatientTextElement = (item: Partogramme_t["Row"]) => {
-  let patientName = "";
-  if (item.patientFirstName !== null) {
-    patientName =
-      item.patientFirstName.charAt(0).toUpperCase() +
-      item.patientFirstName.slice(1);
-  } else {
-    patientName = "Aucun prénom";
-  }
-  if (item.patientLastName !== null) {
-    patientName +=
-      " " +
-      item.patientLastName.charAt(0).toUpperCase() +
-      item.patientLastName.slice(1);
-  } else {
-    patientName += " Aucun nom";
-  }
-  return patientName;
-};
-
-// A miniature version of the partograph's own alert/action line, standing
-// in for the plain number: dilation is the one reading that's already a
-// plot on the real chart, not just a value.
-const DilationGauge = ({ valueCm, alert }: { valueCm: number; alert: boolean }) => {
-  const pct = Math.min(100, Math.max(0, (valueCm / 10) * 100));
-  return (
-    <View style={styles.gaugeWrap}>
-      <View style={styles.gaugeTrack}>
-        <View style={[styles.gaugeZone, { flex: 55, backgroundColor: colors.success }]} />
-        <View style={[styles.gaugeZone, { flex: 23, backgroundColor: colors.warning }]} />
-        <View style={[styles.gaugeZone, { flex: 22, backgroundColor: colors.danger }]} />
-      </View>
-      <View
-        style={[
-          styles.gaugeMarker,
-          { left: `${pct}%`, backgroundColor: alert ? colors.danger : colors.text },
-        ]}
-      />
-    </View>
-  );
-};
-
-// At-a-glance vitals for an "en cours" row — latest BPM, latest dilation
-// (with its alert/action gauge), and the assigned nurse's phone number, so
-// a doctor can scan the whole list without opening every patient.
+// At-a-glance info for an "en cours" row — assigned nurse's phone, so
+// hospital staff can reach her without opening the patient.
 const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
-  const [nursePhone, setNursePhone] = useState<string | null>(null);
+  const [nurse, setNurse] = useState<{ phone: string | null; isMaternityNurse: boolean } | null>(null);
 
   useEffect(() => {
-    item.babyHeartFrequencyStore.loadBabyHeartFrequencies();
-    item.dilationStore.loadDilations();
     const nurseId = item.asJson.nurseId;
-    if (nurseId) {
-      rootStore.userInfoStore
-        .fetchOtherUserInfo(nurseId)
-        .then((nurse) => setNursePhone(nurse?.phone || null))
-        .catch((error: any) => {
-          logger.warn("PartogrammeList: nurse lookup failed", { nurseId, error: error?.message });
+    if (!nurseId) return;
+    rootStore.userInfoStore
+      .fetchOtherUserInfo(nurseId)
+      .then((info) => {
+        if (!info) return;
+        setNurse({
+          phone: info.phone || null,
+          isMaternityNurse: info.nurseType === "MATERNITY",
         });
-    }
+      })
+      .catch((error: any) => {
+        logger.warn("PartogrammeList: nurse lookup failed", { nurseId, error: error?.message });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.asJson.id]);
 
-  const bpmList = item.babyHeartFrequencyStore.sortedBabyHeartFrequencyList;
-  const latestBpm = bpmList.length > 0 ? bpmList[bpmList.length - 1].data.value : null;
+  if (!nurse) return null;
 
-  const dilationList = item.dilationStore.sortedDilationList;
-  const latestDilation = dilationList.length > 0 ? dilationList[dilationList.length - 1].data.value : null;
-  const band = getDilationBand(
-    dilationList.map((d) => d.data),
-    item.asJson.workStartDateTime,
-  );
-  const dilationAlert = band === "red";
-  const bpmAlert = latestBpm != null && isBpmAlert(latestBpm);
-
-  if (latestBpm == null && latestDilation == null && !nursePhone) return null;
-
-  return (
-    <View style={styles.vitals}>
-      {latestBpm != null && (
-        <View style={[styles.vital, bpmAlert && styles.vitalAlert]}>
-          <View style={styles.vitalLabelRow}>
-            <IconHeart size={10} color={bpmAlert ? colors.danger : colors.textMuted} />
-            <Text style={[styles.vitalLabel, bpmAlert && styles.vitalLabelAlert]}>BPM</Text>
-          </View>
-          <Text style={[styles.vitalValue, bpmAlert && styles.vitalValueAlert]}>
-            {latestBpm}
-          </Text>
-        </View>
-      )}
-      {latestDilation != null && (
-        <View style={[styles.vital, dilationAlert && styles.vitalAlert]}>
-          <Text style={[styles.vitalLabel, dilationAlert && styles.vitalLabelAlert]}>
-            Dilatation
-          </Text>
-          <Text style={[styles.vitalValue, dilationAlert && styles.vitalValueAlert]}>
-            {latestDilation} cm
-          </Text>
-          <DilationGauge valueCm={latestDilation} alert={dilationAlert} />
-        </View>
-      )}
-      {!!nursePhone && (
-        <View style={styles.vital}>
-          <View style={styles.vitalLabelRow}>
-            <IconPhone size={10} color={colors.textMuted} />
-            <Text style={styles.vitalLabel}>Infirmière</Text>
-          </View>
-          <Text style={[styles.vitalValue, styles.vitalValueSub]}>{nursePhone}</Text>
+  const roleLabel = nurse.isMaternityNurse ? "Sage-femme" : "Infirmière";
+  const content = (
+    <View style={styles.nurseRow}>
+      <Text style={[styles.nurseRole, nurse.isMaternityNurse ? styles.nurseRoleMidwife : styles.nurseRoleHospital]}>
+        {roleLabel}
+      </Text>
+      {!!nurse.phone && (
+        <View style={styles.nursePhone}>
+          <IconPhone size={13} color={colors.accent} />
+          <Text style={styles.nursePhoneText}>{nurse.phone}</Text>
         </View>
       )}
     </View>
   );
-});
 
-const Item = observer(({ item, onPress }: ItemProps) => {
-  const isEnCours = item.partogramme.state === "IN_PROGRESS" || item.partogramme.state === "TRANSFERRED";
-  const isDoctor = rootStore.userInfoStore.userInfo.role === "DOCTOR";
+  if (!nurse.phone) return content;
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.card} activeOpacity={0.6}>
-      <View style={styles.cardTop}>
-        <View style={styles.idBlock}>
-          <Text style={styles.patientName} numberOfLines={1}>
-            {renderPatientTextElement(item.partogramme)}
-          </Text>
-          <Text style={styles.fileNumber}>
-            Dossier #{Number(item.partogramme.noFile)}
-          </Text>
-        </View>
-        <View style={styles.statusTag}>
-          <View style={[styles.statusDot, { backgroundColor: statusDotColor(item.partogramme.state) }]} />
-          <Text style={styles.statusTagText}>
-            {getStringByEnum(partogrammeStates, item.partogramme.state)}
-          </Text>
+    <TouchableOpacity
+      activeOpacity={0.6}
+      onPress={(e) => {
+        e.stopPropagation();
+        callPhone(nurse.phone as string);
+      }}
+    >
+      {content}
+    </TouchableOpacity>
+  );
+});
+
+const Item = observer(({ item, onPress, isFlagged }: ItemProps) => {
+  const state = item.partogramme.state;
+  const isEnCours = state === "IN_PROGRESS" || state === "TRANSFERRED";
+  const role = rootStore.userInfoStore.userInfo.role;
+  const isHospitalStaff =
+    role === "DOCTOR" ||
+    (role === "NURSE" && rootStore.userInfoStore.userInfo.nurseType !== "MATERNITY");
+  const tone = isFlagged ? { bg: colors.dangerSoft, fg: colors.danger } : statusColors(state);
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={styles.card}
+    >
+      <View style={styles.cardMain}>
+        <Text style={styles.dossier} numberOfLines={1}>
+          Dossier #{Number(item.partogramme.noFile)}
+        </Text>
+        <View style={styles.cardRight}>
+          <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+            <Text style={[styles.statusPillText, { color: tone.fg }]}>
+              {LIST_STATUS_LABEL[state]}
+            </Text>
+          </View>
         </View>
       </View>
-
+      {isHospitalStaff && isEnCours && <EnCoursSummary item={item} />}
       {!!item.partogramme.commentary && (
-        <Text style={styles.commentLine} numberOfLines={2}>
-          « {item.partogramme.commentary} »
+        <Text style={styles.comment} numberOfLines={2}>
+          <Text style={styles.commentLabel}>Commentaire : </Text>
+          {item.partogramme.commentary}
         </Text>
       )}
-
-      {isDoctor && isEnCours && <EnCoursSummary item={item} />}
     </TouchableOpacity>
   );
 });
@@ -190,18 +136,120 @@ const EmptyListMessage = () => (
   <Text style={styles.emptyText}>Aucun partogramme disponible.</Text>
 );
 
-// Admis → En cours → Terminée. TRANSFERRED (transféré au médecin) is grouped
-// under "En cours" since labor is still actively ongoing, just now under
-// doctor supervision, not a separate top-level bucket.
-const SECTION_DEFS: { title: string; states: Partogramme_t["Row"]["state"][] }[] = [
+// For a midwife, TRANSFERRED means the patient has left her maternity for
+// a hospital entirely — its own section, not folded into "En cours".
+const MATERNITY_SECTION_DEFS: { title: string; states: Partogramme_t["Row"]["state"][] }[] = [
   { title: "Admis", states: ["ADMITTED"] },
-  { title: "En cours", states: ["IN_PROGRESS", "TRANSFERRED"] },
+  { title: "En cours", states: ["IN_PROGRESS"] },
+  { title: "Transféré", states: ["TRANSFERRED"] },
   { title: "Terminée", states: ["WORK_FINISHED"] },
 ];
+
+type HospitalSectionKey = "flagged" | "inLabour" | "transferred" | "finished";
+
+// Gv: hospital listing is flagged first, then in labour not transferred,
+// then transferred; done below / hideable.
+const HOSPITAL_SECTION_DEFS: { title: string; key: HospitalSectionKey; urgent?: boolean }[] = [
+  { title: "À surveiller", key: "flagged", urgent: true },
+  { title: "En cours", key: "inLabour" },
+  { title: "Transféré", key: "transferred" },
+  { title: "Terminée", key: "finished" },
+];
+
+function hospitalSectionData(
+  key: HospitalSectionKey,
+  list: Partogramme[],
+  flaggedIds: Set<string>,
+): Partogramme[] {
+  if (key === "flagged") {
+    return list.filter((p) => flaggedIds.has(p.partogramme.id) && p.partogramme.state !== "WORK_FINISHED");
+  }
+  if (key === "inLabour") {
+    return list.filter(
+      (p) =>
+        (p.partogramme.state === "ADMITTED" || p.partogramme.state === "IN_PROGRESS") &&
+        !flaggedIds.has(p.partogramme.id),
+    );
+  }
+  if (key === "transferred") {
+    return list.filter(
+      (p) => p.partogramme.state === "TRANSFERRED" && !flaggedIds.has(p.partogramme.id),
+    );
+  }
+  return list.filter((p) => p.partogramme.state === "WORK_FINISHED");
+}
 
 export const PartogrammeList = observer(
   ({ title, navigation }: PartogrammeListProps) => {
     const [refreshing, setRefreshing] = useState(false);
+    // Hide/unhide the "Terminée" section on demand — a plain toggle, not a
+    // persisted preference; flips back to visible next time this screen
+    // mounts fresh.
+    const [hideFinished, setHideFinished] = useState(false);
+    const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
+
+    const isMaternityNurse = rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+    const allPartogrammes = rootStore.partogrammeStore.partogrammeList.slice();
+    const finishedCount = allPartogrammes.filter((p) => p.partogramme.state === "WORK_FINISHED").length;
+    const partogrammeIdsKey = allPartogrammes.map((p) => p.partogramme.id).join(",");
+
+    const loadFlags = useCallback(async () => {
+      if (isMaternityNurse) {
+        setFlaggedIds(new Set());
+        return;
+      }
+      const active = rootStore.partogrammeStore.partogrammeList.filter(
+        (p) => p.partogramme.state !== "WORK_FINISHED",
+      );
+      const ids = active.map((p) => p.partogramme.id);
+      if (ids.length === 0) {
+        setFlaggedIds(new Set());
+        return;
+      }
+      try {
+        const [vitals, alerts] = await Promise.all([
+          rootStore.partogrammeStore.transportLayer.fetchLatestVitals(ids),
+          rootStore.partogrammeStore.transportLayer.fetchManualAlerts(ids),
+        ]);
+        const dilationsById: Record<string, TimedReading[]> = {};
+        for (const row of vitals.dilations) {
+          (dilationsById[row.partogrammeId] ??= []).push({
+            value: row.value,
+            created_at: row.created_at,
+          });
+        }
+        const bpmLatest: Record<string, { value: number; at: number }> = {};
+        for (const row of vitals.bpms) {
+          const at = new Date(row.created_at).getTime();
+          const existing = bpmLatest[row.partogrammeId];
+          if (!existing || at > existing.at) {
+            bpmLatest[row.partogrammeId] = { value: row.value, at };
+          }
+        }
+        const hasManual = new Set(alerts.map((a) => a.partogrammeId));
+        const next = new Set<string>();
+        for (const p of active) {
+          const id = p.partogramme.id;
+          if (
+            isPatientFlagged(
+              dilationsById[id] ?? [],
+              p.partogramme.workStartDateTime,
+              bpmLatest[id]?.value ?? null,
+              hasManual.has(id),
+            )
+          ) {
+            next.add(id);
+          }
+        }
+        setFlaggedIds(next);
+      } catch (error: any) {
+        logger.warn("PartogrammeList: loadFlags failed", { error: error?.message });
+      }
+    }, [isMaternityNurse, partogrammeIdsKey]);
+
+    useEffect(() => {
+      loadFlags();
+    }, [loadFlags]);
 
     const onRefresh = async () => {
       setRefreshing(true);
@@ -217,6 +265,7 @@ export const PartogrammeList = observer(
         } else {
           await rootStore.partogrammeStore.fetchFromServer();
         }
+        await loadFlags();
       } catch (error: any) {
         logger.warn("PartogrammeList: refresh failed", { error: error?.message });
       } finally {
@@ -232,17 +281,30 @@ export const PartogrammeList = observer(
     const renderItem = ({ item }: { item: Partogramme }) => (
       <Item
         item={item}
+        isFlagged={flaggedIds.has(item.partogramme.id)}
         onPress={() => partogrammeSelected(item.partogramme.id)}
       />
     );
 
-    const allPartogrammes = rootStore.partogrammeStore.partogrammeList.slice();
-    const sections = SECTION_DEFS
-      .map((def) => ({
-        title: def.title,
-        data: allPartogrammes.filter((p) => def.states.includes(p.partogramme.state)),
-      }))
-      .filter((section) => section.data.length > 0);
+    const sections = isMaternityNurse
+      ? MATERNITY_SECTION_DEFS
+          .map((def) => ({
+            title: def.title,
+            finished: def.states.includes("WORK_FINISHED"),
+            urgent: false,
+            data: allPartogrammes.filter((p) => def.states.includes(p.partogramme.state)),
+          }))
+          .filter((section) => section.data.length > 0)
+          .filter((section) => !(hideFinished && section.finished))
+      : HOSPITAL_SECTION_DEFS
+          .map((def) => ({
+            title: def.title,
+            finished: def.key === "finished",
+            urgent: !!def.urgent,
+            data: hospitalSectionData(def.key, allPartogrammes, flaggedIds),
+          }))
+          .filter((section) => section.data.length > 0)
+          .filter((section) => !(hideFinished && section.finished));
 
     return (
       <SectionList
@@ -251,14 +313,46 @@ export const PartogrammeList = observer(
         renderItem={renderItem}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
-            <Text style={styles.sectionHeaderCount}>{section.data.length}</Text>
+            <Text style={[styles.sectionHeaderText, section.urgent && styles.sectionHeaderTextUrgent]}>
+              {section.title}
+            </Text>
+            <View style={styles.sectionHeaderRight}>
+              {section.finished && (
+                <TouchableOpacity
+                  style={styles.hideFinishedButton}
+                  activeOpacity={0.7}
+                  onPress={() => setHideFinished(true)}
+                >
+                  <IconEyeOff size={14} color={colors.accent} />
+                  <Text style={styles.hideFinishedButtonText}>Masquer</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={[styles.sectionHeaderCount, section.urgent && styles.sectionHeaderCountUrgent]}>
+                {section.data.length} patiente{section.data.length !== 1 ? "s" : ""}
+              </Text>
+            </View>
           </View>
         )}
         keyExtractor={(item) => item.partogramme.id}
         ListEmptyComponent={EmptyListMessage}
+        ListFooterComponent={
+          hideFinished && finishedCount > 0 ? (
+            <TouchableOpacity
+              style={styles.showFinishedButton}
+              activeOpacity={0.7}
+              onPress={() => setHideFinished(false)}
+            >
+              <IconEye size={15} color={colors.accent} />
+              <Text style={styles.showFinishedButtonText}>
+                Afficher les terminées ({finishedCount})
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.listFooterSpacer} />
+          )
+        }
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ flexGrow: 1, paddingTop: spacing.sm }}
+        contentContainerStyle={{ flexGrow: 1, paddingTop: spacing.sm, paddingBottom: spacing.xl }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -280,6 +374,33 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     paddingHorizontal: spacing.lg,
   },
+  hideFinishedButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  hideFinishedButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.accent,
+  },
+  showFinishedButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: spacing.lg,
+  },
+  showFinishedButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.accent,
+  },
+  listFooterSpacer: {
+    height: spacing.md,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -287,142 +408,102 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  sectionHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
   sectionHeaderText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.textMuted,
   },
   sectionHeaderCount: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "400",
     color: colors.textMuted,
+  },
+  sectionHeaderTextUrgent: {
+    color: colors.danger,
+  },
+  sectionHeaderCountUrgent: {
+    color: colors.danger,
   },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  cardTop: {
+  cardMain: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  idBlock: {
+  dossier: {
     flex: 1,
     minWidth: 0,
-  },
-  patientName: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "500",
     color: colors.text,
   },
-  fileNumber: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 2,
-    fontFamily: monoFontFamily,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  statusTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusTagText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  commentLine: {
-    marginTop: spacing.md,
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontStyle: "italic",
-    color: colors.textSecondary,
-  },
-  vitals: {
-    marginTop: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.hairline,
-    flexDirection: "row",
-  },
-  vital: {
-    flex: 1,
-    paddingHorizontal: spacing.sm,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.hairline,
-  },
-  vitalAlert: {
-    backgroundColor: colors.dangerSoft,
-    borderLeftColor: "transparent",
-    borderRadius: radius.sm,
-    marginVertical: -4,
-    paddingVertical: 6,
-  },
-  vitalLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  cardRight: {
+    flexShrink: 0,
+    alignItems: "flex-end",
     gap: 4,
   },
-  vitalLabel: {
-    fontSize: 9.5,
-    fontWeight: "700",
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
   },
-  vitalLabelAlert: {
-    color: colors.danger,
-  },
-  vitalValue: {
-    marginTop: 3,
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
-    fontFamily: monoFontFamily,
-  },
-  vitalValueSub: {
+  statusPillText: {
     fontSize: 12,
+    fontWeight: "500",
   },
-  vitalValueAlert: {
-    color: colors.danger,
+  comment: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+    color: colors.text,
   },
-  gaugeWrap: {
-    height: 11,
-    justifyContent: "center",
-    marginTop: 5,
+  commentLabel: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: colors.textMuted,
   },
-  gaugeTrack: {
-    height: 5,
-    borderRadius: 3,
-    overflow: "hidden",
+  nurseRow: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    marginTop: 8,
   },
-  gaugeZone: {
-    opacity: 0.35,
+  nurseRole: {
+    fontSize: 13,
+    fontWeight: "600",
   },
-  gaugeMarker: {
-    position: "absolute",
-    top: 0,
-    width: 3,
-    height: 11,
-    marginLeft: -1.5,
-    borderRadius: 1,
-    borderWidth: 1.5,
-    borderColor: colors.surface,
+  nurseRoleMidwife: {
+    color: colors.accent,
+  },
+  nurseRoleHospital: {
+    color: colors.warning,
+  },
+  nursePhone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  nursePhoneText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.accent,
+    textDecorationLine: "underline",
   },
   emptyText: {
     marginTop: spacing.xxxl,

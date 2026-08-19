@@ -16,6 +16,7 @@ export type Role = Database["public"]["Enums"]["Role"];
 export type NurseType = Database["public"]["Enums"]["NurseType"];
 export type Hospital = Database["public"]["Tables"]["hospital"];
 export type Maternity = Database["public"]["Tables"]["maternity"];
+export type HospitalMaternityLink = Database["public"]["Tables"]["hospitalMaternityLink"];
 
 export class UserInfoStore {
   userInfo: UserInfo["Row"] = {
@@ -37,6 +38,7 @@ export class UserInfoStore {
   doctorIds: string[] = [];
   hospitals: Hospital["Row"][] = [];
   maternities: Maternity["Row"][] = [];
+  hospitalMaternityLinks: HospitalMaternityLink["Row"][] = [];
   doctorInfos: UserInfo["Row"][] = [];
 
   state = "pending";
@@ -144,6 +146,10 @@ export class UserInfoStore {
     this.maternities = maternities;
   }
 
+  setHospitalMaternityLinks(links: HospitalMaternityLink["Row"][]) {
+    this.hospitalMaternityLinks = links;
+  }
+
   async fetchUserInfo() {
     // See `hydrated`'s comment — guarantees the AsyncStorage snapshot below
     // can never overwrite this call's fresh server data after the fact.
@@ -196,6 +202,17 @@ export class UserInfoStore {
         .then((maternities) => runInAction(() => this.setMaternities(maternities)))
         .catch((error: any) => {
           logger.warn("fetchUserInfo: fetchAllMaternities failed", { error: error?.message });
+        });
+
+      // The explicit admin-assigned hospital<->maternity relationship (see
+      // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §1) — a midwife needs this to
+      // know which hospitals she can transfer/reassign/request to; broadly
+      // readable, same as hospitals/maternities themselves.
+      this.transportLayer
+        .fetchHospitalMaternityLinks()
+        .then((links) => runInAction(() => this.setHospitalMaternityLinks(links)))
+        .catch((error: any) => {
+          logger.warn("fetchUserInfo: fetchHospitalMaternityLinks failed", { error: error?.message });
         });
     }
   }

@@ -11,6 +11,7 @@ import "react-native-url-polyfill/auto";
 import { observer } from "mobx-react";
 import { useLogin } from "./useLogin";
 import { PasswordInput } from "../../components/PasswordInput";
+import { IconAlertTriangle } from "../../components/Icons";
 import { colors, spacing, radius, type, layout } from "../../theme";
 
 export type Props = {

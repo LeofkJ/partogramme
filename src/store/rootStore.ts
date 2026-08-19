@@ -3,12 +3,18 @@ import { PartogrammeStore } from "./partogramme/partogrammeStore";
 import { ProfileStore } from "./user/profileStore";
 import { UserInfoStore } from "./user/userInfoStore";
 import { AdminStore } from "./admin/adminStore";
+import { HospitalDashboardStore } from "./hospitalDashboard/hospitalDashboardStore";
+import { AlertBannerStore } from "./alertBanner/alertBannerStore";
+import { MaternityAlertsStore } from "./maternityAlerts/maternityAlertsStore";
 
 export class RootStore {
   profileStore: ProfileStore;
   partogrammeStore: PartogrammeStore;
   userInfoStore: UserInfoStore;
   adminStore: AdminStore;
+  hospitalDashboardStore: HospitalDashboardStore;
+  alertBannerStore: AlertBannerStore;
+  maternityAlertsStore: MaternityAlertsStore;
   transportLayer: TransportLayer;
 
   constructor() {
@@ -17,6 +23,9 @@ export class RootStore {
     this.userInfoStore = new UserInfoStore(this);
     this.partogrammeStore = new PartogrammeStore(this, this.transportLayer);
     this.adminStore = new AdminStore(this);
+    this.hospitalDashboardStore = new HospitalDashboardStore(this, this.transportLayer);
+    this.alertBannerStore = new AlertBannerStore(this, this.transportLayer);
+    this.maternityAlertsStore = new MaternityAlertsStore(this, this.transportLayer);
   }
 }
 

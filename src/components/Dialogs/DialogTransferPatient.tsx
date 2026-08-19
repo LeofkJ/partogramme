@@ -15,23 +15,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { CustomDropdown } from "./CustomDropdown";
-import { Database } from "../../../types/supabase";
 import { colors, radius, spacing } from "../../theme";
-
-type UrgencyLevel = Database["public"]["Enums"]["UrgencyLevel"];
-
-// Escalating severity, not decoration — reuses the same clinical
-// bg/fg tokens as statusColors (theme.ts) rather than inventing new hues.
-// All four are a plain colored outline at rest — so nothing looks
-// pre-selected — and fill in once picked; EMERGENCY fills solid instead of
-// soft so choosing it specifically still reads as the most severe pick.
-const URGENCY_STYLES: Record<UrgencyLevel, { label: string; softBg: string; strongBg: string; fg: string }> = {
-  LOW: { label: "Faible", softBg: colors.successSoft, strongBg: colors.success, fg: colors.success },
-  MEDIUM: { label: "Moyenne", softBg: colors.warningSoft, strongBg: colors.warning, fg: colors.warning },
-  HIGH: { label: "Élevée", softBg: colors.dangerSoft, strongBg: colors.danger, fg: colors.danger },
-  EMERGENCY: { label: "Urgence", softBg: colors.dangerSoft, strongBg: colors.danger, fg: colors.danger },
-};
-const URGENCY_ORDER: UrgencyLevel[] = ["LOW", "MEDIUM", "HIGH", "EMERGENCY"];
 
 interface DropdownItem {
   label: string;
@@ -42,14 +26,13 @@ interface Props {
   isVisible: boolean;
   hospitalItems: DropdownItem[];
   onClose: () => void;
-  onSubmit: (input: { hospitalId: string; reason: string; urgencyLevel: UrgencyLevel }) => Promise<void>;
+  onSubmit: (input: { hospitalId: string; reason: string }) => Promise<void>;
 }
 
 export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSubmit }: Props) => {
   const { width } = useWindowDimensions();
   const [hospitalId, setHospitalId] = useState("");
   const [reason, setReason] = useState("");
-  const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>("MEDIUM");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -57,7 +40,6 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSub
     if (!isVisible) return;
     setHospitalId("");
     setReason("");
-    setUrgencyLevel("MEDIUM");
     setErrorMessage(null);
   }, [isVisible]);
 
@@ -72,7 +54,7 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSub
     }
     setErrorMessage(null);
     setIsSubmitting(true);
-    onSubmit({ hospitalId, reason: reason.trim(), urgencyLevel })
+    onSubmit({ hospitalId, reason: reason.trim() })
       .then(() => setIsSubmitting(false))
       .catch((error: any) => {
         setIsSubmitting(false);
@@ -105,33 +87,6 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSub
               Aucun hôpital n'est rattaché à votre région pour le moment.
             </Text>
           )}
-
-          <Text style={styles.label}>Urgence</Text>
-          <View style={styles.urgencyRow}>
-            {URGENCY_ORDER.map((level) => {
-              const { label, softBg, strongBg, fg } = URGENCY_STYLES[level];
-              const selected = urgencyLevel === level;
-              const isEmergency = level === "EMERGENCY";
-              const backgroundColor = !selected ? colors.surface : isEmergency ? strongBg : softBg;
-              const textColor = selected && isEmergency ? colors.onAccent : fg;
-              return (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.urgencyChip,
-                    { backgroundColor, borderColor: fg },
-                    selected && styles.urgencyChipSelected,
-                  ]}
-                  onPress={() => setUrgencyLevel(level)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.urgencyChipText, { color: textColor }]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
           <Text style={styles.label}>Motif du transfert</Text>
           <TextInput
@@ -213,26 +168,6 @@ const styles = StyleSheet.create({
   reasonInput: {
     minHeight: 70,
     textAlignVertical: "top",
-  },
-  urgencyRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 4,
-  },
-  urgencyChip: {
-    borderWidth: 1.5,
-    borderRadius: radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  urgencyChipSelected: {
-    borderWidth: 2,
-    borderColor: colors.text,
-  },
-  urgencyChipText: {
-    fontSize: 12,
-    fontWeight: "700",
   },
   dropdownButton: {
     borderWidth: 1,

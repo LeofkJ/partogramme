@@ -3,6 +3,7 @@ import "react-native-get-random-values";
 import { useEffect, useState } from "react";
 import { AppState, Platform } from "react-native";
 import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
+import { AlertBanner } from "./src/components/AlertBanner/AlertBanner";
 import { navigationRef } from "./src/navigationRef";
 import { colors, radius } from "./src/theme";
 import * as Sentry from "./src/lib/sentry";
@@ -18,6 +19,7 @@ import { ScreenAddPartogramme } from "./src/screens/AddPartogramme/AddPartogramm
 import { ScreenGraph } from "./src/screens/Graph/Graph";
 import { ScreenProfile } from "./src/screens/Profile/Profile";
 import { ScreenAdmin } from "./src/screens/Admin/Admin";
+import { ScreenHospitalDashboard } from "./src/screens/HospitalDashboard/HospitalDashboard";
 import { MainTabs } from "./src/navigation/MainTabs";
 
 // react-native-paper-dates (the date/time pickers) renders through
@@ -56,6 +58,7 @@ const linking = {
       Screen_Graph: "/graph",
       Screen_Profile: "/profile",
       Screen_Admin: "/admin",
+      Screen_HospitalDashboard: "/dashboard",
     },
   },
 };
@@ -84,6 +87,7 @@ function App() {
             onStateChange={syncCurrentRoute}
           >
             <NavBar currentRouteName={currentRouteName} />
+            <AlertBanner />
             <Stack.Navigator>
               <Stack.Screen
                 name="Screen_Login"
@@ -148,6 +152,18 @@ function App() {
                   component={ScreenAdmin}
                   options={{
                     title: "Administration",
+                    headerTintColor: colors.accent,
+                    headerTitleAlign: "center",
+                    headerShown: !NAVBAR_ENABLED,
+                  }}
+                />
+              )}
+              {Platform.OS === "web" && (
+                <Stack.Screen
+                  name="Screen_HospitalDashboard"
+                  component={ScreenHospitalDashboard}
+                  options={{
+                    title: "Tableau de bord",
                     headerTintColor: colors.accent,
                     headerTitleAlign: "center",
                     headerShown: !NAVBAR_ENABLED,

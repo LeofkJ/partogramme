@@ -28,6 +28,7 @@ export function useLogin(onLoggedIn: () => void) {
       if (event === "SIGNED_OUT") {
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
+        rootStore.alertBannerStore.signOut();
         return;
       }
       if (event === "SIGNED_IN") {
@@ -54,6 +55,7 @@ export function useLogin(onLoggedIn: () => void) {
       .then((result) => {
         if (result) {
           logger.info("Login success", { email: rootStore.profileStore.email });
+          rootStore.alertBannerStore.resetForLogin();
           onLoggedIn();
         }
         setIsSubmitting(false);

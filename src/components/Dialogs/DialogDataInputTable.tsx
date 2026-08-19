@@ -46,6 +46,8 @@ export interface Props {
   preSelectedDataChoice?: DataInputTable_t;
   /** When set (editing an existing entry), the ISO timestamp it was recorded at. */
   recordedAt?: string;
+  /** When editing, the current value so the field isn't empty / 0. */
+  initialValue?: string;
 }
 
 const DialogDataInputTable: React.FC<Props> = observer(({
@@ -56,6 +58,7 @@ const DialogDataInputTable: React.FC<Props> = observer(({
   onDelete,
   preSelectedDataChoice,
   recordedAt,
+  initialValue,
 }) => {
   const { width } = useWindowDimensions();
 
@@ -84,7 +87,18 @@ const DialogDataInputTable: React.FC<Props> = observer(({
 
   const [selectedAmnioticLiquidState, setSelectedAmnioticLiquidState] =
     useState(getValueByRank(liquidStates, 0) as string);
-  const [inputDataNumber, setInputDataNumber] = useState("0");
+  const [inputDataNumber, setInputDataNumber] = useState("");
+
+  useEffect(() => {
+    if (!visible || !preSelectedDataChoice) return;
+    const isAmniotic = preSelectedDataChoice instanceof AmnioticLiquidStore;
+    if (initialValue != null && initialValue !== "") {
+      if (isAmniotic) setSelectedAmnioticLiquidState(initialValue);
+      else setInputDataNumber(initialValue);
+    } else if (!isAmniotic) {
+      setInputDataNumber("");
+    }
+  }, [visible, preSelectedDataChoice, initialValue]);
 
   // Multi-field entry (no preselected type): one optional value per data
   // type, starts empty every time the dialog opens — pre-filling with the

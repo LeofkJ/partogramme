@@ -62,26 +62,91 @@ export class TransportLayer {
     }
   }
 
+  /** Every doctor/nurse at a hospital sees every patient associated with
+   * that hospital, plus every not-yet-transferred patient at any maternity
+   * linked to it — not just alert-flagged ones (see task.md, reverses the
+   * earlier "doctors see alerts only" decision). Two queries merged
+   * client-side rather than one OR'd query, since "own hospital" and
+   * "linked maternity, not yet transferred" are different shapes
+   * (hospitalId match vs. hospitalId is null + maternityId in a list). */
+  async fetchPartogrammesForHospitalStaff(hospitalId: string) {
+    const [ownHospital, linkedMaternities] = await Promise.all([
+      supabase
+        .from("Partogramme")
+        .select("*")
+        .eq("hospitalId", hospitalId)
+        .eq("isDeleted", false),
+      supabase
+        .from("hospitalMaternityLink")
+        .select("maternityId")
+        .eq("hospitalId", hospitalId),
+    ]);
+    if (ownHospital.error) {
+      logger.error(ownHospital.error.message, { code: ownHospital.error.code });
+      Sentry.captureException(ownHospital.error);
+      throw ownHospital.error;
+    }
+    if (linkedMaternities.error) {
+      logger.error(linkedMaternities.error.message, { code: linkedMaternities.error.code });
+      Sentry.captureException(linkedMaternities.error);
+      throw linkedMaternities.error;
+    }
+
+    const maternityIds = linkedMaternities.data.map((l) => l.maternityId);
+    if (maternityIds.length === 0) {
+      return ownHospital.data;
+    }
+
+    const { data: maternityPatients, error: maternityError } = await supabase
+      .from("Partogramme")
+      .select("*")
+      .in("maternityId", maternityIds)
+      .is("hospitalId", null)
+      .eq("isDeleted", false);
+    if (maternityError) {
+      logger.error(maternityError.message, { code: maternityError.code });
+      Sentry.captureException(maternityError);
+      throw maternityError;
+    }
+
+    return [...ownHospital.data, ...maternityPatients];
+  }
+
   /** Same scope as fetchPartogrammes' nurse branch (her own ADMITTED/
    * IN_PROGRESS patients), just keyed on maternityId instead of
    * hospitalId — a separate method rather than overloading
    * fetchPartogrammes, since a maternity nurse has no hospitalId at all. */
-  async fetchPartogrammesForMaternityNurse(maternityId: string, nurseId: string) {
+  // Every non-deleted patient at this maternity, any state — a midwife
+  // keeps permanent visibility into her maternity's patients even after
+  // they've been transferred/finished elsewhere (see
+  // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §2). Not scoped to a single nurse's
+  // own patients: any midwife at the maternity sees all of it, matching
+  // what the RLS policy already permits (keyed on maternityId, not
+  // nurseId) — this used to also filter by nurseId/state, narrower than
+  // what was actually allowed.
+  async fetchPartogrammesForMaternityNurse(maternityId: string) {
     const { data, error } = await supabase
       .from("Partogramme")
       .select("*")
-      .eq("nurseId", nurseId)
       .eq("maternityId", maternityId)
-      .eq("isDeleted", false)
-      .in("state", ["ADMITTED", "IN_PROGRESS"]);
+      .eq("isDeleted", false);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
+  // Plain UPDATE, not upsert — every caller acts on a patient that already
+  // exists (insertPartogramme below is the only genuine create path).
+  // .upsert() compiles to INSERT ... ON CONFLICT DO UPDATE, which needs
+  // the caller to satisfy an INSERT policy even when a conflict always
+  // occurs — doctors have none (they never create patients), so any
+  // doctor action routed through this (RÉCLAMER, transfer requests, state
+  // changes) failed with a 42501 despite the UPDATE policy itself being
+  // correct. Confirmed live: the exact same write succeeds as a plain
+  // UPDATE under a doctor's identity, fails as an upsert.
   async updatePartogramme(partogramme: Partogramme_t["Row"]) {
     const { data, error } = await supabase
       .from("Partogramme")
-      .upsert({ ...partogramme })
+      .update({ ...partogramme })
       .eq("id", partogramme.id);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
     return data;
@@ -593,6 +658,62 @@ export class TransportLayer {
     return data;
   }
 
+  // The admin-managed hospital<->maternity relationship (see
+  // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §1) — replaces the old
+  // region-text-match. No isDeleted on this table; a link is just
+  // created/removed outright, hard delete.
+  async fetchHospitalMaternityLinks() {
+    const { data, error } = await supabase.from("hospitalMaternityLink").select("*");
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  /** Still-at-the-maternity patients (not yet transferred) from a given
+   * set of maternities — the doctor's alert panel's source list (see
+   * MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §3). RLS
+   * (2026-08-13_doctor_maternity_alerts_and_requests.sql) only lets a
+   * doctor's query actually return rows from maternities linked to his own
+   * hospital, regardless of which maternityIds are passed in here. */
+  async fetchMaternityAlertCandidates(maternityIds: string[]) {
+    if (maternityIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("id, patientFirstName, patientLastName, noFile, maternityId, workStartDateTime, transferRequestHospitalId")
+      .in("maternityId", maternityIds)
+      .in("state", ["ADMITTED", "IN_PROGRESS"])
+      .eq("isDeleted", false);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  /** Hospital staff requesting a transfer for a maternity patient — sets
+   * the request fields only; RLS (see 2026-08-19_hospital_staff_edit_and_request.sql)
+   * restricts this to a linked maternity and won't let it touch anything
+   * else on the row. */
+  async requestMaternityTransfer(partogrammeId: string, hospitalId: string, doctorProfileId: string) {
+    const { error } = await supabase
+      .from("Partogramme")
+      .update({ transferRequestHospitalId: hospitalId, transferRequestByDoctorId: doctorProfileId })
+      .eq("id", partogrammeId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+  }
+
+  // Admin-only, gated by the "Admins can create hospital-maternity links"
+  // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
+  async linkHospitalMaternity(link: { id: string; hospitalId: string; maternityId: string }) {
+    const { data, error } = await supabase.from("hospitalMaternityLink").insert(link);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  // Admin-only, gated by the "Admins can delete hospital-maternity links"
+  // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
+  async unlinkHospitalMaternity(linkId: string) {
+    const { data, error } = await supabase.from("hospitalMaternityLink").delete().eq("id", linkId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
   async fetchAllDoctors() {
     const { data, error } = await supabase
       .from("userInfo")
@@ -679,27 +800,14 @@ export class TransportLayer {
     return data.lastSignInByProfileId as Record<string, string | null>;
   }
 
-  /** Every non-deleted partogramme across every hospital — feeds both the
-   * Admin accounts list's per-employee active-patient count and the
-   * Dashboard's census/throughput widgets. Only enough columns for those,
-   * not the full row like the nurse/doctor fetch. */
-  async fetchAllPartogrammesForAdmin() {
-    const { data, error } = await supabase
-      .from("Partogramme")
-      .select(
-        "id, nurseId, refDoctorId, state, hospitalId, maternityId, admissionDateTime, workStartDateTime, workFinishedDateTime, noFile, patientFirstName, patientLastName, commentary, transferReason, urgencyLevel",
-      )
-      .eq("isDeleted", false);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
-    return data;
-  }
-
-  /** Latest dilation + BPM reading per partogramme, for the Dashboard's
-   * "needs attention" widget (see 2026-08-06_admin_vitals_select.sql for
-   * the RLS this needs). Fetches every reading for the given ids and lets
-   * the caller reduce to "latest per id" — same client-side pattern the
-   * rest of the app already uses for a single patient's history. */
-  async fetchLatestVitalsForAdmin(partogrammeIds: string[]) {
+  /** Latest dilation + BPM reading per partogramme — used by the doctor's
+   * linked-maternity alert panel
+   * (2026-08-13_doctor_maternity_alerts_and_requests.sql). Fetches every
+   * reading for the given ids and lets the caller reduce to "latest per
+   * id" — same client-side pattern the rest of the app already uses for a
+   * single patient's history. Relies entirely on RLS to scope which rows
+   * actually come back for a given caller. */
+  async fetchLatestVitals(partogrammeIds: string[]) {
     if (partogrammeIds.length === 0) return { dilations: [], bpms: [] };
     const [dilationRes, bpmRes] = await Promise.all([
       supabase
@@ -716,5 +824,46 @@ export class TransportLayer {
     if (dilationRes.error) { logger.error(dilationRes.error.message, { code: dilationRes.error.code }); throw dilationRes.error; }
     if (bpmRes.error) { logger.error(bpmRes.error.message, { code: bpmRes.error.code }); throw bpmRes.error; }
     return { dilations: dilationRes.data, bpms: bpmRes.data };
+  }
+
+  /** Every currently-active manual alert (isDeleted = false) for the given
+   * patients — a patient can have more than one at once, so this returns
+   * one row per alert, not per patient. Shared by HospitalDashboardStore
+   * and MaternityAlertsStore so both flag off the exact same rows. */
+  async fetchManualAlerts(partogrammeIds: string[]) {
+    if (partogrammeIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("ManualAlert")
+      .select("id, partogrammeId, comment, createdAt")
+      .in("partogrammeId", partogrammeIds)
+      .eq("isDeleted", false)
+      .order("createdAt", { ascending: false });
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  async createManualAlert(partogrammeId: string, comment: string) {
+    const { error } = await supabase.from("ManualAlert").insert({ partogrammeId, comment });
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+  }
+
+  // Soft delete, matching every other table's isDeleted convention —
+  // RLS only grants update, not delete, on this table.
+  async deleteManualAlert(alertId: string) {
+    const { error } = await supabase.from("ManualAlert").update({ isDeleted: true }).eq("id", alertId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+  }
+
+  /** Close every open manual alert on a patient — hospital staff after
+   * transfer/claim (see 2026-08-19_hospital_staff_clear_manual_alerts.sql).
+   * A patient can have several at once; this is "we've got her" not
+   * dismissing one note at a time. */
+  async deleteManualAlertsForPartogramme(partogrammeId: string) {
+    const { error } = await supabase
+      .from("ManualAlert")
+      .update({ isDeleted: true })
+      .eq("partogrammeId", partogrammeId)
+      .eq("isDeleted", false);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
   }
 }

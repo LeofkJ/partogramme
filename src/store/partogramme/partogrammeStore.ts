@@ -137,9 +137,14 @@ export class PartogrammeStore {
     this.state = "pending";
     const userInfo = this.rootStore.userInfoStore.userInfo;
     const isMaternityNurse = userInfo.role === "NURSE" && userInfo.nurseType === "MATERNITY";
+    // Hospital staff (doctor or hospital nurse) both see every patient at
+    // their hospital plus every not-yet-transferred patient at a linked
+    // maternity — not just the nurse's own active queue anymore (see
+    // task.md). Only maternity nurses keep the separate maternityId-scoped
+    // fetch.
     const fetchPromise = isMaternityNurse && nurseId && userInfo.maternityId
-      ? this.transportLayer.fetchPartogrammesForMaternityNurse(userInfo.maternityId, nurseId)
-      : this.transportLayer.fetchPartogrammes(userInfo.hospitalId as string, nurseId);
+      ? this.transportLayer.fetchPartogrammesForMaternityNurse(userInfo.maternityId)
+      : this.transportLayer.fetchPartogrammesForHospitalStaff(userInfo.hospitalId as string);
     await fetchPromise
       .then((fetchedPartogrammes) => {
         runInAction(() => {
@@ -168,7 +173,11 @@ export class PartogrammeStore {
         return Promise.reject(error);
       });
 
-    this.subscribeToRealtime(nurseId);
+    // Hospital nurses now get the same "never drop a row" realtime handling
+    // as doctors (full hospital visibility, not just her own active queue)
+    // — only pass nurseId through for maternity nurses, who are the one
+    // case subscribeToRealtime still branches on.
+    this.subscribeToRealtime(isMaternityNurse ? nurseId : undefined);
   }
 
   // Subscribe to real-time changes on the Partogramme table for the current hospital.
@@ -180,6 +189,8 @@ export class PartogrammeStore {
 
     const hospitalId = this.rootStore.userInfoStore.userInfo.hospitalId;
 
+    const isMaternityNurse = this.rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+
     const handlePayload = (payload: any) => {
       const row = payload.new as Partogramme_t["Row"];
       if (nurseId) {
@@ -188,7 +199,11 @@ export class PartogrammeStore {
         // longer "currently managing" it, so drop it from her list right
         // away instead of just updating its status in place. Local-only:
         // no server call, the state change already happened server-side.
-        if (row.state !== "ADMITTED" && row.state !== "IN_PROGRESS") {
+        // Not for a midwife — she keeps permanent visibility into her
+        // maternity's patients regardless of state (see
+        // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §2), so a state change
+        // should update the row in place, never remove it.
+        if (!isMaternityNurse && row.state !== "ADMITTED" && row.state !== "IN_PROGRESS") {
           runInAction(() => {
             const existing = this.partogrammeList.find((p) => p.partogramme.id === row.id);
             if (existing) this.partogrammeList.splice(this.partogrammeList.indexOf(existing), 1);
@@ -377,6 +392,9 @@ export class Partogramme {
     maternityId: null,
     refDoctorId: "",
     transferReason: null,
+    transferRequestHospitalId: null,
+    transferRequestByDoctorId: null,
+    transferRequestRejectionComment: null,
     urgencyLevel: null,
   };
 
@@ -524,6 +542,9 @@ export class Partogramme {
       maternityId: maternityId,
       refDoctorId: refDoctorId,
       transferReason: transferReason,
+      transferRequestHospitalId: null,
+      transferRequestByDoctorId: null,
+      transferRequestRejectionComment: null,
       urgencyLevel: urgencyLevel,
     };
   }
@@ -683,6 +704,31 @@ export class Partogramme {
       });
   }
 
+  // Hospital staff requesting a transfer of a linked-maternity patient to
+  // their own hospital, from the patient's own (read-only) chart. Doesn't
+  // change hospitalId/state — the midwife still has to accept or reject
+  // (see acceptTransferRequest/rejectTransferRequest below).
+  async requestTransfer(hospitalId: string, doctorProfileId: string) {
+    const data = this.asJson;
+    data.transferRequestHospitalId = hospitalId;
+    data.transferRequestByDoctorId = doctorProfileId;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("requestTransfer: updatePartogramme failed", { id: data.id, hospitalId, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
   // Maternity nurse → hospital referral (see MATERNITY_TRANSFER_PLAN.md).
   // Deliberately separate from changeState rather than folded into it —
   // this is the maternity nurse handing the patient to a hospital for the
@@ -693,13 +739,11 @@ export class Partogramme {
   async transferToHospital(
     hospitalId: string,
     reason: string,
-    urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"],
   ) {
     const data = this.asJson;
     data.hospitalId = hospitalId;
     data.state = "TRANSFERRED";
     data.transferReason = reason;
-    data.urgencyLevel = urgencyLevel;
     await this.store.transportLayer
       .updatePartogramme(data)
       .then(() => {
@@ -713,6 +757,120 @@ export class Partogramme {
           this.store.state = "error";
         });
         logger.warn("transferToHospital: updatePartogramme failed", { id: data.id, hospitalId, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
+  // Midwife accepting a doctor's transfer request (see
+  // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §5) — same end state as her own
+  // direct transferToHospital (patient lands in the requesting hospital's
+  // unclaimed pool, RÉCLAMER handles the rest), just triggered from a
+  // request instead of her own initiative. No reason/urgency to carry over
+  // — the doctor's request didn't collect either.
+  async acceptTransferRequest() {
+    const data = this.asJson;
+    const hospitalId = data.transferRequestHospitalId;
+    if (!hospitalId) return;
+    data.hospitalId = hospitalId;
+    data.state = "TRANSFERRED";
+    data.transferRequestHospitalId = null;
+    data.transferRequestByDoctorId = null;
+    data.transferRequestRejectionComment = null;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("acceptTransferRequest: updatePartogramme failed", { id: data.id, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
+  // Midwife rejecting a doctor's transfer request — comment is optional,
+  // nothing else about the patient changes, she keeps managing her
+  // as normal.
+  async rejectTransferRequest(comment: string | null) {
+    const data = this.asJson;
+    data.transferRequestHospitalId = null;
+    data.transferRequestByDoctorId = null;
+    data.transferRequestRejectionComment = comment;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("rejectTransferRequest: updatePartogramme failed", { id: data.id, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
+  // Midwife moving an already-transferred patient to a different hospital
+  // — a wrong claim, or a straight Hospital A -> Hospital B change (see
+  // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md, both turned out to be the same
+  // action). Clears refDoctorId — whoever claimed her at the old hospital
+  // no longer has any relationship to this patient, the new hospital's
+  // doctor has to claim fresh via RÉCLAMER. State stays TRANSFERRED.
+  async reassignToHospital(hospitalId: string, reason: string) {
+    const data = this.asJson;
+    data.hospitalId = hospitalId;
+    data.refDoctorId = null;
+    data.transferReason = reason;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("reassignToHospital: updatePartogramme failed", { id: data.id, hospitalId, error: error?.message });
+        return Promise.reject(error);
+      });
+  }
+
+  // Midwife pulling an already-transferred patient all the way back to her
+  // own maternity, instead of reassigning her to a different hospital —
+  // same override authority as reassignToHospital (works even if a doctor
+  // already claimed her, see MATERNITY_HOSPITAL_WORKFLOW_PLAN.md). Clears
+  // hospitalId/refDoctorId entirely and drops the state back to
+  // IN_PROGRESS, same as any patient still being followed at the maternity.
+  async pullBackToMaternity() {
+    const data = this.asJson;
+    data.hospitalId = null;
+    data.refDoctorId = null;
+    data.state = "IN_PROGRESS";
+    data.transferReason = null;
+    await this.store.transportLayer
+      .updatePartogramme(data)
+      .then(() => {
+        runInAction(() => {
+          this.partogramme = data;
+          this.store.state = "done";
+        });
+      })
+      .catch((error) => {
+        runInAction(() => {
+          this.store.state = "error";
+        });
+        logger.warn("pullBackToMaternity: updatePartogramme failed", { id: data.id, error: error?.message });
         return Promise.reject(error);
       });
   }

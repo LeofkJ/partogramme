@@ -17,9 +17,9 @@ import { CustomDropdown } from "../../components/Dialogs/CustomDropdown";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
 import { DialogAccountDetails, AccountDetails } from "../../components/Dialogs/DialogAccountDetails";
 import { DialogEditAccount, EditableAccount } from "../../components/Dialogs/DialogEditAccount";
+import { MaternityHospitalLinksPanel } from "../../components/MaternityHospitalLinksPanel";
 import { SegmentedControl } from "../../components/SegmentedControl";
-import { IconTrash, IconPlus, IconUser, IconHome, IconUserCog, IconCopy, IconCheck, IconChartBar } from "../../components/Icons";
-import { AdminDashboard } from "./Dashboard";
+import { IconTrash, IconPlus, IconUser, IconHospital, IconMaternity, IconUserCog, IconCopy, IconCheck } from "../../components/Icons";
 import { notify } from "../../lib/notify";
 import { reset } from "../../navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
@@ -27,7 +27,7 @@ import { formatDateOnly } from "../../tools/StringUtilitary";
 
 type RoleChoice = "NURSE" | "DOCTOR";
 type NurseTypeChoice = "HOSPITAL" | "MATERNITY";
-type Page = "dashboard" | "create" | "accounts" | "hospitals" | "maternities" | "admins";
+type Page = "create" | "accounts" | "hospitals" | "maternities" | "admins";
 
 // Below this, the sidebar nav collapses into a segmented control above the
 // content instead of sitting fixed on the side. Comfortably below common
@@ -45,7 +45,7 @@ export const ScreenAdmin: React.FC = observer(() => {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= WIDE_BREAKPOINT;
 
-  const [page, setPage] = useState<Page>("dashboard");
+  const [page, setPage] = useState<Page>("create");
   const [createdAccount, setCreatedAccount] = useState<{ email: string; tempPassword: string } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
 
@@ -392,19 +392,6 @@ export const ScreenAdmin: React.FC = observer(() => {
   const navButtons = (
     <View style={[styles.navList, !isWide && styles.navListNarrow]}>
       <TouchableOpacity
-        style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "dashboard" && styles.navButtonActive]}
-        onPress={() => setPage("dashboard")}
-      >
-        <IconChartBar
-          size={14}
-          color={page === "dashboard" ? colors.text : colors.textSecondary}
-        />
-        <Text style={[styles.navButtonText, page === "dashboard" && styles.navButtonTextActive]}>
-          Tableau de bord
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
         style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "create" && styles.navButtonActive]}
         onPress={() => setPage("create")}
       >
@@ -434,7 +421,7 @@ export const ScreenAdmin: React.FC = observer(() => {
         style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "hospitals" && styles.navButtonActive]}
         onPress={() => setPage("hospitals")}
       >
-        <IconHome
+        <IconHospital
           size={14}
           color={page === "hospitals" ? colors.text : colors.textSecondary}
         />
@@ -447,7 +434,7 @@ export const ScreenAdmin: React.FC = observer(() => {
         style={[styles.navButton, !isWide && styles.navButtonNarrow, page === "maternities" && styles.navButtonActive]}
         onPress={() => setPage("maternities")}
       >
-        <IconHome
+        <IconMaternity
           size={14}
           color={page === "maternities" ? colors.text : colors.textSecondary}
         />
@@ -639,7 +626,6 @@ export const ScreenAdmin: React.FC = observer(() => {
                 <Text style={[styles.tableHeaderText, styles.colPhone]}>Téléphone</Text>
                 <Text style={[styles.tableHeaderText, styles.colRole]}>Rôle</Text>
                 <Text style={[styles.tableHeaderText, styles.colHospital]}>Hôpital / Maternité</Text>
-                <Text style={[styles.tableHeaderText, styles.colPatients]}>Patients</Text>
                 <Text style={[styles.tableHeaderText, styles.colLastLogin]}>Dernière connexion</Text>
                 <Text style={[styles.tableHeaderText, styles.colAction]}> </Text>
               </View>
@@ -647,7 +633,6 @@ export const ScreenAdmin: React.FC = observer(() => {
 
             {filteredAccounts.map((account) => {
               const lastLogin = adminStore.lastLoginByProfileId[account.profileId];
-              const patientCount = adminStore.patientCounts(account);
 
               return (
                 <TouchableOpacity
@@ -665,9 +650,7 @@ export const ScreenAdmin: React.FC = observer(() => {
               )}
               {!isWide && (
                 <Text style={styles.accountMeta}>
-                  {facilityName(account)} · {patientCount.active} actif
-                  {patientCount.active !== 1 ? "s" : ""}, {patientCount.inactive} inactif
-                  {patientCount.inactive !== 1 ? "s" : ""} ·{" "}
+                  {facilityName(account)} ·{" "}
                   {lastLogin ? formatDateOnly(lastLogin) : "Jamais connecté"}
                 </Text>
               )}
@@ -704,7 +687,7 @@ export const ScreenAdmin: React.FC = observer(() => {
                   {account.role === "DOCTOR"
                     ? "Médecin"
                     : account.nurseType === "MATERNITY"
-                      ? "Maternité"
+                      ? "Sage-femme"
                       : "Infirmière"}
                 </Text>
               </View>
@@ -716,20 +699,6 @@ export const ScreenAdmin: React.FC = observer(() => {
               </Text>
             )}
 
-            {isWide && (
-              <View style={[styles.colPatients, styles.patientBadgeRow]}>
-                <View style={[styles.patientBadge, styles.patientBadgeActive]}>
-                  <Text style={[styles.patientBadgeText, styles.patientBadgeTextActive]}>
-                    {patientCount.active}
-                  </Text>
-                </View>
-                <View style={[styles.patientBadge, styles.patientBadgeInactive]}>
-                  <Text style={[styles.patientBadgeText, styles.patientBadgeTextInactive]}>
-                    {patientCount.inactive}
-                  </Text>
-                </View>
-              </View>
-            )}
 
             {isWide && (
               <Text style={[styles.colLastLogin, styles.accountMeta]}>
@@ -990,7 +959,7 @@ export const ScreenAdmin: React.FC = observer(() => {
         {filteredMaternities.map((maternity) => (
           <View key={maternity.id}>
             <View style={styles.hospitalRow}>
-              <View>
+              <View style={styles.maternityNameCol}>
                 <Text style={styles.accountName}>{maternity.name}</Text>
                 <Text style={styles.accountMeta}>{maternity.region}</Text>
               </View>
@@ -1004,6 +973,24 @@ export const ScreenAdmin: React.FC = observer(() => {
                 </TouchableOpacity>
               )}
             </View>
+
+            {deletingMaternityId !== maternity.id && (
+              <MaternityHospitalLinksPanel
+                hospitals={adminStore.hospitals.map((h) => ({
+                  id: h.id,
+                  name: h.name,
+                  city: h.city,
+                  linked: adminStore.hospitalsForMaternity(maternity.id).some((linked) => linked.id === h.id),
+                }))}
+                onToggle={(hospitalId, linked) => {
+                  if (linked) {
+                    adminStore.linkMaternityToHospital(maternity.id, hospitalId).catch(() => {});
+                  } else {
+                    adminStore.unlinkMaternityFromHospital(maternity.id, hospitalId).catch(() => {});
+                  }
+                }}
+              />
+            )}
 
             {deletingMaternityId === maternity.id && (
               <View style={styles.deleteConfirmBox}>
@@ -1293,17 +1280,15 @@ export const ScreenAdmin: React.FC = observer(() => {
   const pageContent = (
     <>
       {tempPasswordBanner}
-      {page === "dashboard"
-        ? <AdminDashboard />
-        : page === "create"
-          ? createPage
-          : page === "accounts"
-            ? accountsPage
-            : page === "hospitals"
-              ? hospitalsPage
-              : page === "maternities"
-                ? maternitiesPage
-                : adminsPage}
+      {page === "create"
+        ? createPage
+        : page === "accounts"
+          ? accountsPage
+          : page === "hospitals"
+            ? hospitalsPage
+            : page === "maternities"
+              ? maternitiesPage
+              : adminsPage}
       <DialogConfirm
         isVisible={!!removeTarget}
         setIsVisible={(value) => {
@@ -1697,15 +1682,6 @@ const styles = StyleSheet.create({
     flex: 1.4,
     minWidth: 120,
   },
-  colPatients: {
-    flex: 0.7,
-    minWidth: 80,
-    alignItems: "flex-start",
-  },
-  patientBadgeRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
   colLastLogin: {
     flex: 1,
     minWidth: 110,
@@ -1733,6 +1709,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: colors.hairline,
+  },
+  maternityNameCol: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: spacing.sm,
   },
   deleteConfirmBox: {
     backgroundColor: colors.dangerSoft,
@@ -1789,30 +1770,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,
-  },
-  patientBadge: {
-    alignSelf: "flex-start",
-    minWidth: 22,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    alignItems: "center",
-  },
-  patientBadgeActive: {
-    backgroundColor: colors.successSoft,
-  },
-  patientBadgeInactive: {
-    backgroundColor: colors.surfaceMuted,
-  },
-  patientBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  patientBadgeTextActive: {
-    color: colors.success,
-  },
-  patientBadgeTextInactive: {
-    color: colors.textMuted,
   },
   actionCell: {
     alignItems: "flex-end",

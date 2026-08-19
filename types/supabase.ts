@@ -267,6 +267,39 @@ export type Database = {
         }
         Relationships: []
       }
+      hospitalMaternityLink: {
+        Row: {
+          hospitalId: string
+          id: string
+          maternityId: string
+        }
+        Insert: {
+          hospitalId: string
+          id: string
+          maternityId: string
+        }
+        Update: {
+          hospitalId?: string
+          id?: string
+          maternityId?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospitalMaternityLink_hospitalId_fkey"
+            columns: ["hospitalId"]
+            isOneToOne: false
+            referencedRelation: "hospital"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospitalMaternityLink_maternityId_fkey"
+            columns: ["maternityId"]
+            isOneToOne: false
+            referencedRelation: "maternity"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       MotherContractionDuration: {
         Row: {
           created_at: string
@@ -477,6 +510,38 @@ export type Database = {
           },
         ]
       }
+      ManualAlert: {
+        Row: {
+          comment: string
+          createdAt: string
+          id: string
+          isDeleted: boolean
+          partogrammeId: string
+        }
+        Insert: {
+          comment: string
+          createdAt?: string
+          id?: string
+          isDeleted?: boolean
+          partogrammeId: string
+        }
+        Update: {
+          comment?: string
+          createdAt?: string
+          id?: string
+          isDeleted?: boolean
+          partogrammeId?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ManualAlert_partogrammeId_fkey"
+            columns: ["partogrammeId"]
+            isOneToOne: false
+            referencedRelation: "Partogramme"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Partogramme: {
         Row: {
           admissionDateTime: string
@@ -492,6 +557,9 @@ export type Database = {
           refDoctorId: string | null
           state: Database["public"]["Enums"]["PartogrammeState"]
           transferReason: string | null
+          transferRequestByDoctorId: string | null
+          transferRequestHospitalId: string | null
+          transferRequestRejectionComment: string | null
           urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime: string | null
           workStartDateTime: string | null
@@ -510,6 +578,9 @@ export type Database = {
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
           transferReason?: string | null
+          transferRequestByDoctorId?: string | null
+          transferRequestHospitalId?: string | null
+          transferRequestRejectionComment?: string | null
           urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null
@@ -528,6 +599,9 @@ export type Database = {
           refDoctorId?: string | null
           state?: Database["public"]["Enums"]["PartogrammeState"]
           transferReason?: string | null
+          transferRequestByDoctorId?: string | null
+          transferRequestHospitalId?: string | null
+          transferRequestRejectionComment?: string | null
           urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null

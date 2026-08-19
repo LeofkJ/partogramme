@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { IconPlus } from "../../components/Icons";
 import { PartogrammeList } from "../../components/partogrammeList";
+import { MaternityTransferRequestsPanel } from "../../components/MaternityTransferRequestsPanel";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DialogSetPassword } from "../../components/Dialogs/DialogSetPassword";
@@ -16,6 +17,7 @@ export type Props = {
 
 export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
   const isNurse = rootStore.userInfoStore.userInfo.role === "NURSE";
+  const isMaternityNurse = isNurse && rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
   const firstName = rootStore.userInfoStore.userInfo.firstName;
   const lastName = rootStore.userInfoStore.userInfo.lastName;
 
@@ -77,7 +79,7 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
             <Text style={styles.headerRole}>
               {rootStore.userInfoStore.userInfo.role === "NURSE"
                 ? rootStore.userInfoStore.userInfo.nurseType === "MATERNITY"
-                  ? "Infirmière de maternité"
+                  ? "Sage-femme"
                   : "Infirmière"
                 : "Médecin"}
             </Text>
@@ -86,12 +88,14 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         <View style={styles.headerHairline} />
       </View>
 
+      {isMaternityNurse && <MaternityTransferRequestsPanel />}
+
       <View style={styles.listContainer}>
         <PartogrammeList title={"Partogrammes"} navigation={navigation} />
       </View>
 
       {/* Native: the bottom tab bar's "+" replaces this — see MainTabs.tsx. */}
-      {isNurse && Platform.OS === "web" && (
+      {isMaternityNurse && Platform.OS === "web" && (
         <View style={styles.fabContainer}>
           <TouchableOpacity
             style={styles.fab}

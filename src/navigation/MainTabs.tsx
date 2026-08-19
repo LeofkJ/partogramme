@@ -5,7 +5,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { observer } from "mobx-react";
 import { ScreenMenu } from "../screens/Menu/Menu";
 import { ScreenProfile } from "../screens/Profile/Profile";
-import { IconHome, IconUser, IconPlus } from "../components/Icons";
+import { ScreenHospitalDashboard } from "../screens/HospitalDashboard/HospitalDashboard";
+import { IconHome, IconUser, IconPlus, IconChartBar } from "../components/Icons";
 import { rootStore } from "../store/rootStore";
 import { colors } from "../theme";
 
@@ -17,6 +18,12 @@ const AddPartogrammeActionPlaceholder = () => null;
 
 export const MainTabs = observer(() => {
   const isNurse = rootStore.userInfoStore.userInfo.role === "NURSE";
+  const isDoctor = rootStore.userInfoStore.userInfo.role === "DOCTOR";
+  const isMaternityNurse = isNurse && rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+  // Dashboard is shared by every doctor and hospital nurse (see task.md) —
+  // not maternity nurses, whose own patient list already shows everything
+  // at her maternity permanently.
+  const isHospitalStaff = isDoctor || (isNurse && !isMaternityNurse);
 
   return (
     <Tab.Navigator
@@ -42,7 +49,7 @@ export const MainTabs = observer(() => {
           tabBarIcon: ({ color, size }) => <IconHome size={size} color={color} />,
         }}
       />
-      {isNurse && (
+      {isMaternityNurse && (
         <Tab.Screen
           name="AddPartogrammeAction"
           component={AddPartogrammeActionPlaceholder}
@@ -56,6 +63,20 @@ export const MainTabs = observer(() => {
               navigation.navigate("Screen_AddPartogramme");
             },
           })}
+        />
+      )}
+      {isHospitalStaff && (
+        <Tab.Screen
+          name="Screen_HospitalDashboard"
+          component={ScreenHospitalDashboard}
+          options={{
+            title: "Tableau de bord",
+            tabBarIcon: ({ color, size }) => <IconChartBar size={size} color={color} />,
+            headerShown: true,
+            headerTitle: "Tableau de bord",
+            headerTintColor: colors.accent,
+            headerTitleAlign: "center",
+          }}
         />
       )}
       <Tab.Screen
