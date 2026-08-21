@@ -1,9 +1,9 @@
 /**
  * Maternity nurse -> hospital referral (see MATERNITY_TRANSFER_PLAN.md).
- * Every hospital in the system is offered (see Graph.tsx's
- * transferHospitalItems) — the nurse's choice isn't restricted, only
- * pre-filled with her maternity's admin-configured default hospital, if
- * one's set.
+ * Hospital choices are the ones the admin assigned to her maternity (see
+ * Graph.tsx's transferHospitalItems), pre-filled with the maternity's
+ * default hospital if one's set — the default is always included even if
+ * not separately assigned.
  */
 import { useEffect, useState } from "react";
 import {
@@ -90,7 +90,7 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, defaultHospita
           />
           {hospitalItems.length === 0 && (
             <Text style={styles.hint}>
-              Aucun hôpital n'a été ajouté pour le moment.
+              Aucun hôpital n'est assigné à votre maternité pour le moment.
             </Text>
           )}
 

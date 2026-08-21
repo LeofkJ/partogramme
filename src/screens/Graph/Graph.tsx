@@ -135,18 +135,24 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   // Gv: hospital = every doctor and nurse at that hospital, same powers.
   const isHospitalStaff = isDoctor || (isNurse && !isMaternityNurse);
 
-  // Every hospital in the system — the transfer/reassign dialogs' target
-  // list. Used to be restricted to hospitals explicitly linked to the
-  // maternity nurse's own maternity (hospitalMaternityLink), but Gv's
-  // stakeholder email settled this: the midwife picks any hospital, a
-  // maternity's "default hospital" (admin-set, see Admin.tsx) just
-  // pre-fills the choice instead of restricting it.
+  // Hospitals the admin has explicitly assigned to the maternity nurse's
+  // own maternity (hospitalMaternityLink) — the transfer/reassign dialogs'
+  // target list. The maternity's "default hospital" (admin-set, see
+  // Admin.tsx) is folded into this same list even if it isn't separately
+  // linked, and pre-fills the picker — but the choice itself stays
+  // restricted to what the admin assigned, not every hospital in the system.
   const ownMaternity = rootStore.userInfoStore.maternities.find(
     (m) => m.id === rootStore.userInfoStore.userInfo.maternityId,
   );
   const defaultHospitalId = ownMaternity?.defaultHospitalId ?? null;
+  const linkedHospitalIds = new Set(
+    rootStore.userInfoStore.hospitalMaternityLinks
+      .filter((l) => l.maternityId === ownMaternity?.id)
+      .map((l) => l.hospitalId),
+  );
+  if (defaultHospitalId) linkedHospitalIds.add(defaultHospitalId);
   const transferHospitalItems = rootStore.userInfoStore.hospitals
-    .slice()
+    .filter((h) => linkedHospitalIds.has(h.id))
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id }));
 
