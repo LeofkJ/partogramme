@@ -646,6 +646,18 @@ export class TransportLayer {
     return data;
   }
 
+  // Admin-only, gated by the same "Admins can update maternities" RLS
+  // policy — just pre-fills the midwife's hospital picker on
+  // transfer/reassign (see Graph.tsx's transferHospitalItems), doesn't
+  // restrict her choice to it.
+  async updateMaternityDefaultHospital(maternityId: string, defaultHospitalId: string | null) {
+    const { error } = await supabase
+      .from("maternity")
+      .update({ defaultHospitalId })
+      .eq("id", maternityId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+  }
+
   // Soft-delete, same pattern as removeHospital. Admin-only, gated by the
   // "Admins can update maternities" RLS policy
   // (supabase/policies/2026-08-09_maternity_nurses_and_transfer.sql).
@@ -693,7 +705,50 @@ export class TransportLayer {
   async requestMaternityTransfer(partogrammeId: string, hospitalId: string, doctorProfileId: string) {
     const { error } = await supabase
       .from("Partogramme")
-      .update({ transferRequestHospitalId: hospitalId, transferRequestByDoctorId: doctorProfileId })
+      .update({
+        transferRequestHospitalId: hospitalId,
+        transferRequestByDoctorId: doctorProfileId,
+        // Clear any leftover outcome from a previous request cycle on this
+        // same patient — same reasoning as Partogramme.requestTransfer in
+        // partogrammeStore.ts, this is the dashboard's separate write path
+        // for the same action (see task.md: chart button + dashboard button
+        // both call "Demander un transfert").
+        transferRequestStatus: null,
+        transferRequestRejectionComment: null,
+      })
+      .eq("id", partogrammeId);
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+  }
+
+  /** The requester's own not-yet-seen outcome, if any — accepted or
+   * rejected. At most one row expected in practice (a requester waits for
+   * one before making another), but not enforced; just takes the first. */
+  async fetchTransferRequestOutcome(requesterProfileId: string) {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("id, noFile, transferRequestStatus, transferRequestRejectionComment")
+      .eq("transferRequestByDoctorId", requesterProfileId)
+      .not("transferRequestStatus", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    return data;
+  }
+
+  /** Called once the requester has actually seen the outcome popup — clears
+   * all three request columns so it doesn't show again. Targeted update
+   * only (not the full-row shape acceptTransferRequest/rejectTransferRequest
+   * use) since the requester doesn't necessarily have this patient loaded
+   * in their own partogrammeList (a rejected one stays at the maternity,
+   * not their hospital). */
+  async acknowledgeTransferRequestOutcome(partogrammeId: string) {
+    const { error } = await supabase
+      .from("Partogramme")
+      .update({
+        transferRequestByDoctorId: null,
+        transferRequestStatus: null,
+        transferRequestRejectionComment: null,
+      })
       .eq("id", partogrammeId);
     if (error) { logger.error(error.message, { code: error.code }); throw error; }
   }

@@ -246,6 +246,7 @@ export type Database = {
       maternity: {
         Row: {
           address: string | null
+          defaultHospitalId: string | null
           id: string
           isDeleted: boolean | null
           name: string
@@ -253,6 +254,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          defaultHospitalId?: string | null
           id: string
           isDeleted?: boolean | null
           name: string
@@ -260,6 +262,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          defaultHospitalId?: string | null
           id?: string
           isDeleted?: boolean | null
           name?: string
@@ -560,6 +563,7 @@ export type Database = {
           transferRequestByDoctorId: string | null
           transferRequestHospitalId: string | null
           transferRequestRejectionComment: string | null
+          transferRequestStatus: string | null
           urgencyLevel: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime: string | null
           workStartDateTime: string | null
@@ -581,6 +585,7 @@ export type Database = {
           transferRequestByDoctorId?: string | null
           transferRequestHospitalId?: string | null
           transferRequestRejectionComment?: string | null
+          transferRequestStatus?: string | null
           urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null
@@ -602,6 +607,7 @@ export type Database = {
           transferRequestByDoctorId?: string | null
           transferRequestHospitalId?: string | null
           transferRequestRejectionComment?: string | null
+          transferRequestStatus?: string | null
           urgencyLevel?: Database["public"]["Enums"]["UrgencyLevel"] | null
           workFinishedDateTime?: string | null
           workStartDateTime?: string | null

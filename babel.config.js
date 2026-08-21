@@ -3,7 +3,6 @@ module.exports = function (api) {
   return {
     presets: ["babel-preset-expo"],
     plugins: [
-      "react-native-worklets/plugin",
       [
         "module:react-native-dotenv",
         {
@@ -16,6 +15,9 @@ module.exports = function (api) {
           verbose: false,
         },
       ],
+      // Reanimated 4 / worklets: must stay last so later plugins cannot
+      // skip or rewrite the worklet transform.
+      "react-native-worklets/plugin",
     ],
   };
 };

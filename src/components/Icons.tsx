@@ -265,8 +265,14 @@ export const IconCheck: React.FC<IconProps> = ({ size = 24, color = "#000" }) =>
   </Svg>
 );
 
-export const IconChartBar: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
+// Dashboard tab icon — a plain 2x2 grid reads unambiguously as "dashboard"
+// at tab-bar size, unlike the old three-bars glyph which looked like a
+// signal/equalizer icon instead.
+export const IconLayoutDashboard: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M5 21V10M12 21V4M19 21v-7" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Rect x="3.5" y="3.5" width="7.5" height="9" rx="1.6" stroke={color} strokeWidth={1.8} />
+    <Rect x="13" y="3.5" width="7.5" height="5" rx="1.6" stroke={color} strokeWidth={1.8} />
+    <Rect x="13" y="11" width="7.5" height="9.5" rx="1.6" stroke={color} strokeWidth={1.8} />
+    <Rect x="3.5" y="15" width="7.5" height="5.5" rx="1.6" stroke={color} strokeWidth={1.8} />
   </Svg>
 );

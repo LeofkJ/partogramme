@@ -152,6 +152,24 @@ export class AdminStore {
     }
   }
 
+  /** Pre-fills the midwife's hospital picker on transfer/reassign — see
+   * Graph.tsx's transferHospitalItems. Doesn't restrict her choice, she
+   * can still pick any hospital. */
+  async updateMaternityDefaultHospital(maternityId: string, defaultHospitalId: string | null) {
+    try {
+      await this.transportLayer.updateMaternityDefaultHospital(maternityId, defaultHospitalId);
+      runInAction(() => {
+        const maternity = this.maternities.find((m) => m.id === maternityId);
+        if (maternity) maternity.defaultHospitalId = defaultHospitalId;
+      });
+      notify.success("Hôpital par défaut mis à jour");
+    } catch (error: any) {
+      logger.warn("AdminStore: updateMaternityDefaultHospital failed", { error: error?.message });
+      notify.error("Erreur", error?.message ?? "Impossible de mettre à jour l'hôpital par défaut");
+      throw error;
+    }
+  }
+
   /** Hospitals currently linked to a maternity (see
    * MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §1) — the admin-assigned
    * relationship, not the region text match. */

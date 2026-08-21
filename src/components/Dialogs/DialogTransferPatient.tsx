@@ -1,7 +1,9 @@
 /**
  * Maternity nurse -> hospital referral (see MATERNITY_TRANSFER_PLAN.md).
- * Hospital choices are pre-filtered to the nurse's own region by the
- * caller (Graph.tsx) — this dialog just renders whatever list it's given.
+ * Every hospital in the system is offered (see Graph.tsx's
+ * transferHospitalItems) — the nurse's choice isn't restricted, only
+ * pre-filled with her maternity's admin-configured default hospital, if
+ * one's set.
  */
 import { useEffect, useState } from "react";
 import {
@@ -25,11 +27,14 @@ interface DropdownItem {
 interface Props {
   isVisible: boolean;
   hospitalItems: DropdownItem[];
+  /** Pre-fills the picker (the maternity's admin-configured default
+   * hospital) — still freely changeable to any other item in hospitalItems. */
+  defaultHospitalId?: string | null;
   onClose: () => void;
   onSubmit: (input: { hospitalId: string; reason: string }) => Promise<void>;
 }
 
-export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSubmit }: Props) => {
+export const DialogTransferPatient = ({ isVisible, hospitalItems, defaultHospitalId, onClose, onSubmit }: Props) => {
   const { width } = useWindowDimensions();
   const [hospitalId, setHospitalId] = useState("");
   const [reason, setReason] = useState("");
@@ -38,9 +43,10 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSub
 
   useEffect(() => {
     if (!isVisible) return;
-    setHospitalId("");
+    setHospitalId(defaultHospitalId ?? "");
     setReason("");
     setErrorMessage(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
 
   const handleSubmit = () => {
@@ -84,7 +90,7 @@ export const DialogTransferPatient = ({ isVisible, hospitalItems, onClose, onSub
           />
           {hospitalItems.length === 0 && (
             <Text style={styles.hint}>
-              Aucun hôpital n'est rattaché à votre région pour le moment.
+              Aucun hôpital n'a été ajouté pour le moment.
             </Text>
           )}
 

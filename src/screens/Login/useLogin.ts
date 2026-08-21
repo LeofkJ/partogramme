@@ -29,6 +29,7 @@ export function useLogin(onLoggedIn: () => void) {
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
         rootStore.alertBannerStore.signOut();
+        rootStore.transferOutcomeStore.reset();
         return;
       }
       if (event === "SIGNED_IN") {
@@ -56,6 +57,11 @@ export function useLogin(onLoggedIn: () => void) {
         if (result) {
           logger.info("Login success", { email: rootStore.profileStore.email });
           rootStore.alertBannerStore.resetForLogin();
+          const profileId = rootStore.profileStore.profile.id;
+          if (profileId) {
+            rootStore.transferOutcomeStore.checkOnBoot(profileId);
+            rootStore.transferOutcomeStore.subscribe(profileId);
+          }
           onLoggedIn();
         }
         setIsSubmitting(false);

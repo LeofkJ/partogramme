@@ -135,21 +135,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   // Gv: hospital = every doctor and nurse at that hospital, same powers.
   const isHospitalStaff = isDoctor || (isNurse && !isMaternityNurse);
 
-  // Hospitals explicitly linked to the maternity nurse's own maternity —
-  // the transfer/reassign dialogs' target list (see
-  // MATERNITY_HOSPITAL_WORKFLOW_PLAN.md §1). Replaces the old
-  // region-text-match: an admin now assigns this relationship directly, so
-  // a hospital only shows up here if it's actually been linked.
+  // Every hospital in the system — the transfer/reassign dialogs' target
+  // list. Used to be restricted to hospitals explicitly linked to the
+  // maternity nurse's own maternity (hospitalMaternityLink), but Gv's
+  // stakeholder email settled this: the midwife picks any hospital, a
+  // maternity's "default hospital" (admin-set, see Admin.tsx) just
+  // pre-fills the choice instead of restricting it.
   const ownMaternity = rootStore.userInfoStore.maternities.find(
     (m) => m.id === rootStore.userInfoStore.userInfo.maternityId,
   );
-  const linkedHospitalIds = new Set(
-    rootStore.userInfoStore.hospitalMaternityLinks
-      .filter((l) => l.maternityId === ownMaternity?.id)
-      .map((l) => l.hospitalId),
-  );
+  const defaultHospitalId = ownMaternity?.defaultHospitalId ?? null;
   const transferHospitalItems = rootStore.userInfoStore.hospitals
-    .filter((h) => linkedHospitalIds.has(h.id))
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id }));
 
   // A hospital's own patient — false for a linked maternity's
@@ -853,6 +851,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <DialogTransferPatient
             isVisible={isTransferDialogVisible}
             hospitalItems={transferHospitalItems}
+            defaultHospitalId={defaultHospitalId}
             onClose={() => setTransferDialogVisible(false)}
             onSubmit={({ hospitalId, reason }) =>
               partogramme!

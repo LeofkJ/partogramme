@@ -33,3 +33,28 @@ export function unsubscribeChannel(channel: RealtimeChannel | null) {
     supabase.removeChannel(channel);
   }
 }
+
+/**
+ * Subscribes to UPDATE events on Partogramme rows where the current user
+ * is the transfer requester — so a doctor/hospital nurse sees the
+ * accept/reject outcome popup right away if they're online when the
+ * midwife decides, instead of only finding out on their next login.
+ */
+export function subscribeToTransferOutcomes(
+  requesterProfileId: string,
+  onChange: (row: { id: string; noFile: number; transferRequestStatus: string | null; transferRequestRejectionComment: string | null }) => void,
+): RealtimeChannel {
+  return supabase
+    .channel(`transfer-outcomes-${requesterProfileId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "Partogramme",
+        filter: `transferRequestByDoctorId=eq.${requesterProfileId}`,
+      },
+      (payload) => onChange(payload.new as any),
+    )
+    .subscribe();
+}

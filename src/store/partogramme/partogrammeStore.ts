@@ -395,6 +395,7 @@ export class Partogramme {
     transferRequestHospitalId: null,
     transferRequestByDoctorId: null,
     transferRequestRejectionComment: null,
+    transferRequestStatus: null,
     urgencyLevel: null,
   };
 
@@ -545,6 +546,7 @@ export class Partogramme {
       transferRequestHospitalId: null,
       transferRequestByDoctorId: null,
       transferRequestRejectionComment: null,
+      transferRequestStatus: null,
       urgencyLevel: urgencyLevel,
     };
   }
@@ -712,6 +714,11 @@ export class Partogramme {
     const data = this.asJson;
     data.transferRequestHospitalId = hospitalId;
     data.transferRequestByDoctorId = doctorProfileId;
+    // Clear any leftover outcome from a previous request cycle on this same
+    // patient (e.g. rejected once, requested again later) so the new
+    // pending request starts from a clean slate.
+    data.transferRequestStatus = null;
+    data.transferRequestRejectionComment = null;
     await this.store.transportLayer
       .updatePartogramme(data)
       .then(() => {
@@ -767,6 +774,11 @@ export class Partogramme {
   // unclaimed pool, RÉCLAMER handles the rest), just triggered from a
   // request instead of her own initiative. No reason/urgency to carry over
   // — the doctor's request didn't collect either.
+  // transferRequestByDoctorId deliberately survives this (only
+  // transferRequestHospitalId clears, which is what drops it off the
+  // midwife's own pending list) — the requester's outcome notification
+  // reads it via transferRequestStatus, and acknowledgeTransferRequestOutcome
+  // is what finally clears it once they've actually seen the popup.
   async acceptTransferRequest() {
     const data = this.asJson;
     const hospitalId = data.transferRequestHospitalId;
@@ -774,8 +786,7 @@ export class Partogramme {
     data.hospitalId = hospitalId;
     data.state = "TRANSFERRED";
     data.transferRequestHospitalId = null;
-    data.transferRequestByDoctorId = null;
-    data.transferRequestRejectionComment = null;
+    data.transferRequestStatus = "accepted";
     await this.store.transportLayer
       .updatePartogramme(data)
       .then(() => {
@@ -795,11 +806,12 @@ export class Partogramme {
 
   // Midwife rejecting a doctor's transfer request — comment is optional,
   // nothing else about the patient changes, she keeps managing her
-  // as normal.
+  // as normal. transferRequestByDoctorId survives this too, same reasoning
+  // as acceptTransferRequest above.
   async rejectTransferRequest(comment: string | null) {
     const data = this.asJson;
     data.transferRequestHospitalId = null;
-    data.transferRequestByDoctorId = null;
+    data.transferRequestStatus = "rejected";
     data.transferRequestRejectionComment = comment;
     await this.store.transportLayer
       .updatePartogramme(data)

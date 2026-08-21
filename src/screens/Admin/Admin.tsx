@@ -975,6 +975,31 @@ export const ScreenAdmin: React.FC = observer(() => {
             </View>
 
             {deletingMaternityId !== maternity.id && (
+              <View style={styles.defaultHospitalRow}>
+                <Text style={styles.defaultHospitalLabel}>Défaut</Text>
+                <CustomDropdown
+                  items={adminStore.hospitals.map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id }))}
+                  selectedValue={maternity.defaultHospitalId ?? ""}
+                  onValueChange={(hospitalId) =>
+                    adminStore.updateMaternityDefaultHospital(maternity.id, hospitalId || null).catch(() => {})
+                  }
+                  placeholder="Aucun"
+                  buttonStyle={[
+                    styles.defaultHospitalButton,
+                    !!maternity.defaultHospitalId && styles.defaultHospitalButtonSet,
+                  ]}
+                  textStyle={[
+                    styles.defaultHospitalButtonText,
+                    !!maternity.defaultHospitalId && styles.defaultHospitalButtonTextSet,
+                  ]}
+                  searchable
+                  searchPlaceholder="Rechercher un hôpital…"
+                  clearable
+                />
+              </View>
+            )}
+
+            {deletingMaternityId !== maternity.id && (
               <MaternityHospitalLinksPanel
                 hospitals={adminStore.hospitals.map((h) => ({
                   id: h.id,
@@ -1714,6 +1739,33 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     marginRight: spacing.sm,
+  },
+  defaultHospitalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 6,
+  },
+  defaultHospitalLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    flexShrink: 0,
+  },
+  defaultHospitalButton: {
+    flexShrink: 1,
+    maxWidth: 200,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+  },
+  defaultHospitalButtonSet: {},
+  defaultHospitalButtonText: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  defaultHospitalButtonTextSet: {
+    color: colors.accent,
   },
   deleteConfirmBox: {
     backgroundColor: colors.dangerSoft,

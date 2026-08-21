@@ -6,7 +6,7 @@ import { observer } from "mobx-react";
 import { ScreenMenu } from "../screens/Menu/Menu";
 import { ScreenProfile } from "../screens/Profile/Profile";
 import { ScreenHospitalDashboard } from "../screens/HospitalDashboard/HospitalDashboard";
-import { IconHome, IconUser, IconPlus, IconChartBar } from "../components/Icons";
+import { IconHome, IconUser, IconPlus, IconLayoutDashboard } from "../components/Icons";
 import { rootStore } from "../store/rootStore";
 import { colors } from "../theme";
 
@@ -71,7 +71,7 @@ export const MainTabs = observer(() => {
           component={ScreenHospitalDashboard}
           options={{
             title: "Tableau de bord",
-            tabBarIcon: ({ color, size }) => <IconChartBar size={size} color={color} />,
+            tabBarIcon: ({ color, size }) => <IconLayoutDashboard size={size} color={color} />,
             headerShown: true,
             headerTitle: "Tableau de bord",
             headerTintColor: colors.accent,

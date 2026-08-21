@@ -150,7 +150,11 @@ export class UserInfoStore {
     this.hospitalMaternityLinks = links;
   }
 
-  async fetchUserInfo() {
+  /** `silent`: skip the notify.error popup on failure — for background
+   * checks that can run before/without the user actively being logged in
+   * (e.g. AlertBannerStore's boot-time session check), where a transient
+   * failure should never surface as an error on top of the Login screen. */
+  async fetchUserInfo(silent = false) {
     // See `hydrated`'s comment — guarantees the AsyncStorage snapshot below
     // can never overwrite this call's fresh server data after the fact.
     await this.hydrated.catch(() => {});
@@ -178,7 +182,7 @@ export class UserInfoStore {
       .catch((error: PostgrestError) => {
         this.state = "error";
         logger.warn("fetchUserInfo failed", { profileId, code: error.code, message: error.message });
-        if (error.code !== "PGRST116") {
+        if (!silent && error.code !== "PGRST116") {
           notify.error(error.code, error.message);
         }
         return Promise.reject(error);

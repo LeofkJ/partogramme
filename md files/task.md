@@ -22,11 +22,10 @@ New input from the actual stakeholders (inline replies to the original notes, pl
 - Reassign to a different hospital (wrong region/hospital claim) — confirmed as the midwife's own action (already built this way, matches).
 - BUT: a doctor at a *different* hospital being able to request/pull a patient in ("a different hospital jumping in") is called out as **not actually discussed/agreed** — "a feature we can discuss with Sélim and Nicole." This is specifically about the doctor-request-transfer mechanic already built (`requestTransfer`, accept/reject flow) — it may need to be revisited/confirmed, not assumed settled.
 
-**Open architecture question — do NOT implement without confirming:**
-- Original notes assumed maternity↔hospital is a link at the *maternity* level (which is what `hospitalMaternityLink` currently is — an explicit admin-assigned table). The stakeholder reply pushes back: *"maternity centers aren't assigned to hospital, their patients are... a good idea to have a 'default hospital' for each maternity in settings, so when a patient is created it's added to that hospital by default, but changeable by the midwife."* And separately: *"I think we went back and forth on this. I suggest we stick to patient-hospital for now, with a default hospital for each maternity."*
-  - This suggests the real model might be: **no maternity↔hospital link table at all** — instead a single "default hospital" setting per maternity that just pre-fills the transfer dialog's hospital picker, with the actual relationship living entirely on the patient (`hospitalId`), not a maternity-level link.
-  - This would have real implications for how doctor visibility currently works (`hospitalMaternityLink` is what RLS uses to decide which maternities a hospital's doctors can see alerts/patients from) — if the link table goes away, that whole visibility mechanism needs rethinking too.
-  - **Flagging, not touching.** This is a real architecture divergence from what's built, not a small tweak — needs an explicit decision before any code changes here.
+**Open architecture question — partially resolved 2026-08-21:**
+- Original notes assumed maternity↔hospital is a link at the *maternity* level (which is what `hospitalMaternityLink` currently is — an explicit admin-assigned table). The stakeholder reply pushed back: *"maternity centers aren't assigned to hospital, their patients are... a good idea to have a 'default hospital' for each maternity in settings, so when a patient is created it's added to that hospital by default, but changeable by the midwife."*
+- [x] **Default hospital + free hospital choice, built 2026-08-21**: `maternity.defaultHospitalId` (new column, admin-set via a picker in Admin.tsx next to the existing hospital-links panel). The midwife's transfer/reassign hospital picker (`Graph.tsx`'s `transferHospitalItems`) now offers **every hospital in the system**, pre-filled with her maternity's default if one's set — no longer restricted to `hospitalMaternityLink`-linked hospitals. No RLS change needed: her update policy never restricted which hospitalId she could set, only the client-side dropdown was narrowed.
+- **Not touched, still open**: `hospitalMaternityLink` itself is untouched — it's still what RLS uses to decide which not-yet-transferred maternity patients a hospital's doctors/nurses can see alerts for (see § Hospital staff visibility). The 2026-08-21 change only widened the midwife's own hospital *choice*, it did not replace the link table or its visibility role. Whether that visibility mechanism should also move to a patient-hospital-only model is still an open question — don't assume it's resolved by this change.
 
 ## Patient ownership & transfer
 
@@ -40,7 +39,7 @@ New input from the actual stakeholders (inline replies to the original notes, pl
 - [x] Hospital staff (every doctor/nurse at that hospital) should see **all** patients currently associated with that hospital — both those still in labour at the maternity (not yet transferred) and those already transferred, not just flagged/in-danger ones. (Reversed 2026-08-14.)
 - [x] Doctor should be able to see a maternity center's information — specifically, the doctor at the nearby hospital should be able to see that maternity centre's patients' info. (Same reversal.)
 - [x] Clicking a patient opens the full partogram: read-only mode if not yet transferred (with a transfer request option), edit mode if transferred. Also fixed a bug this surfaced: RÉCLAMER would have let a doctor self-claim a linked maternity's patient directly, bypassing accept/reject — restricted to her own hospital's patients, added a real "Demander un transfert" button on the chart itself.
-- [ ] Patient listing order: flagged patients at top, then in-labour-not-transferred, then transferred; done shown below/submenu. **Reopened 2026-08-19**: built, then explicitly reverted 2026-08-18 back to plain Admis → En cours → Terminée (warnings moved to the dashboard only). But the 2026-08-19 doctor's email reconfirms this exact ordering as a direct requirement, independent of the dashboard. Worth revisiting — the revert may have been premature.
+- [x] Patient listing order: flagged patients at top, then in-labour-not-transferred, then transferred; done shown below/submenu. **Rebuilt 2026-08-19** in `partogrammeList.tsx` (hospital-side sectioning, flagged/inLabour/transferred/finished) after the doctor's email reconfirmed it as a direct requirement.
 
 ## Admin role scope
 
@@ -54,7 +53,7 @@ New input from the actual stakeholders (inline replies to the original notes, pl
 
 - [x] Hospital dashboard shows all maternity centers linked to it and their actual patients (not just counts — built as plain counts first, explicitly rejected as useless, redone as real patient rows).
 - [x] One hospital's dashboard aggregates all its associated maternity centers.
-- [x] ~~Hospital-maternity association is by region~~ — **clarified 2026-08-18**: it's admin-assigned via `hospitalMaternityLink`, not automatic region matching; region stays as reference/display info only. Confirmed intentional, not a bug. **Reopened 2026-08-19**: see the "Open architecture question" at the top of this doc — stakeholder feedback suggests the real model might be patient-hospital only, with a per-maternity "default hospital" setting, not a maternity-level link table at all. Not resolved, don't build against either assumption yet.
+- [x] ~~Hospital-maternity association is by region~~ — **clarified 2026-08-18**: it's admin-assigned via `hospitalMaternityLink`, not automatic region matching; region stays as reference/display info only. Confirmed intentional, not a bug. **Reopened 2026-08-19, partially resolved 2026-08-21**: see the "Open architecture question" at the top of this doc — the midwife's own hospital-assignment choice is now patient-hospital + a per-maternity default, not restricted to linked hospitals. `hospitalMaternityLink` itself still stands for doctor/hospital-staff visibility into not-yet-transferred patients — that half is still open.
 - [x] ~~Each maternity center's own dashboard should show all patients~~ — **resolved 2026-08-18**: explicitly decided NOT needed — a midwife's own patient list already shows every patient at her maternity permanently, a separate dashboard would just duplicate that.
 - [x] Dashboard is scoped per-hospital, not global.
 - [x] ~~Admin dashboard shows counts + alerts~~ — **reassigned 2026-08-18**: admin has no dashboard at all now (see Admin role scope above). Built as the shared hospital-staff dashboard instead (`HospitalDashboard.tsx`), explicitly built "without connecting it to admin."
@@ -64,14 +63,14 @@ New input from the actual stakeholders (inline replies to the original notes, pl
   - [x] Non-flagged patients shown too, not highlighted.
 - [x] ~~Known bug: hospital/maternity toggle on admin dashboard~~ — moot, that screen no longer exists.
 - [x] ~~Admin dashboard stays scoped to one hospital~~ — moot, same reason.
-- [ ] Midwife should also be able to raise/flag an alert manually — keep this simple. **Still open.**
+- [x] Midwife should also be able to raise/flag an alert manually — keep this simple. **Done 2026-08-19** — `DialogRaiseAlert.tsx` wired into `Graph.tsx`, gated to `isMaternityNurse` only.
 - [~] Alert system overall needs to be robust/well-designed — ongoing, not a discrete checkbox (real red/yellow band + BPM threshold logic exists and is shared across the list/dashboard).
 - [ ] Preferable: dashboard should show mini graphs (dilation/BPM) per patient rather than raw numbers. **Deferred — decide later.**
 
 ## Alerts
 
 - [x] Alert/notification only fires on red; yellow is watch-only (dilation graph).
-- [ ] Midwife can manually raise an alarm anytime, independent of thresholds. **Still open** (same item as above).
+- [x] Midwife can manually raise an alarm anytime, independent of thresholds. **Done 2026-08-19** (same item as above).
 - [ ] Optional/unconfirmed: alert if dilation stalls (e.g. 7cm for 2+ hrs) — would become a hospital-side alert. **Still open, unconfirmed.**
 
 ## Roles & profile

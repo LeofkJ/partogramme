@@ -8,7 +8,9 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -17,7 +19,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { colors, radius, spacing } from "../../theme";
-import { IconAlertTriangle } from "../Icons";
 
 interface Props {
   isVisible: boolean;
@@ -54,23 +55,19 @@ export const DialogRaiseAlert = ({ isVisible, onClose, onSubmit }: Props) => {
 
   return (
     <Modal visible={isVisible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <View style={[styles.card, { width: Math.min(width * 0.92, 420) }]}>
-          {/* Danger header strip */}
-          <View style={styles.dangerHeader}>
-            <View style={styles.iconWrap}>
-              <IconAlertTriangle size={22} color={colors.danger} />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={styles.title}>Déclencher une alerte</Text>
-              <Text style={styles.subtitle}>
-                Signale cette patiente à l'hôpital, indépendamment des seuils automatiques.
-              </Text>
-            </View>
+          <View style={styles.header}>
+            <Text style={styles.title}>Déclencher une alerte</Text>
+            <Text style={styles.subtitle}>
+              Signale cette patiente à l'hôpital, indépendamment des seuils automatiques.
+            </Text>
           </View>
 
           <View style={styles.body}>
-            <Text style={styles.label}>Motif de l'alerte</Text>
             <TextInput
               style={[styles.input, !!errorMessage && styles.inputError]}
               value={comment}
@@ -106,15 +103,12 @@ export const DialogRaiseAlert = ({ isVisible, onClose, onSubmit }: Props) => {
               {isSubmitting ? (
                 <ActivityIndicator size="small" color={colors.onAccent} />
               ) : (
-                <>
-                  <IconAlertTriangle size={15} color={colors.onAccent} />
-                  <Text style={styles.submitButtonText}>Déclencher</Text>
-                </>
+                <Text style={styles.submitButtonText}>Déclencher</Text>
               )}
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -122,108 +116,80 @@ export const DialogRaiseAlert = ({ isVisible, onClose, onSubmit }: Props) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    overflow: "hidden",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  dangerHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    backgroundColor: colors.dangerSoft,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5C6C6",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-  },
-  iconWrap: {
-    marginTop: 2,
-  },
-  headerText: {
-    flex: 1,
+  header: {
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: 16,
-    fontWeight: "700",
-    color: colors.danger,
-    letterSpacing: -0.2,
+    fontWeight: "600",
+    color: colors.text,
   },
   subtitle: {
-    fontSize: 12,
-    color: "#9B1C1C",
-    marginTop: 3,
-    lineHeight: 17,
-    opacity: 0.8,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 18,
   },
   body: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-    marginBottom: spacing.xs + 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    marginBottom: spacing.lg,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.sm,
     backgroundColor: colors.background,
     color: colors.text,
     fontSize: 14,
     padding: spacing.sm + 2,
-    minHeight: 90,
+    minHeight: 84,
     lineHeight: 20,
   },
   inputError: {
     borderColor: colors.danger,
-    backgroundColor: "#FFF8F8",
   },
   errorText: {
     color: colors.danger,
-    fontSize: 12,
-    marginTop: spacing.xs,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: spacing.sm,
   },
   footer: {
     flexDirection: "row",
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
     alignItems: "center",
   },
   cancelButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
     color: colors.textSecondary,
   },
   submitButton: {
-    flex: 2,
-    flexDirection: "row",
-    gap: spacing.xs,
-    paddingVertical: 11,
+    flex: 1,
+    paddingVertical: 10,
     borderRadius: radius.sm,
     backgroundColor: colors.danger,
     alignItems: "center",
@@ -234,7 +200,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: colors.onAccent,
   },
 });

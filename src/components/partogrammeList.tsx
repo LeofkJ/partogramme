@@ -123,7 +123,7 @@ const Item = observer(({ item, onPress, isFlagged }: ItemProps) => {
       </View>
       {isHospitalStaff && isEnCours && <EnCoursSummary item={item} />}
       {!!item.partogramme.commentary && (
-        <Text style={styles.comment} numberOfLines={2}>
+        <Text style={styles.comment} numberOfLines={1}>
           <Text style={styles.commentLabel}>Commentaire : </Text>
           {item.partogramme.commentary}
         </Text>
@@ -434,9 +434,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   cardMain: {
     flexDirection: "row",
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
     color: colors.text,
   },
   cardRight: {
@@ -466,15 +466,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   comment: {
-    marginTop: 6,
+    marginTop: 8,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "400",
     lineHeight: 18,
-    color: colors.text,
+    color: colors.textSecondary,
   },
   commentLabel: {
     fontSize: 13,
-    fontWeight: "400",
+    fontWeight: "500",
     color: colors.textMuted,
   },
   nurseRow: {
@@ -482,10 +482,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
-    marginTop: 8,
+    marginTop: 10,
   },
   nurseRole: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "600",
   },
   nurseRoleMidwife: {
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nursePhoneText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "500",
     color: colors.accent,
     textDecorationLine: "underline",

@@ -11,6 +11,7 @@
       "web"
     ],
     "icon": "./assets/icon.png",
+    "scheme": "mypartogramme",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
@@ -40,7 +41,9 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "5437f4c5-d04f-4070-8533-92c75e38a7c1"
+      }
     },
     "plugins": [
       "expo-localization"

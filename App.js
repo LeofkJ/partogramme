@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppState, Platform } from "react-native";
 import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
 import { AlertBanner } from "./src/components/AlertBanner/AlertBanner";
+import { DialogTransferOutcome } from "./src/components/Dialogs/DialogTransferOutcome";
 import { navigationRef } from "./src/navigationRef";
 import { colors, radius } from "./src/theme";
 import * as Sentry from "./src/lib/sentry";
@@ -48,18 +49,38 @@ Sentry.init({
 
 const Stack = createNativeStackNavigator();
 
+const linkingPrefixes = ["https://partogramme.com", "mypartogramme://"];
+
+// Web keeps Profile / Admin / Dashboard as root stack screens (see
+// NavBar.web.tsx). Native nests Profile and Dashboard inside MainTabs,
+// which is mounted as Screen_Menu — those URLs have to be nested too
+// or /profile and /dashboard never resolve on iOS/Android.
 const linking = {
-  prefixes: ["https://partogramme.com", "mypartogramme://"],
+  prefixes: linkingPrefixes,
   config: {
-    screens: {
-      Screen_Login: "/login",
-      Screen_Menu: "/menu",
-      Screen_AddPartogramme: "/add_partogramme",
-      Screen_Graph: "/graph",
-      Screen_Profile: "/profile",
-      Screen_Admin: "/admin",
-      Screen_HospitalDashboard: "/dashboard",
-    },
+    screens:
+      Platform.OS === "web"
+        ? {
+            Screen_Login: "/login",
+            Screen_Menu: "/menu",
+            Screen_AddPartogramme: "/add_partogramme",
+            Screen_Graph: "/graph",
+            Screen_Profile: "/profile",
+            Screen_Admin: "/admin",
+            Screen_HospitalDashboard: "/dashboard",
+          }
+        : {
+            Screen_Login: "login",
+            Screen_Menu: {
+              screens: {
+                Screen_Menu: "menu",
+                Screen_Profile: "profile",
+                Screen_HospitalDashboard: "dashboard",
+              },
+            },
+            Screen_AddPartogramme: "add_partogramme",
+            Screen_Graph: "graph",
+          },
   },
 };
 
@@ -88,6 +109,7 @@ function App() {
           >
             <NavBar currentRouteName={currentRouteName} />
             <AlertBanner />
+            <DialogTransferOutcome />
             <Stack.Navigator>
               <Stack.Screen
                 name="Screen_Login"

@@ -15,6 +15,15 @@ import { supabase } from "../../initSupabase";
 export class AlertBannerStore {
   alertCount = 0;
   dismissed = false;
+
+  // The single most recent flagged patient — shown on the banner itself so
+  // it says *something* concrete ("Dossier #12 · dilatation bande rouge")
+  // instead of just a bare count. hospitalDashboardStore.alertPatients[0] is
+  // whichever the dashboard fetch found first; good enough for a summary
+  // line, the dashboard itself is where the full ordered list lives.
+  get topAlert() {
+    return this.rootStore.hospitalDashboardStore.alertPatients[0] ?? null;
+  }
   // userInfoStore/profileStore both rehydrate from AsyncStorage on boot, so
   // a stale profileId from a *previous* session can sit in memory before
   // anyone has actually re-authenticated this run (e.g. sitting on the
@@ -51,10 +60,15 @@ export class AlertBannerStore {
   // still open. userInfoStore hasn't loaded role/hospitalId/maternityId yet
   // at this point (that only happens once Menu mounts), so this fetches it
   // itself rather than relying on Menu's own later fetchUserInfo call.
+  // Always silent: this also runs from checkSessionOnBoot on every app
+  // launch, before the user has necessarily seen the Login screen at all —
+  // a transient failure here must never pop an error over the login form.
+  // Menu.tsx's own fetchUserInfo call (non-silent) is what surfaces a real
+  // problem once the user is actually past login.
   async resetForLogin() {
     this.dismissed = false;
     try {
-      await this.rootStore.userInfoStore.fetchUserInfo();
+      await this.rootStore.userInfoStore.fetchUserInfo(true);
     } catch (error: any) {
       logger.warn("AlertBannerStore: resetForLogin fetchUserInfo failed", { error: error?.message });
       return;
