@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
-import { colors, layout } from "../../theme";
+import { colors, layout, radius, spacing } from "../../theme";
+import { SkeletonPulse, SkeletonBlock } from "../Skeleton/Skeleton";
+import { IconClock } from "../Icons";
 
 export interface DataTableColumn {
   label: string;
@@ -17,9 +19,13 @@ interface Props {
   editable?: boolean;
   /** Labor start — rows are labeled with the real clock time, one row per minute. */
   startTime?: string | null;
+  /** True while the backing stores' initial fetch is still in flight —
+   * shows skeleton rows instead of an empty grid. Ignored once any column
+   * has data (never re-shows on a background poll). */
+  loading?: boolean;
 }
 
-const HOUR_LABEL_WIDTH = 44;
+const HOUR_LABEL_WIDTH = 34;
 const ROW_HEIGHT = 46;
 const HEADER_HEIGHT = 44;
 const COL_MIN_WIDTH = 44;
@@ -37,7 +43,7 @@ const COLORS = {
   editableTint: colors.accentSoft,
 };
 
-const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => {
+const DataTable: React.FC<Props> = ({ columns, editable = true, startTime, loading }) => {
   const { width } = useWindowDimensions();
   const colCount = columns.length;
   // Cap like the rest of the app: on big monitors the table stays readable
@@ -71,12 +77,56 @@ const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => 
   const useFullNames = effectiveWidth >= 900;
   const headerHeight = useFullNames ? 60 : HEADER_HEIGHT;
 
+  const hasAnyData = columns.some((col) => col.items.length > 0);
+  if (loading && !hasAnyData) {
+    return (
+      <View>
+        <View style={styles.container}>
+          <View style={[styles.row, { height: headerHeight }]}>
+            <View style={[styles.hourCell, styles.hourHeaderCell, { width: HOUR_LABEL_WIDTH }]}>
+              <IconClock size={14} color={COLORS.hourLabelText} />
+            </View>
+            {columns.map((col, i) => (
+              <View key={i} style={[styles.headerCell, { width: colWidth }]}>
+                <Text
+                  style={styles.headerText}
+                  numberOfLines={useFullNames ? 3 : 2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {useFullNames ? col.fullName : col.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <SkeletonPulse>
+            {[0, 1, 2, 3].map((r) => (
+              <View
+                key={r}
+                style={[styles.row, { height: ROW_HEIGHT, backgroundColor: r % 2 === 0 ? COLORS.rowEven : COLORS.rowOdd }]}
+              >
+                <View style={[styles.hourCell, { width: HOUR_LABEL_WIDTH }]} />
+                {columns.map((_, colIndex) => (
+                  <View key={colIndex} style={[styles.cell, { width: colWidth }]}>
+                    <SkeletonBlock width={Math.max(colWidth - 16, 16)} height={12} />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </SkeletonPulse>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View>
       <View style={styles.container}>
         {/* Header row: hour corner + one column per vital sign */}
         <View style={[styles.row, { height: headerHeight }]}>
-          <View style={[styles.hourCell, styles.hourHeaderCell, { width: HOUR_LABEL_WIDTH }]} />
+          <View style={[styles.hourCell, styles.hourHeaderCell, { width: HOUR_LABEL_WIDTH }]}>
+            <IconClock size={14} color={COLORS.hourLabelText} />
+          </View>
           {columns.map((col, i) => (
             <View key={i} style={[styles.headerCell, { width: colWidth }]}>
               <Text
@@ -90,6 +140,14 @@ const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => 
             </View>
           ))}
         </View>
+
+        {hours.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              {editable ? "Aucune donnée pour le moment — touchez « + » pour en ajouter." : "Aucune donnée enregistrée pour le moment."}
+            </Text>
+          </View>
+        )}
 
         {/* One row per hour */}
         {hours.map((h) => {
@@ -129,7 +187,7 @@ const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => 
                 return (
                   <TouchableOpacity
                     key={colIndex}
-                    style={[styles.cell, { width: colWidth }]}
+                    style={[styles.cell, styles.cellAddable, { width: colWidth }]}
                     onPress={() => col.onAddPress(h)}
                     activeOpacity={0.5}
                   >
@@ -147,7 +205,10 @@ const DataTable: React.FC<Props> = ({ columns, editable = true, startTime }) => 
                   {val}
                 </Text>
               );
-              if (!editable) {
+              // Past its correction window (see isWithinEditWindow) — reads
+              // the same as a genuinely read-only cell even though the
+              // table as a whole is still editable.
+              if (!editable || item.isEditable === false) {
                 return (
                   <View key={colIndex} style={[styles.cell, { width: colWidth }]}>
                     {valueText}
@@ -253,14 +314,29 @@ const styles = StyleSheet.create({
   cellEditable: {
     backgroundColor: COLORS.editableTint,
   },
+  cellAddable: {
+    backgroundColor: colors.background,
+  },
   cellText: {
     color: COLORS.cellText,
     textAlign: "center",
     fontWeight: "600",
   },
   emptyCellText: {
+    color: colors.accent,
+    fontWeight: "700",
+  },
+  emptyState: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  emptyStateText: {
+    fontSize: 12,
     color: COLORS.emptyText,
-    fontWeight: "400",
+    textAlign: "center",
   },
   legend: {
     marginHorizontal: 12,

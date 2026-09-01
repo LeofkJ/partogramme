@@ -9,8 +9,14 @@ import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type BabyHeartFrequency_t = Database["public"]["Tables"]["BabyHeartFrequency"];
+
+// Generous outer bound — wide enough for a real severe bradycardia/
+// tachycardia reading, narrow enough to catch a typo'd extra digit.
+const BPM_MIN = 30;
+const BPM_MAX = 300;
 
 export class BabyHeartFrequencyStore {
   rootStore: RootStore;
@@ -116,6 +122,10 @@ export class BabyHeartFrequencyStore {
     partogrammeId: string = this.partogrammeStore.partogramme.id,
     isDeleted: boolean | null = false
   ) {
+    if (!isPhysiologicallyPlausible(babyFc, BPM_MIN, BPM_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${BPM_MIN}–${BPM_MAX} bpm). Vérifiez la saisie.`);
+      return;
+    }
     const frequency = new BabyHeartFrequency(
       this,
       this.partogrammeStore,
@@ -244,11 +254,25 @@ export class BabyHeartFrequency {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   async update(value: String) {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
     let convValue = Number(value);
     if (isNaN(convValue)) {
       notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
+    }
+    if (!isPhysiologicallyPlausible(convValue, BPM_MIN, BPM_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${BPM_MIN}–${BPM_MAX} bpm). Vérifiez la saisie.`);
+      return Promise.reject("Out of range");
     }
     let updatedData = {
       ...this.data,
@@ -265,7 +289,7 @@ export class BabyHeartFrequency {
       })
       .catch((error: any) => {
         logger.warn("BabyHeartFrequency.update failed", { id: this.data.id, error: error?.message });
-        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
+        notify.error("Erreur", "Impossible de mettre à jour la fréquence cardiaque du bébé");
         runInAction(() => {
           this.store.state = "error";
         });
@@ -274,6 +298,10 @@ export class BabyHeartFrequency {
   }
 
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.removeBabyHeartFrequency(this);
   }
 

@@ -7,6 +7,7 @@ import { HospitalDashboardStore } from "./hospitalDashboard/hospitalDashboardSto
 import { AlertBannerStore } from "./alertBanner/alertBannerStore";
 import { MaternityAlertsStore } from "./maternityAlerts/maternityAlertsStore";
 import { TransferOutcomeStore } from "./transferOutcome/transferOutcomeStore";
+import { NetworkStore } from "./network/networkStore";
 
 export class RootStore {
   profileStore: ProfileStore;
@@ -17,6 +18,7 @@ export class RootStore {
   alertBannerStore: AlertBannerStore;
   maternityAlertsStore: MaternityAlertsStore;
   transferOutcomeStore: TransferOutcomeStore;
+  networkStore: NetworkStore;
   transportLayer: TransportLayer;
 
   constructor() {
@@ -29,6 +31,7 @@ export class RootStore {
     this.alertBannerStore = new AlertBannerStore(this, this.transportLayer);
     this.maternityAlertsStore = new MaternityAlertsStore(this, this.transportLayer);
     this.transferOutcomeStore = new TransferOutcomeStore(this, this.transportLayer);
+    this.networkStore = new NetworkStore(this);
   }
 }
 

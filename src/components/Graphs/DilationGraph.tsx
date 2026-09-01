@@ -1,5 +1,6 @@
 import React from "react";
 import { View, useWindowDimensions } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import Svg, {
   Line,
   Circle,
@@ -13,32 +14,71 @@ import { observer } from "mobx-react";
 import { Dilation, DilationStore } from "../../store/GraphData/Dilatation/dilatationStore";
 import { BabyDescent, BabyDescentStore } from "../../store/GraphData/BabyDescent/babyDescentStore";
 import { layout, svgFontFamily } from "../../theme";
+import { SkeletonPulse, SkeletonBlock } from "../Skeleton/Skeleton";
 
 interface DilationGraphProps {
   dilationStore?: DilationStore;
   babyDescentStore?: BabyDescentStore;
+  /** Chart's zero point — the first real reading recorded for this patient
+   * (see Graph.tsx's chartStartTime), not workStartDateTime/patient
+   * creation. Falls back to workStartDateTime only when there's no data
+   * yet to anchor on. */
+  startTime?: string | null;
 }
 
+const PX_PER_HOUR = 70;
+const MIN_HOURS = 12;
+
 export const DilationGraph: React.FC<DilationGraphProps> = observer(
-  ({ dilationStore, babyDescentStore }) => {
+  ({ dilationStore, babyDescentStore, startTime: startTimeProp }) => {
     const { width: windowWidth } = useWindowDimensions();
 
-    // Same content cap as the rest of the app: on big monitors the chart
-    // stays a readable width instead of stretching across the whole screen.
-    const svgWidth = Math.max(Math.min(windowWidth, layout.maxContentWidth) - 32, 200);
-    const svgHeight = 360;
-    const padL = 38, padR = 16, padT = 16, padB = 80;
-    const cW = svgWidth - padL - padR;
-    const cH = svgHeight - padT - padB;
-
-    // Labor start — ticks are rendered as the real clock time this many hours after it.
     const startTime =
+      startTimeProp ??
       dilationStore?.partogrammeStore?.partogramme?.workStartDateTime ??
       babyDescentStore?.partogrammeStore?.partogramme?.workStartDateTime ??
       null;
 
-    const xMin = 0, xMax = 12;
+    const svgHeight = 360;
+    const padL = 38, padR = 16, padT = 16, padB = 80;
+
+    // Position each point by when it was actually recorded, not by Rank
+    // (new dilation/descent entries are always created with Rank=0, which
+    // used to fall back to "now minus labor start" — drifting on every
+    // render instead of staying put).
+    const hoursSince = (dateStr: string): number => {
+      if (!startTime) return 0;
+      return (new Date(dateStr).getTime() - new Date(startTime).getTime()) / (1000 * 60 * 60);
+    };
+
+    const dilationPts = (dilationStore?.sortedDilationList ?? []).map((p: Dilation) => ({
+      x: hoursSince(p.data.created_at),
+      y: p.data.value,
+    }));
+
+    const descentPts = (babyDescentStore?.sortedBabyDescentList ?? []).map((p: BabyDescent) => ({
+      x: hoursSince(p.data.created_at),
+      y: p.data.value,
+    }));
+
+    // No clock-time labels along the x-axis until there's an actual first
+    // value to anchor them to — the grid/chart itself still shows, just
+    // without ticking off a fake start time (workStartDateTime, the
+    // fallback used only when there's nothing real to zero against yet).
+    const hasData = dilationPts.length > 0 || descentPts.length > 0;
+
+    // Chart grows past the fixed 12h window instead of clipping/stacking
+    // late readings at the right edge — the window stays scrollable
+    // (wrapped below) rather than squeezing a long labor into a fixed width.
+    const dataMaxHours = [...dilationPts, ...descentPts].reduce((max, p) => Math.max(max, p.x), 0);
+    const xMin = 0;
+    const xMax = Math.max(MIN_HOURS, Math.ceil(dataMaxHours) + 1);
     const yMin = 0, yMax = 10;
+
+    const availableWidth = Math.max(Math.min(windowWidth, layout.maxContentWidth) - 32, 200);
+    const svgWidth = Math.max(availableWidth, xMax * PX_PER_HOUR + padL + padR);
+    const cW = svgWidth - padL - padR;
+    const cH = svgHeight - padT - padB;
 
     const toX = (v: number) => padL + ((Math.max(xMin, Math.min(xMax, v)) - xMin) / (xMax - xMin)) * cW;
     const toY = (v: number) => padT + (1 - (Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * cH;
@@ -87,33 +127,34 @@ export const DilationGraph: React.FC<DilationGraphProps> = observer(
       return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     };
 
-    // Position each point by when it was actually recorded, not by Rank
-    // (new dilation/descent entries are always created with Rank=0, which
-    // used to fall back to "now minus labor start" — drifting on every
-    // render instead of staying put).
-    const hoursSince = (dateStr: string): number => {
-      if (!startTime) return 0;
-      return (new Date(dateStr).getTime() - new Date(startTime).getTime()) / (1000 * 60 * 60);
-    };
-
-    const dilationPts = (dilationStore?.sortedDilationList ?? []).map((p: Dilation) => ({
-      x: hoursSince(p.data.created_at),
-      y: p.data.value,
-    }));
-
-    const descentPts = (babyDescentStore?.sortedBabyDescentList ?? []).map((p: BabyDescent) => ({
-      x: hoursSince(p.data.created_at),
-      y: p.data.value,
-    }));
-
     const yTicks = [0, 2, 4, 6, 8, 10];
-    const xTicks = [0, 2, 4, 6, 8, 10, 12];
+    const xTicks: number[] = [];
+    for (let h = 0; h <= xMax; h += 2) xTicks.push(h);
 
     const dilPoly = dilationPts.map(d => `${toX(d.x)},${toY(d.y)}`).join(" ");
     const desPoly = descentPts.map(d => `${toX(d.x)},${toY(d.y)}`).join(" ");
 
+    // Shows a skeleton in place of the chart while the initial fetch is
+    // still in flight — ignored once either store has data (never re-shows
+    // on a background poll).
+    const loading = !!(dilationStore?.isLoading || babyDescentStore?.isLoading);
+    if (loading && !hasData) {
+      return (
+        <View style={{ alignSelf: "center", width: availableWidth, height: svgHeight }}>
+          <SkeletonPulse>
+            <SkeletonBlock width={availableWidth} height={svgHeight} blockRadius={8} />
+          </SkeletonPulse>
+        </View>
+      );
+    }
+
     return (
-      <View style={{ alignSelf: "center" }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator
+        style={{ alignSelf: "center", maxWidth: availableWidth, height: svgHeight }}
+      >
+        <View>
         <Svg width={svgWidth} height={svgHeight}>
           <Rect x={padL} y={padT} width={cW} height={cH} fill="#fafafa" stroke="#e0e0e0" strokeWidth={1} />
 
@@ -133,7 +174,9 @@ export const DilationGraph: React.FC<DilationGraphProps> = observer(
           {xTicks.map(x => (
             <G key={`x${x}`}>
               <Line x1={toX(x)} y1={padT} x2={toX(x)} y2={padT + cH} stroke="#e8e8e8" strokeWidth={0.7} />
-              <SvgText fontFamily={svgFontFamily} x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{formatTick(x)}</SvgText>
+              {hasData && (
+                <SvgText fontFamily={svgFontFamily} x={toX(x)} y={padT + cH + 14} textAnchor="middle" fontSize={9} fill="#777">{formatTick(x)}</SvgText>
+              )}
             </G>
           ))}
 
@@ -174,7 +217,8 @@ export const DilationGraph: React.FC<DilationGraphProps> = observer(
           <Circle cx={padL + 8} cy={padT + cH + 64} r={4} fill="#3a6bc4" />
           <SvgText fontFamily={svgFontFamily} x={padL + 17} y={padT + cH + 68} fontSize={9} fill="#333">Descente du bébé</SvgText>
         </Svg>
-      </View>
+        </View>
+      </ScrollView>
     );
   }
 );

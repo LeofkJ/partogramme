@@ -141,7 +141,11 @@ const DataModifierDialog: React.FC<Props> = observer(({
                           {items.length} valeur{items.length > 1 ? "s" : ""}
                         </Text>
                       </TouchableOpacity>
-                      {!readOnly && (
+                      {/* A row's items all land in the same 1-minute slot, so
+                          they expire together — checking the first one is
+                          enough to know whether the whole row is still in
+                          its correction window (see isWithinEditWindow). */}
+                      {!readOnly && (items[0] as any)?.isEditable !== false && (
                         <TouchableOpacity
                           style={styles.rowDeleteButton}
                           onPress={() => setRowPendingDelete([rank, items])}

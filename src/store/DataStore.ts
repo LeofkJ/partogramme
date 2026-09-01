@@ -55,6 +55,17 @@ export abstract class DataStore {
   // Fetch mother heart frequencies from the server and update the store
   async load(partogrammeId: string = this.partogrammeStore.partogramme.id) {
     this.isLoading = true;
+    this.resync(partogrammeId);
+    this.subscribeToRealtime(partogrammeId);
+    return Promise.resolve();
+  }
+
+  // Re-fetches and merges in whatever's on the server — used both by the
+  // initial load and, via subscribeToRealtime's onReconnect, to catch up
+  // on any INSERT/UPDATE missed while the websocket was dropped (a device
+  // offline for a few minutes would otherwise silently miss readings
+  // entered elsewhere during the gap).
+  private resync(partogrammeId: string) {
     this.fetch(partogrammeId).then((fetchedData) => {
       runInAction(() => {
         if (fetchedData) {
@@ -68,8 +79,6 @@ export abstract class DataStore {
       logger.warn(`${this.name}: load failed`, { partogrammeId, error: error?.message });
       return Promise.reject(error);
     });
-    this.subscribeToRealtime(partogrammeId);
-    return Promise.resolve();
   }
 
   // Live-sync: any INSERT/UPDATE on this table for this partogramme, from
@@ -80,7 +89,8 @@ export abstract class DataStore {
       `${this.tableName}-${partogrammeId}`,
       this.tableName,
       partogrammeId,
-      (row: any) => runInAction(() => this.updateFromServer(row))
+      (row: any) => runInAction(() => this.updateFromServer(row)),
+      () => this.resync(partogrammeId),
     );
   }
 

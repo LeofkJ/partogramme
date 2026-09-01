@@ -1,12 +1,14 @@
 import "react-native-url-polyfill/auto";
 import "react-native-get-random-values";
-import { useEffect, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AppState, LogBox, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
 import { AlertBanner } from "./src/components/AlertBanner/AlertBanner";
+import { OfflineBanner } from "./src/components/OfflineBanner/OfflineBanner";
 import { DialogTransferOutcome } from "./src/components/Dialogs/DialogTransferOutcome";
 import { navigationRef } from "./src/navigationRef";
-import { colors, radius } from "./src/theme";
+import { rootStore } from "./src/store/rootStore";
+import { colors, radius, spacing, type } from "./src/theme";
 import * as Sentry from "./src/lib/sentry";
 import { logger } from "./src/lib/logger";
 import { NavigationContainer } from "@react-navigation/native";
@@ -45,6 +47,61 @@ const paperTheme = {
 Sentry.init({
   dsn: "https://e271b157764ea5f872c2b1dc71bddbef@o4511666575441920.ingest.us.sentry.io/4511666598641664",
   enableInExpoDevelopment: true,
+});
+
+// Known no-op warning from RN's legacy Animated native module — fires any
+// time a native-driven Animated value updates with no JS-side listener
+// attached (e.g. react-navigation's own screen-transition animations).
+// Purely internal bookkeeping noise, not something app code can trigger or
+// fix directly; safe to ignore. See facebook/react-native#31693.
+LogBox.ignoreLogs(["Sending `onAnimatedValueUpdate` with no listeners registered"]);
+
+// Sentry.wrap(App) below only adds touch/profiler tracking, not a crash
+// boundary — without this, any render error anywhere in the tree (a bad
+// date parse, an unexpected data shape) takes the whole app to a blank
+// white screen with no recovery short of force-quitting, possibly mid-labor.
+const ErrorFallback = ({ resetError }) => (
+  <View style={errorFallbackStyles.body}>
+    <Text style={errorFallbackStyles.title}>Une erreur est survenue.</Text>
+    <Text style={errorFallbackStyles.message}>
+      L'application a rencontré un problème inattendu. Vous pouvez réessayer, ou redémarrer l'application si le problème persiste.
+    </Text>
+    <TouchableOpacity style={errorFallbackStyles.button} onPress={resetError} activeOpacity={0.8}>
+      <Text style={errorFallbackStyles.buttonText}>Réessayer</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const errorFallbackStyles = StyleSheet.create({
+  body: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  title: {
+    ...type.title,
+    textAlign: "center",
+    marginBottom: spacing.sm,
+  },
+  message: {
+    ...type.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+  },
+  button: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  buttonText: {
+    color: colors.onAccent,
+    fontSize: 15,
+    fontWeight: "600",
+  },
 });
 
 const Stack = createNativeStackNavigator();
@@ -86,10 +143,26 @@ const linking = {
 
 function App() {
   const [currentRouteName, setCurrentRouteName] = useState(undefined);
+  const previousAppState = useRef(AppState.currentState);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       logger.info(`App state: ${state}`);
+      // Realtime's own reconnect logic only fires on a clean websocket
+      // close/error — iOS/Android can silently suspend the socket on
+      // background without ever firing that, so a phone locked for a while
+      // and reopened needs its own explicit resync here.
+      // Only "background" counts as a real suspension worth resyncing for —
+      // "inactive" fires constantly on iOS for routine, momentary things
+      // (an Alert.alert/toast, the keyboard, control center, the app-switcher
+      // preview), none of which actually drop the connection. Treating those
+      // the same as a genuine background/foreground cycle was firing a full
+      // re-fetch + realtime-resubscribe on nearly every UI interaction.
+      const wasBackground = previousAppState.current === "background";
+      if (wasBackground && state === "active" && rootStore.profileStore.profile.id) {
+        rootStore.partogrammeStore.resyncOnForeground();
+      }
+      previousAppState.current = state;
     });
     return () => sub.remove();
   }, []);
@@ -98,6 +171,7 @@ function App() {
     setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
 
   return (
+    <Sentry.GlobalErrorBoundary fallback={ErrorFallback}>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={paperTheme}>
         <SafeAreaProvider>
@@ -109,6 +183,7 @@ function App() {
           >
             <NavBar currentRouteName={currentRouteName} />
             <AlertBanner />
+            <OfflineBanner />
             <DialogTransferOutcome />
             <Stack.Navigator>
               <Stack.Screen
@@ -197,6 +272,7 @@ function App() {
         </SafeAreaProvider>
       </PaperProvider>
     </GestureHandlerRootView>
+    </Sentry.GlobalErrorBoundary>
   );
 }
 

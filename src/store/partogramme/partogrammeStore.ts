@@ -106,12 +106,22 @@ export class PartogrammeStore {
   selectedPartogrammeId: string | null = null;
   transportLayer: TransportLayer;
   private realtimeChannel: RealtimeChannel | null = null;
+  private realtimeHadDropped = false;
+  // Floor between reconnect-triggered refetches — a channel that errors and
+  // reconnects in a tight loop (seen once already: an unfiltered
+  // subscription did exactly this) must not be able to re-trigger
+  // fetchFromServer(), and therefore a fresh subscribeToRealtime() call, on
+  // every single cycle. Belt-and-suspenders on top of always filtering the
+  // subscription now (see subscribeToRealtime).
+  private lastReconnectRefetchAt = 0;
 
   constructor(rootStore: RootStore, transportLayer: TransportLayer) {
     makeAutoObservable(this, {
       rootStore: false,
       transportLayer: false,
       realtimeChannel: false,
+      realtimeHadDropped: false,
+      lastReconnectRefetchAt: false,
       isInSync: false,
       selectedPartogramme: computed,
     });
@@ -130,6 +140,37 @@ export class PartogrammeStore {
     return this.partogrammeList.find(
       (partogramme) => partogramme.partogramme.id === this.selectedPartogrammeId
     );
+  }
+
+  // Called on app foreground (see App.js's AppState listener) — realtime's
+  // own reconnect logic only fires on a clean websocket close/error, which
+  // iOS/Android can bypass by silently suspending the socket on background,
+  // so a phone locked for a while and reopened needs an explicit refetch.
+  // Mirrors the exact nurse/doctor branch already duplicated in
+  // Menu.tsx/Graph.tsx, plus re-loads the currently-open patient's own
+  // vitals/tables/comments (Graph.tsx's fetchData list) since those have
+  // their own separate realtime channels this doesn't otherwise touch.
+  resyncOnForeground() {
+    const userInfo = this.rootStore.userInfoStore.userInfo;
+    if (userInfo.role === "NURSE") {
+      this.fetchFromServer(this.rootStore.profileStore.profile.id);
+    } else {
+      this.fetchFromServer();
+    }
+
+    const current = this.selectedPartogramme;
+    if (current === undefined) return;
+    current.babyHeartFrequencyStore.loadBabyHeartFrequencies();
+    current.babyDescentStore.loadBabyDescents();
+    current.dilationStore.loadDilations();
+    current.motherSystolicBloodPressureStore.loadData();
+    current.motherDiastolicBloodPressureStore.loadData();
+    current.motherContractionFrequencyStore.loadMotherContractionsFrequencies();
+    current.motherContractionDurationStore.load();
+    current.motherTemperatureStore.loadMotherTemperatures();
+    current.motherHeartRateFrequencyStore.loadMotherHeartFrequencies();
+    current.amnioticLiquidStore.loadAmnioticLiquids();
+    current.commentStore.load();
   }
 
   // fetch partogrammes from the server and update the store
@@ -180,16 +221,37 @@ export class PartogrammeStore {
     this.subscribeToRealtime(isMaternityNurse ? nurseId : undefined);
   }
 
-  // Subscribe to real-time changes on the Partogramme table for the current hospital.
+  // Subscribe to real-time changes on the Partogramme table.
   // When nurseId is provided (nurse role), only process events for that nurse's partogrammes.
+  //
+  // REVERTED 2026-09-01: briefly tried dropping the `filter` entirely so
+  // hospital staff would also get live updates for a not-yet-transferred
+  // maternity patient (hospitalId is null on those rows, so the old
+  // hospitalId filter missed them — see the transfer-request staleness fix
+  // below). An unfiltered postgres_changes subscription on this project
+  // errors/reconnects in a tight loop instead of just staying open, and
+  // every reconnect calls fetchFromServer() again — which pegged the
+  // client hammering the same list query dozens of times a second. Back to
+  // a real (if narrower) filter: hospitalId for hospital staff, maternityId
+  // for maternity nurses — at least each role's own primary scope gets
+  // reliable realtime again (maternity nurses previously got zero, since
+  // they have no hospitalId at all). The cross-boundary case (a hospital
+  // doctor's transfer-request state on a linked maternity's patient) is
+  // covered by Graph.tsx's own periodic refetch instead, not realtime.
   private subscribeToRealtime(nurseId?: string) {
     if (this.realtimeChannel) {
       supabase.removeChannel(this.realtimeChannel);
     }
 
-    const hospitalId = this.rootStore.userInfoStore.userInfo.hospitalId;
-
-    const isMaternityNurse = this.rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
+    const userInfo = this.rootStore.userInfoStore.userInfo;
+    const isMaternityNurse = userInfo.nurseType === "MATERNITY";
+    const filter = isMaternityNurse
+      ? (userInfo.maternityId ? `maternityId=eq.${userInfo.maternityId}` : undefined)
+      : (userInfo.hospitalId ? `hospitalId=eq.${userInfo.hospitalId}` : undefined);
+    // No usable scope to filter on (shouldn't happen once userInfo has
+    // loaded) — skip subscribing rather than risk another unfiltered,
+    // reconnect-looping channel.
+    if (!filter) return;
 
     const handlePayload = (payload: any) => {
       const row = payload.new as Partogramme_t["Row"];
@@ -224,7 +286,7 @@ export class PartogrammeStore {
           event: "INSERT",
           schema: "public",
           table: "Partogramme",
-          filter: `hospitalId=eq.${hospitalId}`,
+          filter,
         },
         handlePayload
       )
@@ -234,11 +296,27 @@ export class PartogrammeStore {
           event: "UPDATE",
           schema: "public",
           table: "Partogramme",
-          filter: `hospitalId=eq.${hospitalId}`,
+          filter,
         },
         handlePayload
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Supabase's websocket reconnects itself, but nothing re-syncs app
+        // data afterward — a device offline for a few minutes would
+        // otherwise miss any INSERT/UPDATE that happened during the gap.
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          this.realtimeHadDropped = true;
+        } else if (status === "SUBSCRIBED" && this.realtimeHadDropped) {
+          this.realtimeHadDropped = false;
+          const now = Date.now();
+          if (now - this.lastReconnectRefetchAt < 10000) {
+            logger.warn("partogrammeStore: skipping reconnect refetch, too soon since the last one", { msSinceLast: now - this.lastReconnectRefetchAt });
+            return;
+          }
+          this.lastReconnectRefetchAt = now;
+          this.fetchFromServer(nurseId);
+        }
+      });
   }
 
   // Update a partogramme with information from the server. Guarantees a partogramme only
@@ -779,16 +857,31 @@ export class Partogramme {
   // midwife's own pending list) — the requester's outcome notification
   // reads it via transferRequestStatus, and acknowledgeTransferRequestOutcome
   // is what finally clears it once they've actually seen the popup.
-  async acceptTransferRequest() {
+  // noFileOverride: lets the midwife renumber the dossier in the same
+  // action when the target hospital already has a different patient with
+  // this number (23505 on Partogramme_hospitalId_noFile_unique — see
+  // MaternityTransferRequestsPanel's inline retry) — without this,
+  // accepting was a dead end since nothing else lets her edit noFile.
+  async acceptTransferRequest(noFileOverride?: number) {
     const data = this.asJson;
     const hospitalId = data.transferRequestHospitalId;
     if (!hospitalId) return;
+    const linkStillExists = await this.store.transportLayer.hospitalMaternityLinkExists(
+      data.maternityId as string,
+      hospitalId,
+    );
+    if (!linkStillExists) {
+      const error: any = new Error("Cet hôpital n'est plus lié à cette maternité.");
+      error.code = "LINK_REMOVED";
+      throw error;
+    }
     data.hospitalId = hospitalId;
     data.state = "TRANSFERRED";
     data.transferRequestHospitalId = null;
     data.transferRequestStatus = "accepted";
+    if (noFileOverride !== undefined) data.noFile = noFileOverride;
     await this.store.transportLayer
-      .updatePartogramme(data)
+      .resolveTransferRequest(data)
       .then(() => {
         runInAction(() => {
           this.partogramme = data;
@@ -799,7 +892,7 @@ export class Partogramme {
         runInAction(() => {
           this.store.state = "error";
         });
-        logger.warn("acceptTransferRequest: updatePartogramme failed", { id: data.id, error: error?.message });
+        logger.warn("acceptTransferRequest: resolveTransferRequest failed", { id: data.id, error: error?.message, code: error?.code });
         return Promise.reject(error);
       });
   }
@@ -814,7 +907,7 @@ export class Partogramme {
     data.transferRequestStatus = "rejected";
     data.transferRequestRejectionComment = comment;
     await this.store.transportLayer
-      .updatePartogramme(data)
+      .resolveTransferRequest(data)
       .then(() => {
         runInAction(() => {
           this.partogramme = data;
@@ -825,7 +918,7 @@ export class Partogramme {
         runInAction(() => {
           this.store.state = "error";
         });
-        logger.warn("rejectTransferRequest: updatePartogramme failed", { id: data.id, error: error?.message });
+        logger.warn("rejectTransferRequest: resolveTransferRequest failed", { id: data.id, error: error?.message, code: error?.code });
         return Promise.reject(error);
       });
   }

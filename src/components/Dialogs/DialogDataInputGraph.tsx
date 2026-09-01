@@ -17,7 +17,12 @@ interface Props {
   endValue: number;
   step: number;
   initialValue?: string;
-  onClose: (data: string) => void;
+  /** Return (or resolve to) `false` when the value was rejected (e.g. an
+   * out-of-range value the store's own validation silently declined) so
+   * this dialog knows to stay open instead of closing on a save that
+   * never actually happened. Anything else — true, undefined/void — is
+   * treated as success. */
+  onClose: (data: string) => void | boolean | Promise<void | boolean>;
   onCancel: () => void;
 }
 
@@ -33,11 +38,16 @@ const DialogDataInputGraph: React.FC<Props> = ({
   const { width } = useWindowDimensions();
   const [value, setValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Guards against a fast double-tap firing onClose twice before the
+  // parent hides this modal (its own state update isn't synchronous) —
+  // the parent's create call has no such lock of its own.
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setValue(initialValue ?? "");
     setErrorMessage(null);
+    setIsSubmitting(false);
   }, [visible, initialValue]);
 
   const handleCancel = () => {
@@ -46,15 +56,24 @@ const DialogDataInputGraph: React.FC<Props> = ({
     onCancel();
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
+    if (isSubmitting) return;
     const trimmed = value.trim();
     if (trimmed === "" || Number.isNaN(Number(trimmed))) {
       setErrorMessage("Veuillez saisir un nombre valide.");
       return;
     }
-    setValue("");
+    setIsSubmitting(true);
     setErrorMessage(null);
-    onClose(trimmed);
+    const result = await onClose(trimmed);
+    if (result === false) {
+      // Rejected (out of range, etc.) — the store already showed why via
+      // its own error. Keep the value in the field so it can be fixed,
+      // rather than clearing it as if it had been saved.
+      setIsSubmitting(false);
+      return;
+    }
+    setValue("");
   };
 
   return (
@@ -98,8 +117,9 @@ const DialogDataInputGraph: React.FC<Props> = ({
               <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.buttonValidate]}
+              style={[styles.button, styles.buttonValidate, isSubmitting && styles.buttonDisabled]}
               onPress={handleValidate}
+              disabled={isSubmitting}
             >
               <Text style={styles.buttonText}>Valider</Text>
             </TouchableOpacity>
@@ -171,6 +191,9 @@ const styles = StyleSheet.create({
   },
   buttonValidate: {
     backgroundColor: colors.accent,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonCancel: {
     backgroundColor: colors.surface,

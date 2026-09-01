@@ -30,7 +30,9 @@ async function unwrapFunctionError(fnName: string, error: any): Promise<Error> {
   }
   logger.error(`Edge Function ${fnName} failed: ${error?.message}`, { status: error?.context?.status, body });
   const realMessage = typeof body === "object" && body?.error ? body.error : undefined;
-  return new Error(realMessage ?? error?.message ?? "Unknown error");
+  const unwrapped = new Error(realMessage ?? error?.message ?? "Unknown error");
+  Sentry.captureException(unwrapped, { extra: { fnName, status: error?.context?.status } });
+  return unwrapped;
 }
 
 export class TransportLayer {
@@ -134,6 +136,21 @@ export class TransportLayer {
     return data;
   }
 
+  /** Fresh read of one patient's own row (state, transferRequest*, etc.) —
+   * for a screen that's been sitting open and needs to notice a change made
+   * from elsewhere (e.g. the other party accepting/rejecting a transfer
+   * request) without waiting on realtime, which doesn't reliably cover this
+   * table for every viewer (see Graph.tsx's refreshSelectedPartogramme). */
+  async fetchPartogrammeById(id: string) {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return data;
+  }
+
   // Plain UPDATE, not upsert — every caller acts on a patient that already
   // exists (insertPartogramme below is the only genuine create path).
   // .upsert() compiles to INSERT ... ON CONFLICT DO UPDATE, which needs
@@ -148,16 +165,72 @@ export class TransportLayer {
       .from("Partogramme")
       .update({ ...partogramme })
       .eq("id", partogramme.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
+  }
+
+  /** Same write as updatePartogramme, but only commits if the transfer
+   * request is still pending server-side (transferRequestStatus IS NULL,
+   * confirmed against TransferOutcomeStore.toOutcome — only "accepted"/
+   * "rejected" count as decided) — guards against two concurrent
+   * accept/reject decisions on the same request silently overwriting each
+   * other. .select() is required after .update() to detect a 0-row match
+   * (Supabase JS v2 returns no data otherwise): an empty result means the
+   * request was already decided, not a silent success. */
+  async resolveTransferRequest(partogramme: Partogramme_t["Row"]) {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .update({ ...partogramme })
+      .eq("id", partogramme.id)
+      .is("transferRequestStatus", null)
+      .select();
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    if (!data || data.length === 0) {
+      const alreadyHandled: any = new Error("Cette demande de transfert a déjà été traitée.");
+      alreadyHandled.code = "TRANSFER_ALREADY_DECIDED";
+      throw alreadyHandled;
+    }
+    return data;
+  }
+
+  /** Fresh server check that the maternity is still linked to the target
+   * hospital, right before committing an accept — the picker that produced
+   * hospitalId may be stale if an admin unlinked it since the request was
+   * made or since the picker last loaded. */
+  async hospitalMaternityLinkExists(maternityId: string, hospitalId: string) {
+    const { data, error } = await supabase
+      .from("hospitalMaternityLink")
+      .select("id")
+      .eq("maternityId", maternityId)
+      .eq("hospitalId", hospitalId)
+      .maybeSingle();
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return !!data;
   }
 
   async insertPartogramme(partogramme: Partogramme_t["Row"]) {
     const { data, error } = await supabase
       .from("Partogramme")
       .insert({ ...partogramme });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
+  }
+
+  // Suggests the next dossier number for a new maternity patient — a
+  // convenience prefill, not the actual uniqueness guarantee (that's
+  // Partogramme_maternityId_noFile_unique). Only considers not-yet-
+  // transferred patients (hospitalId is null), matching that index's scope.
+  async fetchNextDossierNumber(maternityId: string) {
+    const { data, error } = await supabase
+      .from("Partogramme")
+      .select("noFile")
+      .eq("maternityId", maternityId)
+      .is("hospitalId", null)
+      .eq("isDeleted", false)
+      .order("noFile", { ascending: false })
+      .limit(1);
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return (data && data.length > 0 ? data[0].noFile : 0) + 1;
   }
 
   async fetchBabyHeartFrequencies(partogrammeId: string) {
@@ -165,7 +238,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -174,7 +247,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -183,7 +256,7 @@ export class TransportLayer {
       .from("BabyHeartFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -191,7 +264,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("BabyHeartFrequency")
       .insert({ ...frequency });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -200,7 +273,7 @@ export class TransportLayer {
       .from("Dilation")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -209,7 +282,7 @@ export class TransportLayer {
       .from("Dilation")
       .upsert({ ...dilation })
       .eq("id", dilation.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -217,7 +290,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Dilation")
       .insert({ ...dilation });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -226,7 +299,7 @@ export class TransportLayer {
       .from("Dilation")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -235,7 +308,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -244,7 +317,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .upsert({ ...babyDescent })
       .eq("id", babyDescent.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -252,7 +325,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("BabyDescent")
       .insert({ ...babyDescent });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -261,7 +334,7 @@ export class TransportLayer {
       .from("BabyDescent")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -270,7 +343,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -279,7 +352,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .upsert({ ...amnioticLiquid })
       .eq("id", amnioticLiquid.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -287,7 +360,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("amnioticLiquid")
       .insert({ ...amnioticLiquid });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -296,7 +369,7 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .update({ isDeleted: true })
       .eq("id", amnioticLiquidId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -305,7 +378,7 @@ export class TransportLayer {
       .from("MotherSystolicBloodPressure")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -315,7 +388,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherSystolicBloodPressure")
       .insert(motherBloodPressure);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -326,7 +399,7 @@ export class TransportLayer {
       .from("MotherSystolicBloodPressure")
       .update(motherBloodPressure)
       .eq("id", motherBloodPressure.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -335,7 +408,7 @@ export class TransportLayer {
       .from("MotherSystolicBloodPressure")
       .update({ isDeleted: true })
       .eq("id", motherBloodPressureId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -344,7 +417,7 @@ export class TransportLayer {
       .from("MotherDiastolicBloodPressure")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -354,7 +427,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
       .insert(motherBloodPressure);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -365,7 +438,7 @@ export class TransportLayer {
       .from("MotherDiastolicBloodPressure")
       .update(motherBloodPressure)
       .eq("id", motherBloodPressure.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -374,7 +447,7 @@ export class TransportLayer {
       .from("MotherDiastolicBloodPressure")
       .update({ isDeleted: true })
       .eq("id", motherBloodPressureId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -383,7 +456,7 @@ export class TransportLayer {
       .from("MotherContractionsFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -392,7 +465,7 @@ export class TransportLayer {
       .from("MotherContractionsFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -403,7 +476,7 @@ export class TransportLayer {
       .from("MotherContractionsFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -413,7 +486,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherContractionsFrequency")
       .insert({ ...frequency });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -422,7 +495,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -431,7 +504,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -440,7 +513,7 @@ export class TransportLayer {
       .from("MotherHeartFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -448,7 +521,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherHeartFrequency")
       .insert({ ...frequency });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -457,7 +530,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -466,7 +539,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -475,7 +548,7 @@ export class TransportLayer {
       .from("MotherTemperature")
       .upsert({ ...temperature })
       .eq("id", temperature.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -483,7 +556,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherTemperature")
       .insert({ ...temperature });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -492,7 +565,7 @@ export class TransportLayer {
       .from("MotherContractionDuration")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -503,7 +576,7 @@ export class TransportLayer {
       .from("MotherContractionDuration")
       .update({ isDeleted: true })
       .eq("id", motherContraction.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -514,7 +587,7 @@ export class TransportLayer {
       .from("MotherContractionDuration")
       .upsert({ ...duration })
       .eq("id", duration.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -524,7 +597,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherContractionDuration")
       .insert({ ...duration });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -533,7 +606,7 @@ export class TransportLayer {
       .from("Comment")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -542,7 +615,7 @@ export class TransportLayer {
       .from("Comment")
       .update({ isDeleted: true })
       .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -551,7 +624,7 @@ export class TransportLayer {
       .from("Comment")
       .upsert({ ...comment })
       .eq("id", comment.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -559,7 +632,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("Comment")
       .insert({ ...comment });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -569,7 +642,7 @@ export class TransportLayer {
       .select("*")
       .eq("profileId", profileId)
       .single();
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -577,7 +650,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("userInfo")
       .upsert(userInfo, { onConflict: "profileId" });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -586,13 +659,13 @@ export class TransportLayer {
       .from("Profile")
       .update(profile)
       .eq("id", profile.id);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
   async fetchAllProfiles() {
     const { data, error } = await supabase.from("Profile").select("*");
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -601,7 +674,7 @@ export class TransportLayer {
       .from("hospital")
       .select("*")
       .neq("isDeleted", true);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -611,7 +684,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("hospital")
       .insert({ ...hospital, isDeleted: false });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -623,8 +696,23 @@ export class TransportLayer {
       .from("hospital")
       .update({ isDeleted: true })
       .eq("id", hospitalId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
+  }
+
+  // Used by AdminStore.removeHospital/removeMaternity to block a delete
+  // that would orphan active patients — removeHospital/removeMaternity are
+  // plain soft-deletes with no cascade, so nothing else stops this.
+  async countActivePatients(scope: { hospitalId: string } | { maternityId: string }) {
+    let query = supabase
+      .from("Partogramme")
+      .select("id", { count: "exact", head: true })
+      .eq("isDeleted", false)
+      .neq("state", "WORK_FINISHED");
+    query = "hospitalId" in scope ? query.eq("hospitalId", scope.hospitalId) : query.eq("maternityId", scope.maternityId);
+    const { count, error } = await query;
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return count ?? 0;
   }
 
   async fetchAllMaternities() {
@@ -632,7 +720,7 @@ export class TransportLayer {
       .from("maternity")
       .select("*")
       .neq("isDeleted", true);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -642,7 +730,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("maternity")
       .insert({ ...maternity, isDeleted: false });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -655,7 +743,7 @@ export class TransportLayer {
       .from("maternity")
       .update({ defaultHospitalId })
       .eq("id", maternityId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 
   // Soft-delete, same pattern as removeHospital. Admin-only, gated by the
@@ -666,7 +754,7 @@ export class TransportLayer {
       .from("maternity")
       .update({ isDeleted: true })
       .eq("id", maternityId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -676,7 +764,7 @@ export class TransportLayer {
   // created/removed outright, hard delete.
   async fetchHospitalMaternityLinks() {
     const { data, error } = await supabase.from("hospitalMaternityLink").select("*");
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -694,7 +782,7 @@ export class TransportLayer {
       .in("maternityId", maternityIds)
       .in("state", ["ADMITTED", "IN_PROGRESS"])
       .eq("isDeleted", false);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -717,22 +805,22 @@ export class TransportLayer {
         transferRequestRejectionComment: null,
       })
       .eq("id", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 
-  /** The requester's own not-yet-seen outcome, if any — accepted or
-   * rejected. At most one row expected in practice (a requester waits for
-   * one before making another), but not enforced; just takes the first. */
-  async fetchTransferRequestOutcome(requesterProfileId: string) {
+  /** Every one of the requester's own not-yet-seen outcomes — accepted or
+   * rejected. A requester can have more than one decided request pending
+   * acknowledgment (e.g. two patients transferred while she was offline),
+   * and no timestamp column exists on Partogramme to order by, so this
+   * returns everything and lets the store queue them. */
+  async fetchTransferRequestOutcomes(requesterProfileId: string) {
     const { data, error } = await supabase
       .from("Partogramme")
       .select("id, noFile, transferRequestStatus, transferRequestRejectionComment")
       .eq("transferRequestByDoctorId", requesterProfileId)
-      .not("transferRequestStatus", "is", null)
-      .limit(1)
-      .maybeSingle();
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
-    return data;
+      .not("transferRequestStatus", "is", null);
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
+    return data ?? [];
   }
 
   /** Called once the requester has actually seen the outcome popup — clears
@@ -750,14 +838,14 @@ export class TransportLayer {
         transferRequestRejectionComment: null,
       })
       .eq("id", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 
   // Admin-only, gated by the "Admins can create hospital-maternity links"
   // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
   async linkHospitalMaternity(link: { id: string; hospitalId: string; maternityId: string }) {
     const { data, error } = await supabase.from("hospitalMaternityLink").insert(link);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -765,7 +853,7 @@ export class TransportLayer {
   // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
   async unlinkHospitalMaternity(linkId: string) {
     const { data, error } = await supabase.from("hospitalMaternityLink").delete().eq("id", linkId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -775,7 +863,7 @@ export class TransportLayer {
       .select("*")
       .eq("role", "DOCTOR")
       .neq("isDeleted", true);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -788,7 +876,7 @@ export class TransportLayer {
       .from("userInfo")
       .select("*")
       .neq("isDeleted", true);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
@@ -813,7 +901,7 @@ export class TransportLayer {
       body: input,
     });
     if (error) { throw await unwrapFunctionError("create-account", error); }
-    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    if (data?.error) { logger.error(data.error); const err = new Error(data.error); Sentry.captureException(err); throw err; }
     return data as { userId: string; tempPassword: string };
   }
 
@@ -822,7 +910,7 @@ export class TransportLayer {
       body: { userInfoId },
     });
     if (error) { throw await unwrapFunctionError("remove-account", error); }
-    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    if (data?.error) { logger.error(data.error); const err = new Error(data.error); Sentry.captureException(err); throw err; }
     return data;
   }
 
@@ -840,7 +928,7 @@ export class TransportLayer {
       body: input,
     });
     if (error) { throw await unwrapFunctionError("update-account", error); }
-    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    if (data?.error) { logger.error(data.error); const err = new Error(data.error); Sentry.captureException(err); throw err; }
     return data;
   }
 
@@ -851,7 +939,7 @@ export class TransportLayer {
   async adminListLogins() {
     const { data, error } = await supabase.functions.invoke("admin-list-logins");
     if (error) { throw await unwrapFunctionError("admin-list-logins", error); }
-    if (data?.error) { logger.error(data.error); throw new Error(data.error); }
+    if (data?.error) { logger.error(data.error); const err = new Error(data.error); Sentry.captureException(err); throw err; }
     return data.lastSignInByProfileId as Record<string, string | null>;
   }
 
@@ -876,8 +964,8 @@ export class TransportLayer {
         .in("partogrammeId", partogrammeIds)
         .eq("isDeleted", false),
     ]);
-    if (dilationRes.error) { logger.error(dilationRes.error.message, { code: dilationRes.error.code }); throw dilationRes.error; }
-    if (bpmRes.error) { logger.error(bpmRes.error.message, { code: bpmRes.error.code }); throw bpmRes.error; }
+    if (dilationRes.error) { logger.error(dilationRes.error.message, { code: dilationRes.error.code }); Sentry.captureException(dilationRes.error); throw dilationRes.error; }
+    if (bpmRes.error) { logger.error(bpmRes.error.message, { code: bpmRes.error.code }); Sentry.captureException(bpmRes.error); throw bpmRes.error; }
     return { dilations: dilationRes.data, bpms: bpmRes.data };
   }
 
@@ -893,20 +981,20 @@ export class TransportLayer {
       .in("partogrammeId", partogrammeIds)
       .eq("isDeleted", false)
       .order("createdAt", { ascending: false });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
   async createManualAlert(partogrammeId: string, comment: string) {
     const { error } = await supabase.from("ManualAlert").insert({ partogrammeId, comment });
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 
   // Soft delete, matching every other table's isDeleted convention —
   // RLS only grants update, not delete, on this table.
   async deleteManualAlert(alertId: string) {
     const { error } = await supabase.from("ManualAlert").update({ isDeleted: true }).eq("id", alertId);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 
   /** Close every open manual alert on a patient — hospital staff after
@@ -919,6 +1007,6 @@ export class TransportLayer {
       .update({ isDeleted: true })
       .eq("partogrammeId", partogrammeId)
       .eq("isDeleted", false);
-    if (error) { logger.error(error.message, { code: error.code }); throw error; }
+    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
   }
 }

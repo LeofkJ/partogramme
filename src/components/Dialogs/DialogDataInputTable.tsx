@@ -40,7 +40,12 @@ export interface DataInputEntry {
 export interface Props {
   visible: boolean;
   data: DataInputTable_t[];
-  onClose: (entries: DataInputEntry[]) => void;
+  /** Return (or resolve to) `false` when one or more entries were rejected
+   * (e.g. an out-of-range value the store's own validation silently
+   * declined) so this dialog knows to stay open — and not show "Ajouté" —
+   * instead of closing on a save that never actually happened. Anything
+   * else — true, undefined/void — is treated as success. */
+  onClose: (entries: DataInputEntry[]) => void | boolean | Promise<void | boolean>;
   onCancel: () => void;
   onDelete?: () => void;
   preSelectedDataChoice?: DataInputTable_t;
@@ -116,8 +121,15 @@ const DialogDataInputTable: React.FC<Props> = observer(({
   // proof it worked — a submission that updates an existing row instead of
   // creating a new one is otherwise invisible, which reads as "did nothing".
   const [justSaved, setJustSaved] = useState(false);
-  const confirmSave = (entries: DataInputEntry[]) => {
-    onClose(entries);
+  const confirmSave = async (entries: DataInputEntry[]) => {
+    const result = await onClose(entries);
+    if (result === false) {
+      // Rejected (out of range, etc.) — the store already showed why via
+      // its own error. Stay open with the values still in the fields
+      // instead of flashing "Ajouté" for a save that never happened.
+      setIsSubmitting(false);
+      return;
+    }
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 900);
   };
@@ -131,6 +143,13 @@ const DialogDataInputTable: React.FC<Props> = observer(({
 
   useEffect(() => {
     if (visible) setPendingEntries(null);
+  }, [visible]);
+
+  // Guards against a fast double-tap firing confirmSave twice before the
+  // parent hides this modal (its own state update isn't synchronous).
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  useEffect(() => {
+    if (visible) setIsSubmitting(false);
   }, [visible]);
 
   // MotherContractionsFrequencyStore's full unit ("contractions/10min") is
@@ -251,6 +270,18 @@ const DialogDataInputTable: React.FC<Props> = observer(({
   };
 
   const hasAnyMultiValue = data.some((_, i) => (multiValues[i] ?? "").trim() !== "");
+  // Amniotic-liquid entry is always valid (a dropdown, never empty/NaN);
+  // every other preselected type needs an actual numeric value — this was
+  // previously unchecked, so an empty/garbage inputDataNumber could be
+  // submitted straight through in preselected mode.
+  const isPreselectedValueValid = preSelectedDataChoice
+    ? preSelectedDataChoice.name === data[0].partogrammeStore.amnioticLiquidStore.name ||
+      (inputDataNumber.trim() !== "" && !Number.isNaN(Number(inputDataNumber)))
+    : true;
+  const isSubmitDisabled =
+    isSubmitting ||
+    (!preSelectedDataChoice && !hasAnyMultiValue) ||
+    (!!preSelectedDataChoice && !isPreselectedValueValid);
 
   return (
     <Modal
@@ -280,13 +311,17 @@ const DialogDataInputTable: React.FC<Props> = observer(({
                   <Text style={[styles.buttonText, styles.buttonTextCancel]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.button, styles.buttonValidate]}
+                  style={[styles.button, styles.buttonValidate, isSubmitting && styles.buttonDisabled]}
+                  disabled={isSubmitting}
                   onPress={() => {
+                    setIsSubmitting(true);
                     confirmSave(pendingEntries);
                     setPendingEntries(null);
                   }}
                 >
-                  <Text style={styles.buttonText}>Ajouter quand même</Text>
+                  <Text style={[styles.buttonText, styles.buttonTextLong]} numberOfLines={1}>
+                    Ajouter quand même
+                  </Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -342,15 +377,16 @@ const DialogDataInputTable: React.FC<Props> = observer(({
                   style={[
                     styles.button,
                     styles.buttonValidate,
-                    !preSelectedDataChoice && !hasAnyMultiValue && styles.buttonDisabled,
+                    isSubmitDisabled && styles.buttonDisabled,
                   ]}
-                  disabled={!preSelectedDataChoice && !hasAnyMultiValue}
+                  disabled={isSubmitDisabled}
                   onPress={() => {
                     if (!rootStore.partogrammeStore.selectedPartogramme) return;
 
                     if (preSelectedDataChoice) {
                       const dataStore = rootStore.partogrammeStore.selectedPartogramme.getDataStore(selectedDataName);
                       if (dataStore) {
+                        setIsSubmitting(true);
                         confirmSave([{
                           dataStore,
                           value: selectedDataName === data[0].partogrammeStore.amnioticLiquidStore.name
@@ -380,6 +416,7 @@ const DialogDataInputTable: React.FC<Props> = observer(({
                         setRecentMinutesAgo(Math.round(minutesAgo));
                         setPendingEntries(entries);
                       } else {
+                        setIsSubmitting(true);
                         confirmSave(entries);
                       }
                     }
@@ -635,6 +672,12 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 15,
+  },
+  // "Ajouter quand même" is far longer than this row's other labels
+  // (Annuler/Valider) — at the shared 15px size it wraps to 2 lines and
+  // unevenly stretches its sibling button on SE-width screens.
+  buttonTextLong: {
+    fontSize: 12,
   },
   deleteLink: {
     alignItems: "center",

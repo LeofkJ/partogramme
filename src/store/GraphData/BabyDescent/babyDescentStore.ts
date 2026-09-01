@@ -10,8 +10,14 @@ import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type BabyDescent_t = Database["public"]["Tables"]["BabyDescent"];
+
+// Same 0-10 scale as Dilation — this app plots descent on the dilation
+// graph's shared y-axis, not the standard clinical -5..+5 station scale.
+const DESCENT_MIN = 0;
+const DESCENT_MAX = 10;
 
 export class BabyDescentStore {
   rootStore: RootStore;
@@ -106,7 +112,9 @@ export class BabyDescentStore {
     }
   }
 
-  // Create a new baby descent on the server and add it to the store
+  // Create a new baby descent on the server and add it to the store — only
+  // added to dataList once the write is confirmed, so a failed write (bad
+  // connection) never leaves a phantom reading on the chart.
   createBabyDescent(
     babyDescent: number,
     created_at: string,
@@ -114,6 +122,10 @@ export class BabyDescentStore {
     partogrammeId: string = this.partogrammeStore.partogramme.id,
     isDeleted: boolean | null = false
   ) {
+    if (!isPhysiologicallyPlausible(babyDescent, DESCENT_MIN, DESCENT_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DESCENT_MIN}–${DESCENT_MAX}). Vérifiez la saisie.`);
+      return;
+    }
     const descent = new BabyDescent(
       this,
       this.partogrammeStore,
@@ -124,7 +136,17 @@ export class BabyDescentStore {
       Rank,
       isDeleted
     );
-    this.dataList.push(descent);
+    this.transportLayer.updateBabyDescent(descent.data)
+      .then(() => {
+        runInAction(() => {
+          this.dataList.push(descent);
+        });
+      })
+      .catch((error: any) => {
+        logger.warn("createBabyDescent failed", { id: descent.data.id, error: error?.message });
+        notify.error("Erreur", "Impossible d'ajouter la descente du bébé. \nVeuillez réessayer plus tard.");
+        return Promise.reject(error);
+      });
     return descent;
   }
 
@@ -199,8 +221,6 @@ export class BabyDescent {
       Rank: Rank,
       isDeleted: isDeleted,
     };
-
-    this.store.transportLayer.updateBabyDescent(this.data);
   }
 
   get asJson() {
@@ -213,14 +233,37 @@ export class BabyDescent {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.removeBabyDescent(this);
   }
 
   async update(value : String)
   {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
+    let convValue = Number(value);
+    if (isNaN(convValue)) {
+      notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
+      return Promise.reject("Not a number");
+    }
+    if (!isPhysiologicallyPlausible(convValue, DESCENT_MIN, DESCENT_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DESCENT_MIN}–${DESCENT_MAX}). Vérifiez la saisie.`);
+      return Promise.reject("Out of range");
+    }
     let updatedData = this.asJson;
-    updatedData.value = Number(value);
+    updatedData.value = convValue;
     this.store.transportLayer
       .updateBabyDescent(updatedData)
       .then((response) => {
@@ -230,7 +273,7 @@ export class BabyDescent {
       })
       .catch((error) => {
         logger.warn("BabyDescent.update failed", { id: this.data.id, error: error?.message });
-        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
+        notify.error("Erreur", "Impossible de mettre à jour la descente du bébé");
         runInAction(() => {
           this.store.state = "error";
         });

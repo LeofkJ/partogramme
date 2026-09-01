@@ -4,4 +4,5 @@ export {
   captureException,
   reactNavigationIntegration,
   flush,
+  GlobalErrorBoundary,
 } from "@sentry/react-native";

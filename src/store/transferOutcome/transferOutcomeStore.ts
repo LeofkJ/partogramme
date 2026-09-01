@@ -21,7 +21,7 @@ export type TransferOutcome = {
  * "I was already looking at the app." Both funnel into the same `outcome`
  * field so the popup doesn't care which path found it. */
 export class TransferOutcomeStore {
-  outcome: TransferOutcome | null = null;
+  outcomes: TransferOutcome[] = [];
 
   rootStore: RootStore;
   transportLayer: TransportLayer;
@@ -31,6 +31,19 @@ export class TransferOutcomeStore {
     makeAutoObservable(this, { rootStore: false, transportLayer: false, channel: false });
     this.rootStore = rootStore;
     this.transportLayer = transportLayer;
+  }
+
+  // Keeps DialogTransferOutcome.tsx's `store.outcome` read working
+  // unchanged — shows one outcome at a time without dropping others queued
+  // behind it.
+  get outcome(): TransferOutcome | null {
+    return this.outcomes[0] ?? null;
+  }
+
+  private mergeOutcome(outcome: TransferOutcome) {
+    const idx = this.outcomes.findIndex((o) => o.partogrammeId === outcome.partogrammeId);
+    if (idx >= 0) this.outcomes[idx] = outcome;
+    else this.outcomes.push(outcome);
   }
 
   private toOutcome(row: {
@@ -53,10 +66,17 @@ export class TransferOutcomeStore {
   // requester was logged out or the app was closed.
   async checkOnBoot(profileId: string) {
     try {
-      const row = await this.transportLayer.fetchTransferRequestOutcome(profileId);
-      if (!row) return;
-      const outcome = this.toOutcome(row);
-      if (outcome) runInAction(() => { this.outcome = outcome; });
+      const rows = await this.transportLayer.fetchTransferRequestOutcomes(profileId);
+      runInAction(() => {
+        // Merge-add only, never remove-by-absence: a poll racing an
+        // in-flight acknowledge() (which already removed its entry
+        // locally, optimistically) must not resurrect it before the
+        // server-side clear lands.
+        for (const row of rows) {
+          const outcome = this.toOutcome(row);
+          if (outcome) this.mergeOutcome(outcome);
+        }
+      });
     } catch (error: any) {
       logger.warn("TransferOutcomeStore: checkOnBoot failed", { error: error?.message });
     }
@@ -67,10 +87,28 @@ export class TransferOutcomeStore {
   // using the app shows up immediately instead of waiting for their next
   // login. unsubscribe() tears it down on logout.
   subscribe(profileId: string) {
-    this.channel = subscribeToTransferOutcomes(profileId, (row) => {
-      const outcome = this.toOutcome(row);
-      if (outcome) runInAction(() => { this.outcome = outcome; });
-    });
+    this.channel = subscribeToTransferOutcomes(
+      profileId,
+      (row) => {
+        const outcome = this.toOutcome(row);
+        if (outcome) runInAction(() => { this.mergeOutcome(outcome); });
+        // partogrammeStore's own realtime channel is filtered by hospitalId,
+        // which stays null on a not-yet-transferred maternity patient — a
+        // rejection (hospitalId never changes) never reaches it that way, so
+        // the requester's already-open chart keeps showing "DEMANDE ENVOYÉE"
+        // (button disabled off the stale transferRequestHospitalId) until
+        // the next full list refetch. This channel is filtered by
+        // transferRequestByDoctorId instead, which does catch it — patch the
+        // locally-loaded copy here too so the button re-enables immediately.
+        // Postgres realtime sends the full new row on UPDATE, so `row` (typed
+        // narrow above) safely covers every Partogramme column at runtime.
+        const existing = this.rootStore.partogrammeStore.partogrammeList.find(
+          (p) => p.partogramme.id === row.id,
+        );
+        if (existing) runInAction(() => { existing.updateFromjson(row as any); });
+      },
+      () => { this.checkOnBoot(profileId); },
+    );
   }
 
   unsubscribe() {
@@ -84,7 +122,7 @@ export class TransferOutcomeStore {
   async acknowledge() {
     const current = this.outcome;
     if (!current) return;
-    runInAction(() => { this.outcome = null; });
+    runInAction(() => { this.outcomes.shift(); });
     try {
       await this.transportLayer.acknowledgeTransferRequestOutcome(current.partogrammeId);
     } catch (error: any) {
@@ -94,6 +132,6 @@ export class TransferOutcomeStore {
 
   reset() {
     this.unsubscribe();
-    this.outcome = null;
+    this.outcomes = [];
   }
 }

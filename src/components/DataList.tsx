@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { data_t } from "../store/partogramme/partogrammeStore";
-import { IconPencil, IconTrash } from "./Icons";
+import { IconPencil, IconTrash, IconClock } from "./Icons";
 
 export interface DataListProps {
   title?: string;
@@ -46,22 +46,31 @@ const Item: React.FC<ItemProps> = observer(({ item, showType, onEditButtonPress 
         <Text style={styles.timestampDate}>{date}</Text>
       </View>
       {onEditButtonPress && (
-        <View style={styles.itemActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => onEditButtonPress(item)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <IconPencil size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => item.delete()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <IconTrash size={16} color={colors.danger} />
-          </TouchableOpacity>
-        </View>
+        (item as any).isEditable === false ? (
+          // Past its correction window (see isWithinEditWindow) — shown
+          // instead of the edit/delete controls, not just a bare removal
+          // of them, so it doesn't read as a missing/broken row.
+          <View style={styles.itemActions}>
+            <IconClock size={14} color={colors.textMuted} />
+          </View>
+        ) : (
+          <View style={styles.itemActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onEditButtonPress(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <IconPencil size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => item.delete()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <IconTrash size={16} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
+        )
       )}
     </View>
   );

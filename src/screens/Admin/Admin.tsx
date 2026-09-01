@@ -24,10 +24,28 @@ import { notify } from "../../lib/notify";
 import { reset } from "../../navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
 import { formatDateOnly } from "../../tools/StringUtilitary";
+import { SkeletonPulse, SkeletonBlock } from "../../components/Skeleton/Skeleton";
 
 type RoleChoice = "NURSE" | "DOCTOR";
 type NurseTypeChoice = "HOSPITAL" | "MATERNITY";
 type Page = "create" | "accounts" | "hospitals" | "maternities" | "admins";
+
+// One shared row shape for the accounts/hospitals/maternities lists below —
+// shown only on genuine first load (adminStore.state === "pending" with
+// that list still empty), never on a background refresh once data is
+// already on screen.
+const AdminListSkeleton = ({ count = 4 }: { count?: number }) => (
+  <SkeletonPulse>
+    {Array.from({ length: count }).map((_, i) => (
+      <View key={i} style={styles.hospitalRow}>
+        <View>
+          <SkeletonBlock width={140} height={14} style={{ marginBottom: 6 }} />
+          <SkeletonBlock width={90} height={11} />
+        </View>
+      </View>
+    ))}
+  </SkeletonPulse>
+);
 
 // Below this, the sidebar nav collapses into a segmented control above the
 // content instead of sitting fixed on the side. Comfortably below common
@@ -617,6 +635,10 @@ export const ScreenAdmin: React.FC = observer(() => {
         importantForAutofill="no"
       />
 
+      {adminStore.state === "pending" && adminStore.accounts.length === 0 ? (
+        <AdminListSkeleton count={4} />
+      ) : (
+      <>
       {(() => {
         const accountsTable = (
           <>
@@ -743,6 +765,8 @@ export const ScreenAdmin: React.FC = observer(() => {
                 : "Aucun médecin"}
         </Text>
       )}
+      </>
+      )}
     </View>
   );
 
@@ -815,6 +839,10 @@ export const ScreenAdmin: React.FC = observer(() => {
           importantForAutofill="no"
         />
 
+        {adminStore.state === "pending" && adminStore.hospitals.length === 0 ? (
+          <AdminListSkeleton count={3} />
+        ) : (
+        <>
         {filteredHospitals.map((hospital) => (
           <View key={hospital.id}>
             <View style={styles.hospitalRow}>
@@ -880,6 +908,8 @@ export const ScreenAdmin: React.FC = observer(() => {
               ? "Aucun hôpital pour le moment"
               : "Aucun résultat"}
           </Text>
+        )}
+        </>
         )}
       </View>
     </>
@@ -956,6 +986,10 @@ export const ScreenAdmin: React.FC = observer(() => {
           importantForAutofill="no"
         />
 
+        {adminStore.state === "pending" && adminStore.maternities.length === 0 ? (
+          <AdminListSkeleton count={3} />
+        ) : (
+        <>
         {filteredMaternities.map((maternity) => (
           <View key={maternity.id}>
             <View style={styles.hospitalRow}>
@@ -1062,6 +1096,8 @@ export const ScreenAdmin: React.FC = observer(() => {
               ? "Aucune maternité pour le moment"
               : "Aucun résultat"}
           </Text>
+        )}
+        </>
         )}
       </View>
     </>

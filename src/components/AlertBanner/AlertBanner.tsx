@@ -75,10 +75,10 @@ export const AlertBanner: React.FC = observer(() => {
   useEffect(() => {
     const interval = setInterval(() => {
       store.refresh();
-      if (!rootStore.transferOutcomeStore.outcome) {
-        const profileId = rootStore.profileStore.profile.id;
-        if (profileId) rootStore.transferOutcomeStore.checkOnBoot(profileId);
-      }
+      // Merge-add in checkOnBoot means repeated polling is safe even while
+      // an outcome is currently showing — it won't clobber it.
+      const profileId = rootStore.profileStore.profile.id;
+      if (profileId) rootStore.transferOutcomeStore.checkOnBoot(profileId);
     }, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps

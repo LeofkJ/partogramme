@@ -13,9 +13,13 @@ import { Partogramme } from "../../partogramme/partogrammeStore";
 import { DataStore } from "../../DataStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type MotherContractionDuration_t =
   Database["public"]["Tables"]["MotherContractionDuration"];
+
+const CONTRACTION_DURATION_MIN = 0;
+const CONTRACTION_DURATION_MAX = 300;
 
 export class MotherContractionDurationStore extends DataStore {
   dataList: MotherContractionDuration[] = [];
@@ -50,6 +54,10 @@ export class MotherContractionDurationStore extends DataStore {
   }
 
   async createData(json: any): Promise<any> {
+    if (!isPhysiologicallyPlausible(json.value, CONTRACTION_DURATION_MIN, CONTRACTION_DURATION_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${CONTRACTION_DURATION_MIN}–${CONTRACTION_DURATION_MAX} s). Vérifiez la saisie.`);
+      return Promise.resolve(undefined);
+    }
     const data = new MotherContractionDuration(
       this,
       this.partogrammeStore,
@@ -58,7 +66,7 @@ export class MotherContractionDurationStore extends DataStore {
       json.created_at,
       this.partogrammeStore.partogramme.id,
       json.Rank,
-      (json.isDeleted = undefined ? false : json.isDeleted)
+      json.isDeleted === undefined ? false : json.isDeleted
     );
     this.transportLayer
       .insertMotherContractionDuration(data.data)
@@ -193,8 +201,6 @@ export class MotherContractionDuration {
       Rank: Rank,
       isDeleted: isDeleted,
     };
-
-    this.store.transportLayer.updateMotherContractionDuration(this.data);
   }
 
   get asJson() {
@@ -207,11 +213,25 @@ export class MotherContractionDuration {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   async update(value: String) {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
     let convValue = Number(value);
     if (isNaN(convValue)) {
       notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
+    }
+    if (!isPhysiologicallyPlausible(convValue, CONTRACTION_DURATION_MIN, CONTRACTION_DURATION_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${CONTRACTION_DURATION_MIN}–${CONTRACTION_DURATION_MAX} s). Vérifiez la saisie.`);
+      return Promise.reject("Out of range");
     }
     let updatedData = this.asJson;
     updatedData.value = Number(value);
@@ -224,7 +244,7 @@ export class MotherContractionDuration {
       })
       .catch((error: any) => {
         logger.warn("MotherContractionDuration.update failed", { id: this.data.id, error: error?.message });
-        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
+        notify.error("Erreur", "Impossible de mettre à jour la durée des contractions de la mère");
         runInAction(() => {
           this.store.state = "error";
         });
@@ -233,6 +253,10 @@ export class MotherContractionDuration {
   }
 
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.remove(this);
   }
 

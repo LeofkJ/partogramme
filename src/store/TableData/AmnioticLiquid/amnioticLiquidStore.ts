@@ -11,6 +11,7 @@ import { isLiquidState } from "../../../misc/CheckTypes";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
+import { isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type AmnioticLiquid_t =
   Database["public"]["Tables"]["amnioticLiquid"];
@@ -156,6 +157,7 @@ export class AmnioticLiquidStore {
           this.state = "error";
         });
         logger.warn("createAmnioticLiquid failed", { id: liquid.data.id, error: error?.message });
+        notify.error("Erreur", "Impossible d'ajouter le liquide amniotique. \nVeuillez réessayer plus tard.");
         return Promise.reject(error);
       });
     return liquid;
@@ -285,7 +287,17 @@ export class AmnioticLiquid {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.removeAmnioticLiquid(this)
       .then(() => {
       })
@@ -296,6 +308,10 @@ export class AmnioticLiquid {
   }
 
   async update(value: String) {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
     let updatedData = this.asJson;
     updatedData.value = value;
     this.store.transportLayer

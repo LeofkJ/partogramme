@@ -8,7 +8,6 @@
  */
 import { observer } from "mobx-react";
 import {
-  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,7 @@ import { rootStore } from "../../store/rootStore";
 import { IconTrash, IconX } from "../Icons";
 import { colors, radius, spacing } from "../../theme";
 import { formatElapsed } from "../../lib/formatElapsed";
+import { SkeletonPulse, SkeletonBlock } from "../Skeleton/Skeleton";
 
 interface Props {
   isVisible: boolean;
@@ -53,11 +53,23 @@ export const DialogMaternityAlerts = observer(
             </View>
 
             {store.state === "pending" ? (
-              <ActivityIndicator
-                size="small"
-                color={colors.textMuted}
-                style={{ marginVertical: spacing.xl }}
-              />
+              <SkeletonPulse>
+                {[0, 1].map((i) => (
+                  <View key={i} style={[styles.row, i > 0 && { marginTop: spacing.sm }]}>
+                    <View style={styles.rowMain}>
+                      <SkeletonBlock width={100} height={14} style={{ marginBottom: 6 }} />
+                      <SkeletonBlock width={140} height={12} />
+                    </View>
+                  </View>
+                ))}
+              </SkeletonPulse>
+            ) : store.state === "error" ? (
+              <View>
+                <Text style={styles.error}>Impossible de charger les alertes. Vérifiez votre connexion.</Text>
+                <TouchableOpacity onPress={() => store.fetchAlerts()} activeOpacity={0.7}>
+                  <Text style={styles.retry}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
             ) : count === 0 ? (
               <Text style={styles.empty}>Aucune alerte active à la maternité.</Text>
             ) : (
@@ -143,6 +155,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     paddingVertical: spacing.md,
+  },
+  error: {
+    fontSize: 13,
+    color: colors.danger,
+    paddingTop: spacing.md,
+  },
+  retry: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.accent,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   list: {
     gap: spacing.sm,

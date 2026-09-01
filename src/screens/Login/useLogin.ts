@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { rootStore } from "../../store/rootStore";
 import { supabase } from "../../initSupabase";
 import { logger } from "../../lib/logger";
+import { notify } from "../../lib/notify";
+import { navigationRef, reset } from "../../navigationRef";
 
 /**
  * Login screen logic, shared by every platform variant of the screen
@@ -25,11 +27,32 @@ export function useLogin(onLoggedIn: () => void) {
     // stores on every single tab switch. Only wipe when the session's user
     // actually differs from whichever profile is currently loaded.
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // A fresh subscription is delivered the current session state
+      // immediately (as INITIAL_SESSION, even for subscriptions registered
+      // long after boot) — and `reset()` below replaces the whole nav stack
+      // with a brand-new route, which remounts Login even when it's already
+      // the active screen, re-running this effect and creating a new
+      // subscription. Without this guard, that new subscription immediately
+      // gets its own INITIAL_SESSION/no-session delivery and resets again —
+      // an infinite mount → reset → mount loop that pegs the CPU, replays
+      // the screen-transition animation nonstop (the iOS "blinking" and the
+      // onAnimatedValueUpdate spam), and drops every keystroke in the login
+      // form since the TextInput never survives a render.
+      const alreadyOnLogin =
+        navigationRef.isReady() && navigationRef.getCurrentRoute()?.name === "Screen_Login";
       if (event === "SIGNED_OUT") {
         rootStore.partogrammeStore.cleanUp();
         rootStore.userInfoStore.cleanUp();
         rootStore.alertBannerStore.signOut();
         rootStore.transferOutcomeStore.reset();
+        // Covers a session dying mid-app (expired/failed refresh), not just
+        // an explicit logout — those already navigate themselves (Profile.tsx,
+        // NavBar.web.tsx), so only toast when this listener is the first to
+        // notice (i.e. we're not already on the Login screen).
+        if (!alreadyOnLogin) {
+          notify.error("Session expirée", "Votre session a expiré. Veuillez vous reconnecter.");
+          reset("Screen_Login");
+        }
         return;
       }
       if (event === "SIGNED_IN") {
@@ -37,6 +60,22 @@ export function useLogin(onLoggedIn: () => void) {
         if (previousProfileId && session?.user?.id && session.user.id !== previousProfileId) {
           rootStore.partogrammeStore.cleanUp();
           rootStore.userInfoStore.cleanUp();
+        }
+      }
+      // Fires once at boot with the result of checking AsyncStorage for a
+      // stored session — session is null here when the refresh token is
+      // dead (expired/revoked/not found), not just "never logged in".
+      // Without this, a dev-client reload (or any restored deep link) that
+      // lands somewhere other than the Login screen can be left holding a
+      // stale persisted userInfoStore snapshot (mobx-persist-store, 24h
+      // TTL) with no real session behind it, so a patient-list fetch fails
+      // against RLS and shows a misleading "check your connection" error.
+      // No toast — this is indistinguishable from a normal fresh install.
+      if (event === "INITIAL_SESSION" && !session) {
+        rootStore.partogrammeStore.cleanUp();
+        rootStore.userInfoStore.cleanUp();
+        if (!alreadyOnLogin) {
+          reset("Screen_Login");
         }
       }
     });

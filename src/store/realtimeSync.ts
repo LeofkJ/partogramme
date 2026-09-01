@@ -10,9 +10,11 @@ export function subscribeToPartogrammeTable<T>(
   channelName: string,
   table: string,
   partogrammeId: string,
-  onChange: (row: T) => void
+  onChange: (row: T) => void,
+  onReconnect?: () => void
 ): RealtimeChannel {
   const handlePayload = (payload: any) => onChange(payload.new as T);
+  let hadDropped = false;
   return supabase
     .channel(channelName)
     .on(
@@ -25,7 +27,17 @@ export function subscribeToPartogrammeTable<T>(
       { event: "UPDATE", schema: "public", table, filter: `partogrammeId=eq.${partogrammeId}` },
       handlePayload
     )
-    .subscribe();
+    .subscribe((status) => {
+      // Supabase's websocket reconnects itself, but nothing re-syncs app
+      // data afterward — a device offline for a few minutes would
+      // otherwise miss any INSERT/UPDATE that happened during the gap.
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        hadDropped = true;
+      } else if (status === "SUBSCRIBED" && hadDropped) {
+        hadDropped = false;
+        onReconnect?.();
+      }
+    });
 }
 
 export function unsubscribeChannel(channel: RealtimeChannel | null) {
@@ -43,7 +55,9 @@ export function unsubscribeChannel(channel: RealtimeChannel | null) {
 export function subscribeToTransferOutcomes(
   requesterProfileId: string,
   onChange: (row: { id: string; noFile: number; transferRequestStatus: string | null; transferRequestRejectionComment: string | null }) => void,
+  onReconnect?: () => void,
 ): RealtimeChannel {
+  let hadDropped = false;
   return supabase
     .channel(`transfer-outcomes-${requesterProfileId}`)
     .on(
@@ -56,5 +70,12 @@ export function subscribeToTransferOutcomes(
       },
       (payload) => onChange(payload.new as any),
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        hadDropped = true;
+      } else if (status === "SUBSCRIBED" && hadDropped) {
+        hadDropped = false;
+        onReconnect?.();
+      }
+    });
 }

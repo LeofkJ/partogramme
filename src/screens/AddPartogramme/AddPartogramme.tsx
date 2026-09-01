@@ -1,11 +1,12 @@
 import { StyleSheet, View, TextInput, ScrollView, Text, Pressable } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { rootStore } from "../../store/rootStore";
 import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
 import { logger } from "../../lib/logger";
 import { IconMaternity } from "../../components/Icons";
 import { colors, spacing, radius, type, layout } from "../../theme";
+import { parseDossierNumber } from "../../misc/validation";
 
 export type Props = {
   navigation: any;
@@ -22,6 +23,22 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     const [workStartDateTime, onChangeWorkStartDate] = useState(new Date());
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Prefills the next dossier number as a suggestion — she can still
+    // edit it. The database's Partogramme_maternityId_noFile_unique index
+    // is the actual uniqueness guarantee; a fetch failure here just leaves
+    // the field empty, falling back to today's fully-manual entry.
+    useEffect(() => {
+      const maternityId = userInfoStore.userInfo.maternityId;
+      if (userInfoStore.userInfo.nurseType !== "MATERNITY" || !maternityId) return;
+      rootStore.partogrammeStore.transportLayer
+        .fetchNextDossierNumber(maternityId)
+        .then((next) => onChangeNoFile(String(next)))
+        .catch((error: any) => {
+          logger.warn("AddPartogramme: fetchNextDossierNumber failed", { error: error?.message });
+        });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleTimeAdmissionChanged = (time: Date | undefined) => {
       if (time !== undefined) {
@@ -58,10 +75,9 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     };
 
     const createButtonPressed = () => {
-      const trimmedNoFile = noFile.trim();
-      const parsedNoFile = Number(trimmedNoFile);
-      if (trimmedNoFile === "" || Number.isNaN(parsedNoFile)) {
-        setErrorMessage("Le numéro de dossier doit être un nombre valide.");
+      const parsedNoFile = parseDossierNumber(noFile);
+      if (parsedNoFile === null) {
+        setErrorMessage("Le numéro de dossier doit être un nombre entier positif.");
         return;
       }
       setErrorMessage(null);
@@ -81,7 +97,7 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           navigation.navigate("Screen_Menu");
         })
         .catch((error) => {
-          logger.warn("createPartogramme failed", { noFile: trimmedNoFile, error: error?.message, code: error?.code });
+          logger.warn("createPartogramme failed", { noFile, error: error?.message, code: error?.code });
           setIsSubmitting(false);
           // 23505 = Postgres unique_violation — the (hospitalId, noFile)
           // constraint (see 2026-08-07_unique_dossier_per_hospital.sql).

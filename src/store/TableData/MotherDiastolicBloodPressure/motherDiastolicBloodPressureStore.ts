@@ -8,9 +8,13 @@ import { Partogramme } from "../../partogramme/partogrammeStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type MotherDiastolicBloodPressure_t =
   Database["public"]["Tables"]["MotherDiastolicBloodPressure"];
+
+const DIASTOLIC_MIN = 20;
+const DIASTOLIC_MAX = 180;
 
 export class MotherDiastolicBloodPressureStore {
   rootStore: RootStore;
@@ -116,6 +120,10 @@ export class MotherDiastolicBloodPressureStore {
     partogrammeId: string = this.partogrammeStore.partogramme.id,
     isDeleted: boolean | null = false
   ) {
+    if (!isPhysiologicallyPlausible(motherBloodPressure, DIASTOLIC_MIN, DIASTOLIC_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DIASTOLIC_MIN}–${DIASTOLIC_MAX} mmHg). Vérifiez la saisie.`);
+      return;
+    }
     const pressure = new MotherDiastolicBloodPressure(
       this,
       this.partogrammeStore,
@@ -227,8 +235,6 @@ export class MotherDiastolicBloodPressure {
       Rank: Rank,
       isDeleted: isDeleted,
     };
-
-    this.store.transportLayer.updateDiastolicMotherBloodPressure(this.data);
   }
 
   get asJson() {
@@ -241,11 +247,25 @@ export class MotherDiastolicBloodPressure {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   async update(value: String) {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
     let convValue = Number(value);
     if (isNaN(convValue)) {
       notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return Promise.reject("Not a number");
+    }
+    if (!isPhysiologicallyPlausible(convValue, DIASTOLIC_MIN, DIASTOLIC_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DIASTOLIC_MIN}–${DIASTOLIC_MAX} mmHg). Vérifiez la saisie.`);
+      return Promise.reject("Out of range");
     }
     let updatedData = this.asJson;
     updatedData.value = Number(value);
@@ -258,7 +278,7 @@ export class MotherDiastolicBloodPressure {
       })
       .catch((error: any) => {
         logger.warn("MotherDiastolicBloodPressure.update failed", { id: this.data.id, error: error?.message });
-        notify.error("Erreur", "Impossible de mettre à jour les liquides amniotiques");
+        notify.error("Erreur", "Impossible de mettre à jour la pression artérielle diastolique de la mère");
         runInAction(() => {
           this.store.state = "error";
         });
@@ -267,6 +287,10 @@ export class MotherDiastolicBloodPressure {
   }
 
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.removeDiastolicMotherBloodPressure(this);
   }
 

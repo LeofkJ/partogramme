@@ -9,8 +9,12 @@ import { GraphData } from "../GraphData";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
 
 export type Dilation_t = Database["public"]["Tables"]["Dilation"];
+
+const DILATION_MIN = 0;
+const DILATION_MAX = 10;
 
 export class DilationStore {
   rootStore: RootStore;
@@ -94,7 +98,9 @@ export class DilationStore {
     }
   }
 
-  // Create a new dilation on the server and add it to the store
+  // Create a new dilation on the server and add it to the store — only
+  // added to dataList once the write is confirmed, so a failed write
+  // (bad connection) never leaves a phantom reading on the chart.
   createDilation(
     created_at: string,
     dilation: number,
@@ -102,6 +108,10 @@ export class DilationStore {
     partogrammeId: string = this.partogrammeStore.partogramme.id,
     isDeleted: boolean | null = false
   ) {
+    if (!isPhysiologicallyPlausible(dilation, DILATION_MIN, DILATION_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DILATION_MIN}–${DILATION_MAX} cm). Vérifiez la saisie.`);
+      return;
+    }
     const dilationObj = new Dilation(
       this,
       this.partogrammeStore,
@@ -112,7 +122,17 @@ export class DilationStore {
       Rank,
       isDeleted
     );
-    this.dataList.push(dilationObj);
+    this.transportLayer.updateDilation(dilationObj.data)
+      .then(() => {
+        runInAction(() => {
+          this.dataList.push(dilationObj);
+        });
+      })
+      .catch((error: any) => {
+        logger.warn("createDilation failed", { id: dilationObj.data.id, error: error?.message });
+        notify.error("Erreur", "Impossible d'ajouter la dilatation. \nVeuillez réessayer plus tard.");
+        return Promise.reject(error);
+      });
     return dilationObj;
   }
 
@@ -184,8 +204,6 @@ export class Dilation {
       Rank: Rank,
       isDeleted: isDeleted,
     };
-
-    this.store.transportLayer.updateDilation(this.data);
   }
 
   get asJson() {
@@ -198,11 +216,25 @@ export class Dilation {
     this.data = json;
   }
 
+  // Correction window: only editable/deletable for EDIT_WINDOW_MINUTES
+  // after it was recorded — see isWithinEditWindow.
+  get isEditable() {
+    return isWithinEditWindow(this.data.created_at);
+  }
+
   async update(value: String) {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return Promise.reject("Edit window expired");
+    }
     let convValue = Number(value);
     if (isNaN(convValue)) {
       notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
       return  Promise.reject("Not a number");
+    }
+    if (!isPhysiologicallyPlausible(convValue, DILATION_MIN, DILATION_MAX)) {
+      notify.error("Erreur", `Valeur hors limites physiologiques (${DILATION_MIN}–${DILATION_MAX} cm). Vérifiez la saisie.`);
+      return Promise.reject("Out of range");
     }
     let updatedData = this.asJson;
     updatedData.value = Number(value);
@@ -224,6 +256,10 @@ export class Dilation {
   }
 
   delete() {
+    if (!this.isEditable) {
+      notify.error("Erreur", `Cette valeur ne peut plus être supprimée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
+      return;
+    }
     this.store.removeDilation(this);
   }
 

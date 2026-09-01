@@ -24,6 +24,7 @@ import { AlertPatient } from "../../store/hospitalDashboard/hospitalDashboardSto
 import { IconMaternity } from "../../components/Icons";
 import { colors, spacing, radius, layout, monoFontFamily } from "../../theme";
 import { formatElapsed } from "../../lib/formatElapsed";
+import { SkeletonPulse, SkeletonBlock } from "../../components/Skeleton/Skeleton";
 
 export type Props = {
   navigation: any;
@@ -48,6 +49,37 @@ function alertSummary(p: AlertPatient): string {
   }
   return `${p.value} cm · dilatation bande rouge`;
 }
+
+// One alert-tile-shaped bone + one patient-card-shaped bone, repeated —
+// shown only on genuine first load (state === "pending" with every
+// section still empty), never on the 18s background poll refresh once
+// real data is already on screen.
+const DashboardSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.section}>
+      <SkeletonBlock width={90} height={12} style={{ marginBottom: spacing.md }} />
+      {[0, 1].map((i) => (
+        <View key={i} style={styles.alertTile}>
+          <View>
+            <SkeletonBlock width={140} height={14} style={{ marginBottom: spacing.sm }} />
+            <SkeletonBlock width={90} height={12} />
+          </View>
+        </View>
+      ))}
+    </View>
+    <View style={styles.section}>
+      <SkeletonBlock width={90} height={12} style={{ marginBottom: spacing.md }} />
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={styles.patientCard}>
+          <View style={styles.patientCardInfo}>
+            <SkeletonBlock width={100} height={14} />
+          </View>
+          <SkeletonBlock width={40} height={12} />
+        </View>
+      ))}
+    </View>
+  </SkeletonPulse>
+);
 
 export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }) => {
   const store = rootStore.hospitalDashboardStore;
@@ -92,6 +124,12 @@ export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }
 
   const totalLinkedActive = store.linkedMaternities.reduce((sum, m) => sum + m.patients.length, 0);
 
+  const isInitialLoad =
+    store.state === "pending" &&
+    store.alertPatients.length === 0 &&
+    store.ownHospitalPatients.length === 0 &&
+    store.linkedMaternities.length === 0;
+
   return (
     <SafeAreaView style={styles.body} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -103,6 +141,10 @@ export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }
             </Text>
           </View>
 
+          {isInitialLoad ? (
+            <DashboardSkeleton />
+          ) : (
+          <>
           <View style={styles.section}>
             <View style={styles.sectionHead}>
               <Text style={[styles.sectionTitle, store.alertPatients.length > 0 && styles.sectionTitleUrgent]}>
@@ -288,6 +330,8 @@ export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }
                 </View>
               ))}
             </View>
+          )}
+          </>
           )}
         </View>
       </ScrollView>

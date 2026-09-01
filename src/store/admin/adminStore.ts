@@ -107,16 +107,42 @@ export class AdminStore {
     }
   }
 
+  /** Blocks a hospital/maternity delete that would orphan staff still
+   * assigned to it or patients still active under it — removeHospital/
+   * removeMaternity on the transport layer are plain soft-deletes with no
+   * cascade, so nothing else stops this. Throws with `.code =
+   * "BLOCKED_HAS_DEPENDENTS"` (matching the LINK_REMOVED/
+   * TRANSFER_ALREADY_DECIDED convention used elsewhere) so callers can
+   * tell this apart from a real backend failure without relying on
+   * message text. */
+  private async guardNoDependents(scope: { hospitalId: string } | { maternityId: string }, label: string) {
+    const staffCount = this.accounts.filter((a) =>
+      "hospitalId" in scope ? a.hospitalId === scope.hospitalId : a.maternityId === scope.maternityId,
+    ).length;
+    const patientCount = await this.transportLayer.countActivePatients(scope);
+    if (staffCount === 0 && patientCount === 0) return;
+    notify.error(
+      "Suppression impossible",
+      `${staffCount} compte${staffCount !== 1 ? "s" : ""} et ${patientCount} patiente${patientCount !== 1 ? "s" : ""} active${patientCount !== 1 ? "s" : ""} sont encore rattachés à ${label}.`,
+    );
+    const error: any = new Error("Suppression bloquée : des comptes ou patientes sont encore rattachés.");
+    error.code = "BLOCKED_HAS_DEPENDENTS";
+    throw error;
+  }
+
   async removeHospital(hospitalId: string) {
     try {
+      await this.guardNoDependents({ hospitalId }, "cet hôpital");
       await this.transportLayer.removeHospital(hospitalId);
       runInAction(() => {
         this.hospitals = this.hospitals.filter((h) => h.id !== hospitalId);
       });
       notify.success("Hôpital supprimé");
     } catch (error: any) {
-      logger.warn("AdminStore: removeHospital failed", { error: error?.message });
-      notify.error("Erreur", error?.message ?? "Impossible de supprimer l'hôpital");
+      if (error?.code !== "BLOCKED_HAS_DEPENDENTS") {
+        logger.warn("AdminStore: removeHospital failed", { error: error?.message });
+        notify.error("Erreur", error?.message ?? "Impossible de supprimer l'hôpital");
+      }
       throw error;
     }
   }
@@ -140,14 +166,17 @@ export class AdminStore {
 
   async removeMaternity(maternityId: string) {
     try {
+      await this.guardNoDependents({ maternityId }, "cette maternité");
       await this.transportLayer.removeMaternity(maternityId);
       runInAction(() => {
         this.maternities = this.maternities.filter((m) => m.id !== maternityId);
       });
       notify.success("Maternité supprimée");
     } catch (error: any) {
-      logger.warn("AdminStore: removeMaternity failed", { error: error?.message });
-      notify.error("Erreur", error?.message ?? "Impossible de supprimer la maternité");
+      if (error?.code !== "BLOCKED_HAS_DEPENDENTS") {
+        logger.warn("AdminStore: removeMaternity failed", { error: error?.message });
+        notify.error("Erreur", error?.message ?? "Impossible de supprimer la maternité");
+      }
       throw error;
     }
   }

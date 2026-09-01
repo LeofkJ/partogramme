@@ -90,6 +90,17 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
 
       {isMaternityNurse && <MaternityTransferRequestsPanel />}
 
+      {rootStore.partogrammeStore.state === "error" && (
+        <View style={styles.loadError}>
+          <Text style={styles.loadErrorText}>
+            Impossible de charger les patientes. Vérifiez votre connexion.
+          </Text>
+          <TouchableOpacity onPress={refresh} activeOpacity={0.7}>
+            <Text style={styles.loadErrorRetry}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.listContainer}>
         <PartogrammeList title={"Partogrammes"} navigation={navigation} />
       </View>
@@ -157,6 +168,23 @@ const styles = StyleSheet.create({
   listContainer: {
     flex: 1,
     width: "100%",
+  },
+  loadError: {
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  loadErrorText: {
+    fontSize: 13,
+    color: colors.danger,
+  },
+  loadErrorRetry: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.accent,
+    marginTop: 2,
   },
   fabContainer: {
     position: "absolute",

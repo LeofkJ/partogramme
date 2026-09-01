@@ -116,6 +116,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       })
       .catch((error) => {
         logger.warn("Graph: selection recovery failed", { error: error?.message });
+        notify.error("Erreur", "Impossible de charger cette patiente. Vérifiez votre connexion et réessayez.");
       })
       .finally(() => setIsRecoveringSelection(false));
   }, []);
@@ -155,6 +156,21 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     .filter((h) => linkedHospitalIds.has(h.id))
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((h) => ({ label: `${h.name}, ${h.city}`, value: h.id }));
+
+  // Both graphs' shared clock — the first vital sign actually recorded for
+  // this patient (dilation, descent, or BPM, whichever came first), not
+  // workStartDateTime/patient creation. Falls back to workStartDateTime
+  // only when there's no data yet to anchor on (a fresh chart with nothing
+  // plotted has nothing else to zero against).
+  const bpmList = rootStore.partogrammeStore.selectedPartogramme?.babyHeartFrequencyStore.sortedBabyHeartFrequencyList ?? [];
+  const allReadingTimes = [
+    ...(partogramme?.dilationStore.sortedDilationList ?? []).map((p) => p.data.created_at),
+    ...(partogramme?.babyDescentStore.sortedBabyDescentList ?? []).map((p) => p.data.created_at),
+    ...bpmList.map((p) => p.data.created_at),
+  ];
+  const chartStartTime = allReadingTimes.length > 0
+    ? allReadingTimes.reduce((min, t) => (new Date(t).getTime() < new Date(min).getTime() ? t : min))
+    : partogramme?.asJson.workStartDateTime ?? null;
 
   // A hospital's own patient — false for a linked maternity's
   // not-yet-transferred patient (hospitalId is null there), which is what
@@ -221,60 +237,95 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     };
   }, []);
 
+  // Keeps this patient's own record (state, transferRequest*) fresh while
+  // the screen sits open — needed on top of realtime because the
+  // Partogramme realtime subscription (partogrammeStore.ts) filters on the
+  // viewer's own hospitalId, which a not-yet-transferred maternity patient
+  // doesn't have and a maternity nurse never has at all. Without this, a
+  // doctor whose transfer request just got rejected keeps seeing "DEMANDE
+  // ENVOYÉE" (button stuck disabled, can't re-request) until they leave and
+  // come back — and a stale transferRequestStatus on either side can make a
+  // genuine accept/reject fail with "already decided" because the row it's
+  // conditioned on server-side has already moved on.
+  const partogrammeId = partogramme?.asJson.id;
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {});
-    const cleanup = () => {};
-    return () => {
-      cleanup();
-      unsubscribe();
-    };
-  }, [navigation]);
+    if (!partogrammeId) return;
+    const interval = setInterval(() => {
+      rootStore.transportLayer
+        .fetchPartogrammeById(partogrammeId)
+        .then((row) => {
+          if (row) rootStore.partogrammeStore.updatePartogrammeFromServer(row);
+        })
+        .catch((error: any) => {
+          logger.warn("Graph: refreshSelectedPartogramme failed", { error: error?.message });
+        });
+    }, 18000);
+    return () => clearInterval(interval);
+  }, [partogrammeId]);
 
-  const onDialogCloseAddFcBaby = (data: string) => {
-    if (partogramme === null) return;
-    partogramme?.babyHeartFrequencyStore
-      .createBabyHeartFrequency(
-        Number(data),
-        new Date().toISOString(),
-        0,
-      )
-      .then(() => {});
+  // Each createX below rejects out-of-range values by calling notify.error
+  // and returning nothing (no thrown error, no rejected promise) — so
+  // without checking the result, this dialog would close as if the value
+  // had been saved even when it silently wasn't. Only close on a truthy
+  // result (validation passed); a rejected value leaves the dialog open
+  // with the value still in the field so it can be corrected.
+  const onDialogCloseAddFcBaby = async (data: string) => {
+    if (!partogramme) return false;
+    const result = await partogramme.babyHeartFrequencyStore.createBabyHeartFrequency(
+      Number(data),
+      new Date().toISOString(),
+      0,
+    );
+    if (!result) return false;
     setFcDialogVisible(false);
+    return true;
   };
 
-  const onDialogCloseAddDilation = (data: string) => {
-    if (partogramme === null) return;
-    partogramme?.dilationStore.createDilation(
+  const onDialogCloseAddDilation = async (data: string) => {
+    if (!partogramme) return false;
+    const result = partogramme.dilationStore.createDilation(
       new Date().toISOString(),
       Number(data),
       0,
     );
+    if (!result) return false;
     setDilationDialogVisible(false);
+    return true;
   };
 
-  const onDialogCloseAddDescentBaby = (data: string) => {
-    if (partogramme === null) return;
-    partogramme?.babyDescentStore.createBabyDescent(
+  const onDialogCloseAddDescentBaby = async (data: string) => {
+    if (!partogramme) return false;
+    const result = partogramme.babyDescentStore.createBabyDescent(
       Number(data),
       new Date().toISOString(),
       0,
     );
+    if (!result) return false;
     setDescentBabyDialogVisible(false);
+    return true;
   };
 
-  const onDialogCloseAddDataTable = (entries: DataInputEntry[]) => {
+  const onDialogCloseAddDataTable = async (entries: DataInputEntry[]) => {
     if (partogramme === null || entries.length === 0) {
       notify.error(
         "Code Error : Unknown data store type. \n contact the administrator",
       );
-      return;
+      return false;
     }
     // Table rows are 1-minute slots — same field in the same minute
     // overwrites the cell; a new minute starts a new row.
     const currentSlotRank = Math.floor(
       (Date.now() - new Date(partogramme!.asJson.workStartDateTime!).getTime()) / (60 * 1000)
     );
-    entries.forEach(({ dataStore, value: data }) => {
+    // Each createX/update below rejects an out-of-range value by calling
+    // notify.error and returning nothing (no thrown error, no rejected
+    // promise) — so without checking the outcome of every entry, this
+    // dialog would close (and show "Ajouté") even when one silently
+    // wasn't saved. Only close once every entry in this submission is
+    // actually confirmed; otherwise the dialog stays open with the
+    // values still in the fields so the rejected one can be fixed.
+    let allAccepted = true;
+    for (const { dataStore, value: data } of entries) {
       const rank = addTableDataTargetHour ?? currentSlotRank;
       // This field already has a value in the row it would land in — update
       // it instead of creating a second entry at the same rank, which the
@@ -282,64 +333,53 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       // there invisibly piling up.
       const existing = (dataStore.dataList as any[]).find((item) => item.data.Rank === rank);
       if (existing) {
-        existing.update(data).catch((error: any) => {
+        try {
+          await existing.update(data);
+        } catch (error: any) {
           logger.warn("Graph: table cell update (existing row) failed", { error: error?.message });
           notify.error("Erreur", error.message);
-        });
-        return;
+          allAccepted = false;
+        }
+        continue;
       }
-      if (dataStore instanceof AmnioticLiquidStore) {
-        dataStore
-          .createAmnioticLiquid(
+      let result: unknown;
+      try {
+        if (dataStore instanceof AmnioticLiquidStore) {
+          result = await dataStore.createAmnioticLiquid(
             new Date().toISOString(),
             rank,
             data as Database["public"]["Enums"]["LiquidState"],
-          )
-          .catch((error) => {
-            logger.warn("Graph: createAmnioticLiquid failed", { error: error?.message });
-            notify.error("Erreur", error.message);
+          );
+        } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
+          result = dataStore.createNew(Number(data), new Date().toISOString(), rank);
+        } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
+          result = dataStore.createNew(Number(data), new Date().toISOString(), rank);
+        } else if (dataStore instanceof MotherContractionsFrequencyStore) {
+          result = dataStore.createMotherContractionsFrequency(Number(data), new Date().toISOString(), rank);
+        } else if (dataStore instanceof MotherContractionDurationStore) {
+          result = await dataStore.createData({
+            value: Number(data),
+            created_at: new Date().toISOString(),
+            Rank: rank,
           });
-      } else if (dataStore instanceof MotherSystolicBloodPressureStore) {
-        dataStore.createNew(
-          Number(data),
-          new Date().toISOString(),
-          rank,
-        );
-      } else if (dataStore instanceof MotherDiastolicBloodPressureStore) {
-        dataStore.createNew(
-          Number(data),
-          new Date().toISOString(),
-          rank,
-        );
-      } else if (dataStore instanceof MotherContractionsFrequencyStore) {
-        dataStore.createMotherContractionsFrequency(
-          Number(data),
-          new Date().toISOString(),
-          rank,
-        );
-      } else if (dataStore instanceof MotherContractionDurationStore) {
-        dataStore.createData({
-          value: Number(data),
-          created_at: new Date().toISOString(),
-          Rank: rank,
-        });
-      } else if (dataStore instanceof MotherHeartFrequencyStore) {
-        dataStore.createMotherHeartFrequency(
-          Number(data),
-          new Date().toISOString(),
-          rank,
-        );
-      } else if (dataStore instanceof MotherTemperatureStore) {
-        dataStore.createMotherTemperature(
-          Number(data),
-          new Date().toISOString(),
-          rank,
-        );
+        } else if (dataStore instanceof MotherHeartFrequencyStore) {
+          result = dataStore.createMotherHeartFrequency(Number(data), new Date().toISOString(), rank);
+        } else if (dataStore instanceof MotherTemperatureStore) {
+          result = dataStore.createMotherTemperature(Number(data), new Date().toISOString(), rank);
+        }
+      } catch (error: any) {
+        logger.warn("Graph: table cell create failed", { error: error?.message });
+        notify.error("Erreur", error?.message ?? "Impossible d'ajouter cette valeur.");
+        result = undefined;
       }
-    });
-    setAddTableDataDialogVisible(false);
-    setAddTableDataPreselected(undefined);
-    setAddTableDataTargetHour(null);
+      if (!result) allAccepted = false;
+    }
+    if (allAccepted) {
+      setAddTableDataDialogVisible(false);
+      setAddTableDataPreselected(undefined);
+      setAddTableDataTargetHour(null);
+    }
+    return allAccepted;
   };
 
   const onDialogCloseAddComment = (comment: string) => {
@@ -391,7 +431,14 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
       current.motherHeartRateFrequencyStore.loadMotherHeartFrequencies(),
       current.amnioticLiquidStore.loadAmnioticLiquids(),
       current.commentStore.load(),
-    ]);
+    ]).then((results) => {
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        logger.warn("Graph: fetchData had failures", { count: failures.length });
+        notify.error("Erreur", "Certaines données n'ont pas pu être chargées. Tirez pour rafraîchir.");
+      }
+      return results;
+    });
   };
 
   const onRefresh = async () => {
@@ -443,7 +490,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             }
           />
 
-          <View style={{ flex: 1, marginTop: 5, width: "95%" }}>
+          <View style={{ marginTop: 5, width: "95%" }}>
             <View
               style={[
                 { paddingTop: 5, paddingBottom: 5, alignContent: "center" },
@@ -477,7 +524,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               <Text style={[styles.infoTitleText, { padding: 2 }]}>
                 Mise à jour du statut :{" "}
               </Text>
-              <View style={{ flex: 1, flexDirection: "row", width: "100%" }}>
+              <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", width: "100%", gap: 5 }}>
                 {/* EN COURS — maternity nurse, or hospital nurse on a
                     leftover patient already at her hospital. Not for a
                     hospital nurse browsing a linked maternity chart. */}
@@ -489,7 +536,10 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       setChangeStateDialogVisible(true);
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
@@ -500,6 +550,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"EN COURS"}
                     </Text>
@@ -519,11 +570,13 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       setChangeStateDialogVisible(true);
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                       opacity:
                         partogramme!.asJson.state === "IN_PROGRESS" ? 1 : 0.4,
@@ -531,6 +584,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"TRANSFERÉ"}
                     </Text>
@@ -562,7 +616,10 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       setChangeStateDialogVisible(true);
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
@@ -571,6 +628,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"RÉCLAMER"}
                     </Text>
@@ -597,7 +655,10 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                         });
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: partogramme!.asJson.transferRequestHospitalId
                         ? colors.surfaceMuted
                         : colors.accent,
@@ -616,6 +677,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                             : "white",
                         },
                       ]}
+                      numberOfLines={1}
                     >
                       {partogramme!.asJson.transferRequestHospitalId ? "DEMANDE ENVOYÉE" : "DEMANDER UN TRANSFERT"}
                     </Text>
@@ -630,16 +692,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     activeOpacity={0.2}
                     onPress={() => setTransferDialogVisible(true)}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                     }}
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"TRANSFÉRER"}
                     </Text>
@@ -660,16 +725,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     activeOpacity={0.2}
                     onPress={() => setReassignDialogVisible(true)}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                     }}
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"RÉASSIGNER"}
                     </Text>
@@ -690,16 +758,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     activeOpacity={0.2}
                     onPress={() => setPullBackDialogVisible(true)}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                     }}
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"RÉCUPÉRER"}
                     </Text>
@@ -716,16 +787,19 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       setChangeStateDialogVisible(true);
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.accent,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                     }}
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: "white" }]}
+                      numberOfLines={1}
                     >
                       {"TERMINÉ"}
                     </Text>
@@ -740,19 +814,22 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                       rootStore.maternityAlertsStore.fetchAlerts();
                     }}
                     style={{
-                      flex: 1,
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
                       backgroundColor: colors.dangerSoft,
                       borderWidth: 1,
                       borderColor: colors.danger,
                       borderRadius: radius.sm,
                       padding: 2,
-                      marginLeft: 5,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
                     <Text
                       style={[styles.infoText, { padding: 2, color: colors.danger, fontWeight: "600" }]}
+                      numberOfLines={1}
                     >
                       {"ALERTE"}
                     </Text>
@@ -929,11 +1006,9 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             )}
           </View>
           <BabyGraph
-            data={
-              rootStore.partogrammeStore.selectedPartogramme
-                ?.babyHeartFrequencyStore.babyHeartFrequencyGraphData
-            }
-            startTime={partogramme?.asJson.workStartDateTime}
+            data={bpmList.map((p) => p.data)}
+            startTime={chartStartTime}
+            loading={partogramme!.babyHeartFrequencyStore.isLoading}
           />
           <DialogDataInputGraph
             visible={isFcDialogVisible}
@@ -974,6 +1049,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <DilationGraph
             dilationStore={partogramme?.dilationStore}
             babyDescentStore={partogramme?.babyDescentStore}
+            startTime={chartStartTime}
           />
           <DialogDataInputGraph
             visible={isDilationDialogVisible}
@@ -1046,6 +1122,15 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
           <DataTable
             editable={canEdit}
             startTime={partogramme?.asJson.workStartDateTime}
+            loading={
+              partogramme!.motherTemperatureStore.isLoading ||
+              partogramme!.motherSystolicBloodPressureStore.isLoading ||
+              partogramme!.motherDiastolicBloodPressureStore.isLoading ||
+              partogramme!.motherHeartRateFrequencyStore.isLoading ||
+              partogramme!.motherContractionFrequencyStore.isLoading ||
+              partogramme!.motherContractionDurationStore.isLoading ||
+              partogramme!.amnioticLiquidStore.state === "pending"
+            }
             columns={[
               {
                 label: "Temp",
@@ -1096,7 +1181,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 onAddPress: (hour) => openAddDataTableForCell(partogramme!.motherContractionDurationStore, hour),
               },
               {
-                label: "Liquide",
+                label: "Liq.",
                 fullName: "Liquide Amniotique",
                 items: partogramme!.amnioticLiquidStore.sortedAmnioticLiquidList,
                 formattedValues: partogramme!.amnioticLiquidStore.amnioticLiquidAsTableString,
@@ -1309,6 +1394,12 @@ const styles = StyleSheet.create({
   },
   buttonStyle2: {
     flex: 1,
+    // CustomButton's own base style hardcodes width: 150 — an explicit
+    // width always wins over flex sizing in Yoga regardless of flex:1, so
+    // without clearing it here these two buttons never actually share the
+    // row evenly; on SE-width screens "+ Descente bébé" gets squeezed to
+    // its 150px floor with no room for the label.
+    width: undefined,
     height: layout.touchTarget,
     borderRadius: radius.sm,
     justifyContent: "center",

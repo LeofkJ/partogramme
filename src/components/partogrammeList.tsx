@@ -18,6 +18,26 @@ import { isPatientFlagged, TimedReading } from "../lib/clinicalAlerts";
 import { logger } from "../lib/logger";
 import { callPhone } from "../lib/callPhone";
 import { colors, spacing, radius, layout, statusColors } from "../theme";
+import { SkeletonPulse, SkeletonBlock } from "./Skeleton/Skeleton";
+
+// Shown only on genuine first load (state === "pending" with nothing in
+// the list yet) — never on a background poll refresh, which also flips
+// state back to "pending" but shouldn't flash a skeleton over data
+// that's already on screen.
+const PartogrammeListSkeleton = () => (
+  <View style={styles.list}>
+    <SkeletonPulse>
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} style={styles.card}>
+          <View style={styles.cardMain}>
+            <SkeletonBlock width={130} height={15} />
+            <SkeletonBlock width={60} height={20} blockRadius={radius.sm} />
+          </View>
+        </View>
+      ))}
+    </SkeletonPulse>
+  </View>
+);
 
 // Quiet list labels — the ALL-CAPS constants on the chart page are too
 // loud for a row of cards.
@@ -305,6 +325,10 @@ export const PartogrammeList = observer(
           }))
           .filter((section) => section.data.length > 0)
           .filter((section) => !(hideFinished && section.finished));
+
+    if (rootStore.partogrammeStore.state === "pending" && allPartogrammes.length === 0) {
+      return <PartogrammeListSkeleton />;
+    }
 
     return (
       <SectionList
