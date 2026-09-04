@@ -49,7 +49,15 @@ export const DialogRaiseAlert = ({ isVisible, onClose, onSubmit }: Props) => {
       .then(() => setIsSubmitting(false))
       .catch((error: any) => {
         setIsSubmitting(false);
-        setErrorMessage(error?.message || "Erreur inconnue");
+        // 42501 = RLS rejected the insert — always means "you're not
+        // currently responsible for her" (a maternity nurse after she's
+        // been transferred, or hospital staff before she has). Same
+        // message covers both directions since the cause is the same.
+        if (error?.code === "42501") {
+          setErrorMessage("Vous n'êtes pas responsable de cette patiente en ce moment, vous ne pouvez pas gérer ses alertes.");
+        } else {
+          setErrorMessage(error?.message || "Erreur inconnue");
+        }
       });
   };
 

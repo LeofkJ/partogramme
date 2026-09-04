@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import { RootStore } from "../rootStore";
 import { TransportLayer } from "../../transport/transportLayer";
-import { getDilationBand, isBpmAlert, TimedReading } from "../../lib/clinicalAlerts";
+import { DilationBand, getBpmBand, getDilationBand, isBpmAlert, TimedReading } from "../../lib/clinicalAlerts";
 import { logger } from "../../lib/logger";
 
 export type AlertPatient = {
@@ -34,6 +34,16 @@ export type LinkedMaternityPatient = {
   noFile: number;
   latestBpm: number | null;
   latestDilation: number | null;
+  /** Same green/yellow/red WHO banding the dilation graph itself draws
+   * (getDilationBand) — null before active phase (<4cm) or with no
+   * reading yet. Red-banded patients never actually reach this list (see
+   * checkFlag below — they're already pulled into alertPatients), so this
+   * is really only ever green/yellow/null here, but kept as the real
+   * DilationBand type rather than narrowing it for that reason. */
+  latestDilationBand: DilationBand | null;
+  /** Same idea as latestDilationBand but for the bpm reading (getBpmBand)
+   * — null with no reading yet. */
+  latestBpmBand: DilationBand | null;
 };
 
 export type LinkedMaternitySummary = {
@@ -52,6 +62,9 @@ export type OwnHospitalPatient = {
   state: string;
   latestBpm: number | null;
   latestDilation: number | null;
+  /** See LinkedMaternityPatient.latestDilationBand/latestBpmBand — same meaning. */
+  latestDilationBand: DilationBand | null;
+  latestBpmBand: DilationBand | null;
 };
 
 /** A hospital's own dashboard (see task.md's "Dashboard scope") — shared by
@@ -190,14 +203,17 @@ export class HospitalDashboardStore {
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
             )[dilationReadings.length - 1].value
           : null;
+        const ownLatestBpm = latestBpmById[p.id]?.value ?? null;
         ownRows.push({
           id: p.id,
           patientFirstName: p.patientFirstName,
           patientLastName: p.patientLastName,
           noFile: p.noFile,
           state: p.state,
-          latestBpm: latestBpmById[p.id]?.value ?? null,
+          latestBpm: ownLatestBpm,
           latestDilation,
+          latestDilationBand: getDilationBand(dilationReadings, p.workStartDateTime),
+          latestBpmBand: ownLatestBpm != null ? getBpmBand(ownLatestBpm) : null,
         });
       }
       const patientsByMaternityId: Record<string, LinkedMaternityPatient[]> = {};
@@ -214,13 +230,16 @@ export class HospitalDashboardStore {
             )[dilationReadings.length - 1].value
           : null;
         const maternityId = c.maternityId as string;
+        const candidateLatestBpm = latestBpmById[c.id]?.value ?? null;
         (patientsByMaternityId[maternityId] ??= []).push({
           id: c.id,
           patientFirstName: c.patientFirstName,
           patientLastName: c.patientLastName,
           noFile: c.noFile,
-          latestBpm: latestBpmById[c.id]?.value ?? null,
+          latestBpm: candidateLatestBpm,
           latestDilation,
+          latestDilationBand: getDilationBand(dilationReadings, c.workStartDateTime),
+          latestBpmBand: candidateLatestBpm != null ? getBpmBand(candidateLatestBpm) : null,
         });
       }
       const linkedMaternitySummaries: LinkedMaternitySummary[] = linkedMaternityIds.map((id) => ({

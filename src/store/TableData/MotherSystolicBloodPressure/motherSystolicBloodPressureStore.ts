@@ -255,16 +255,16 @@ export class MotherSystolicBloodPressure {
   async update(value: String) {
     if (!this.isEditable) {
       notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
-      return Promise.reject("Edit window expired");
+      return Promise.reject(new Error("Edit window expired"));
     }
     let convValue = Number(value);
     if (isNaN(convValue)) {
       notify.error("Erreur", "La valeur saisie n'est pas un nombre. Veuillez saisir un nombre");
-          return  Promise.reject("Not a number");
+          return  Promise.reject(new Error("Not a number"));
         }
     if (!isPhysiologicallyPlausible(convValue, SYSTOLIC_MIN, SYSTOLIC_MAX)) {
       notify.error("Erreur", `Valeur hors limites physiologiques (${SYSTOLIC_MIN}–${SYSTOLIC_MAX} mmHg). Vérifiez la saisie.`);
-      return Promise.reject("Out of range");
+      return Promise.reject(new Error("Out of range"));
     }
     let updatedData = this.asJson;
     updatedData.value = Number(value);

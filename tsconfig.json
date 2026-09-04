@@ -6,5 +6,15 @@
         "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */,
         "allowSyntheticDefaultImports": true,
         "jsx": "react-jsx",
+        // The base @tsconfig/react-native config sets types:
+        // ["react-native", "jest"] and lib: ["es2019"] — this project's own
+        // code has always used Node ambient globals (Buffer/global/assert)
+        // and Promise.allSettled, but that only type-checked because an
+        // older @supabase/supabase-js's now-removed fetch polyfill
+        // transitively pulled in @types/node via a triple-slash reference.
+        // Declaring both explicitly here means the real dependency doesn't
+        // ride on a dependency's internal implementation choice again.
+        "types": ["react-native", "jest", "node"],
+        "lib": ["es2020"],
     },
 }

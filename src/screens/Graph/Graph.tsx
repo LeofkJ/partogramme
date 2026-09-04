@@ -10,7 +10,7 @@ import {
 import { observer } from "mobx-react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DialogDataInputGraph from "../../components/Dialogs/DialogDataInputGraph";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BabyGraph from "../../components/Graphs/BabyGraph";
 import { rootStore } from "../../store/rootStore";
 import DilationGraph from "../../components/Graphs/DilationGraph";
@@ -27,7 +27,8 @@ import { MotherContractionsFrequencyStore } from "../../store/TableData/MotherCo
 import { MotherHeartFrequencyStore } from "../../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore";
 import { MotherTemperatureStore } from "../../store/TableData/MotherTemperature/motherTemperatureStore";
 import ErrorDialog from "../../components/Dialogs/ErrorDialog";
-import { IconPencil, IconMaternity } from "../../components/Icons";
+import { IconPencil, IconMaternity, IconAlertTriangle } from "../../components/Icons";
+import { getDilationBand, isBpmAlert, TimedReading } from "../../lib/clinicalAlerts";
 import { callPhone } from "../../lib/callPhone";
 import CustomButton from "../../components/CustomButton";
 import DataModifierDialog from "../../components/DataModifierDialog";
@@ -44,6 +45,7 @@ import { DialogTransferPatient } from "../../components/Dialogs/DialogTransferPa
 import { DialogReassignPatient } from "../../components/Dialogs/DialogReassignPatient";
 import { DialogRaiseAlert } from "../../components/Dialogs/DialogRaiseAlert";
 import { DialogMaternityAlerts } from "../../components/Dialogs/DialogMaternityAlerts";
+import { DialogHospitalAlerts } from "../../components/Dialogs/DialogHospitalAlerts";
 import { logger } from "../../lib/logger";
 import { notify } from "../../lib/notify";
 import { colors, spacing, radius, layout, statusColors } from "../../theme";
@@ -74,6 +76,13 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const [isReassignDialogVisible, setReassignDialogVisible] = useState(false);
   const [isRaiseAlertDialogVisible, setRaiseAlertDialogVisible] = useState(false);
   const [isMaternityAlertsExpanded, setMaternityAlertsExpanded] = useState(false);
+  // Hospital-side twin of the maternity dropdown above, but scoped to just
+  // this one patient — she's already the chart he's looking at, so there's
+  // no cross-patient list to jump from the way maternity's ALERTE button
+  // needs (that's what HospitalDashboard's own list is for).
+  const [isHospitalAlertsExpanded, setHospitalAlertsExpanded] = useState(false);
+  const [hospitalAlerts, setHospitalAlerts] = useState<{ id: string; comment: string; createdAt: string }[]>([]);
+  const [hospitalAlertsState, setHospitalAlertsState] = useState<"pending" | "done" | "error">("pending");
   const [isPullBackDialogVisible, setPullBackDialogVisible] = useState(false);
   const [isErrorDialogVisible, setIsErrorDialogVisible] = useState(false);
   const [errorCode, setErrorCode] = useState("");
@@ -172,6 +181,53 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
     ? allReadingTimes.reduce((min, t) => (new Date(t).getTime() < new Date(min).getTime() ? t : min))
     : partogramme?.asJson.workStartDateTime ?? null;
 
+  // Whether THIS patient is currently flagged — previously only visible
+  // from a list screen (Menu, HospitalDashboard) or the maternity-wide
+  // ALERTE dropdown, never on her own chart, which is exactly where
+  // someone already looking at her data needs to see it. Same three
+  // checks every other flagged-patient view uses (isPatientFlagged).
+  const [currentPatientManualAlerts, setCurrentPatientManualAlerts] = useState<
+    { id: string; comment: string; createdAt: string }[]
+  >([]);
+  const fetchCurrentPatientManualAlerts = () => {
+    if (!partogramme) return;
+    rootStore.partogrammeStore.transportLayer
+      .fetchManualAlerts([partogramme.asJson.id])
+      .then((rows) => {
+        setCurrentPatientManualAlerts(rows.map((r) => ({ id: r.id, comment: r.comment, createdAt: r.createdAt })));
+      })
+      .catch((error: any) => {
+        logger.warn("Graph: fetchManualAlerts (banner) failed", { error: error?.message });
+      });
+  };
+  useEffect(fetchCurrentPatientManualAlerts, [partogramme?.asJson.id]);
+
+  const currentPatientLatestBpm = bpmList.reduce<TimedReading | null>((latest, p) => {
+    if (!latest || new Date(p.data.created_at) > new Date(latest.created_at)) {
+      return { value: p.data.value, created_at: p.data.created_at };
+    }
+    return latest;
+  }, null);
+  const currentPatientDilationReadings: TimedReading[] = (partogramme?.dilationStore.sortedDilationList ?? [])
+    .map((p) => ({ value: p.data.value, created_at: p.data.created_at }));
+  const currentPatientDilationBand = getDilationBand(
+    currentPatientDilationReadings,
+    partogramme?.asJson.workStartDateTime ?? null,
+  );
+  const currentPatientBpmAlert =
+    currentPatientLatestBpm != null && isBpmAlert(currentPatientLatestBpm.value) ? currentPatientLatestBpm : null;
+  const currentPatientFlag = currentPatientManualAlerts.length > 0
+    ? { reason: "manual" as const, text: "Alerte manuelle", comment: currentPatientManualAlerts[0].comment }
+    : currentPatientBpmAlert
+    ? {
+        reason: "bpm" as const,
+        text: `${currentPatientBpmAlert.value} bpm · ${currentPatientBpmAlert.value < 100 ? "bradycardie" : "tachycardie"}`,
+        comment: null,
+      }
+    : currentPatientDilationBand === "red"
+    ? { reason: "dilation" as const, text: "Dilatation · bande rouge", comment: null }
+    : null;
+
   // A hospital's own patient — false for a linked maternity's
   // not-yet-transferred patient (hospitalId is null there), which is what
   // makes those charts read-only for hospital staff below.
@@ -186,6 +242,26 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
   const canEdit =
     (isMaternityNurse && status === "IN_PROGRESS") ||
     (isHospitalStaff && isOwnHospitalPatient && status === "TRANSFERRED");
+
+  // If hospital staff is sitting on this patient's chart and she gets
+  // pulled back to her maternity (RÉCUPÉRER) or reassigned to a different
+  // hospital out from under them — from another device, another tab,
+  // whatever — isOwnHospitalPatient flips false on the next realtime/poll
+  // sync (see the fetchPartogrammeById polling effect below) while they're
+  // still looking at it. Kick them back out rather than leaving them
+  // stranded on a chart that's no longer theirs to act on. Only fires on
+  // an actual true->false transition, not on first load — a hospital
+  // nurse opening a linked-maternity candidate's read-only chart (never
+  // "own" to begin with) shouldn't get bounced immediately.
+  const wasOwnHospitalPatientRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!isHospitalStaff || !partogramme) return;
+    if (wasOwnHospitalPatientRef.current === true && !isOwnHospitalPatient) {
+      notify.error("Patiente reprise", "Cette patiente n'est plus à votre hôpital.");
+      navigation.navigate("Screen_Menu");
+    }
+    wasOwnHospitalPatientRef.current = isOwnHospitalPatient;
+  }, [isHospitalStaff, isOwnHospitalPatient, partogramme]);
 
   // Hospital staff looking up which nurse is responsible for this patient,
   // via the partogramme's nurseId (the nurse's own profileId).
@@ -209,6 +285,33 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
         logger.warn("Graph: fetchOtherUserInfo (nurse lookup) failed", { nurseId, error: error?.message });
       });
   }, [isHospitalStaff, nurseId]);
+
+  const fetchHospitalAlerts = () => {
+    if (!partogramme) return;
+    setHospitalAlertsState("pending");
+    rootStore.partogrammeStore.transportLayer
+      .fetchManualAlerts([partogramme.asJson.id])
+      .then((rows) => {
+        setHospitalAlerts(rows.map((r) => ({ id: r.id, comment: r.comment, createdAt: r.createdAt })));
+        setHospitalAlertsState("done");
+      })
+      .catch((error: any) => {
+        logger.warn("Graph: fetchManualAlerts (hospital) failed", { error: error?.message });
+        setHospitalAlertsState("error");
+      });
+  };
+
+  const deleteHospitalAlert = (alertId: string) => {
+    rootStore.partogrammeStore.transportLayer
+      .deleteManualAlert(alertId)
+      .then(() => {
+        setHospitalAlerts((prev) => prev.filter((a) => a.id !== alertId));
+        fetchCurrentPatientManualAlerts();
+      })
+      .catch((error: any) => {
+        logger.warn("Graph: deleteManualAlert (hospital) failed", { error: error?.message });
+      });
+  };
 
   useEffect(() => {
     InteractionManager.runAfterInteractions(() => {
@@ -480,13 +583,38 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             Dossier #{partogramme?.asJson.noFile}
           </Text>
 
+          {currentPatientFlag && (
+            <View style={styles.currentAlertBanner}>
+              <IconAlertTriangle size={16} color={colors.danger} />
+              <View style={styles.currentAlertTextBlock}>
+                <Text style={styles.currentAlertText} numberOfLines={1}>
+                  {currentPatientFlag.text}
+                </Text>
+                {!!currentPatientFlag.comment && (
+                  <Text style={styles.currentAlertComment} numberOfLines={2}>
+                    {currentPatientFlag.comment}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
           <DialogRaiseAlert
             isVisible={isRaiseAlertDialogVisible}
             onClose={() => setRaiseAlertDialogVisible(false)}
             onSubmit={(comment) =>
-              rootStore.maternityAlertsStore.addAlert(partogramme!.asJson.id, comment).then(() => {
-                setRaiseAlertDialogVisible(false);
-              })
+              isMaternityNurse
+                ? rootStore.maternityAlertsStore.addAlert(partogramme!.asJson.id, comment).then(() => {
+                    setRaiseAlertDialogVisible(false);
+                    fetchCurrentPatientManualAlerts();
+                  })
+                : rootStore.partogrammeStore.transportLayer
+                    .createManualAlert(partogramme!.asJson.id, comment)
+                    .then(() => {
+                      setRaiseAlertDialogVisible(false);
+                      fetchHospitalAlerts();
+                      fetchCurrentPatientManualAlerts();
+                    })
             }
           />
 
@@ -835,13 +963,46 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                     </Text>
                   </TouchableOpacity>
                 )}
+
+                {isHospitalStaff && isOwnHospitalPatient && (
+                  <TouchableOpacity
+                    activeOpacity={0.2}
+                    onPress={() => {
+                      setHospitalAlertsExpanded(true);
+                      fetchHospitalAlerts();
+                    }}
+                    style={{
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: 140,
+                      minWidth: 140,
+                      backgroundColor: colors.dangerSoft,
+                      borderWidth: 1,
+                      borderColor: colors.danger,
+                      borderRadius: radius.sm,
+                      padding: 2,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={[styles.infoText, { padding: 2, color: colors.danger, fontWeight: "600" }]}
+                      numberOfLines={1}
+                    >
+                      {"ALERTE"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
             {isMaternityNurse && (
               <DialogMaternityAlerts
                 isVisible={isMaternityAlertsExpanded}
-                onClose={() => setMaternityAlertsExpanded(false)}
+                onClose={() => {
+                  setMaternityAlertsExpanded(false);
+                  fetchCurrentPatientManualAlerts();
+                }}
                 onAdd={() => {
                   setMaternityAlertsExpanded(false);
                   setRaiseAlertDialogVisible(true);
@@ -851,6 +1012,21 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                   rootStore.partogrammeStore.updateSelectedPartogramme(id);
                   navigation.push("Screen_Graph");
                 }}
+              />
+            )}
+
+            {isHospitalStaff && (
+              <DialogHospitalAlerts
+                isVisible={isHospitalAlertsExpanded}
+                state={hospitalAlertsState}
+                alerts={hospitalAlerts}
+                onClose={() => setHospitalAlertsExpanded(false)}
+                onRetry={fetchHospitalAlerts}
+                onAdd={() => {
+                  setHospitalAlertsExpanded(false);
+                  setRaiseAlertDialogVisible(true);
+                }}
+                onDelete={deleteHospitalAlert}
               />
             )}
             <View style={styles.infoRow}>
@@ -994,6 +1170,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             <Text style={styles.textTitle}>Fréquence Cardiaque du bébé</Text>
             {partogramme!.babyHeartFrequencyStore.dataList.length > 0 && (
               <TouchableOpacity
+                style={styles.modifyButton}
                 onPress={() => {
                   setDataModifierStores([partogramme!.babyHeartFrequencyStore]);
                   setDataModifierGroupByRow(false);
@@ -1001,6 +1178,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
+                {canEdit && <IconPencil size={13} color={colors.accent} />}
                 <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
               </TouchableOpacity>
             )}
@@ -1035,6 +1213,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
             {(partogramme!.dilationStore.dataList.length > 0 ||
               partogramme!.babyDescentStore.dataList.length > 0) && (
               <TouchableOpacity
+                style={styles.modifyButton}
                 onPress={() => {
                   setDataModifierStores([partogramme!.dilationStore, partogramme!.babyDescentStore]);
                   setDataModifierGroupByRow(false);
@@ -1042,6 +1221,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
+                {canEdit && <IconPencil size={13} color={colors.accent} />}
                 <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
               </TouchableOpacity>
             )}
@@ -1100,6 +1280,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
               partogramme!.motherContractionDurationStore.dataList.length > 0 ||
               partogramme!.amnioticLiquidStore.dataList.length > 0) && (
               <TouchableOpacity
+                style={styles.modifyButton}
                 onPress={() => {
                   setDataModifierStores([
                     partogramme!.motherTemperatureStore,
@@ -1115,6 +1296,7 @@ export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
+                {canEdit && <IconPencil size={13} color={colors.accent} />}
                 <Text style={styles.modifyLink}>{canEdit ? "Modifier" : "Horaires"}</Text>
               </TouchableOpacity>
             )}
@@ -1318,11 +1500,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.text,
   },
+  modifyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
   modifyLink: {
     fontSize: 13,
     fontWeight: "500",
     color: colors.accent,
-    paddingBottom: 2,
   },
   infoTitleText: {
     fontSize: 14,
@@ -1441,6 +1632,35 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
     marginBottom: spacing.xs,
+  },
+  currentAlertBanner: {
+    width: "95%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  currentAlertTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  currentAlertText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.danger,
+  },
+  currentAlertComment: {
+    fontSize: 12,
+    color: colors.danger,
+    opacity: 0.85,
+    marginTop: 2,
+    lineHeight: 16,
   },
   sectionTitleText: {
     textAlign: "left",

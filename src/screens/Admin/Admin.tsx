@@ -1035,12 +1035,14 @@ export const ScreenAdmin: React.FC = observer(() => {
 
             {deletingMaternityId !== maternity.id && (
               <MaternityHospitalLinksPanel
-                hospitals={adminStore.hospitals.map((h) => ({
-                  id: h.id,
-                  name: h.name,
-                  city: h.city,
-                  linked: adminStore.hospitalsForMaternity(maternity.id).some((linked) => linked.id === h.id),
-                }))}
+                hospitals={adminStore.hospitals
+                  .filter((h) => h.id !== maternity.defaultHospitalId)
+                  .map((h) => ({
+                    id: h.id,
+                    name: h.name,
+                    city: h.city,
+                    linked: adminStore.hospitalsForMaternity(maternity.id).some((linked) => linked.id === h.id),
+                  }))}
                 onToggle={(hospitalId, linked) => {
                   if (linked) {
                     adminStore.linkMaternityToHospital(maternity.id, hospitalId).catch(() => {});

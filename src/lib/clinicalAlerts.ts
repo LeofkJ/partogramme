@@ -40,11 +40,32 @@ export function getDilationBand(
   return "yellow";
 }
 
-// Normal fetal heart rate baseline is 110-160 bpm — bradycardia below,
-// tachycardia above (standard obstetric reference range, not WHO-partograph
-// specific like the dilation band).
+// NICE intrapartum fetal monitoring guidance (NG229; matches the earlier
+// CG190 wording) classifies baseline fetal heart rate into three bands,
+// not a flat normal/abnormal split:
+//   - reassuring: 110-160 bpm
+//   - non-reassuring: 100-109 or 161-180 bpm
+//   - abnormal: <100 or >180 bpm
+// isBpmAlert is the "abnormal" line — this used to fire at <110/>160 (i.e.
+// treated the whole non-reassuring band as a full alert), which is more
+// aggressive than actual clinical practice; a stable 110-160 reading needs
+// no escalation at all per NICE, non-reassuring values get closer watching
+// rather than an alert. Widened to match. See getBpmBand for the
+// non-reassuring/caution band this leaves in between.
 export function isBpmAlert(bpm: number): boolean {
-  return bpm < 110 || bpm > 160;
+  return bpm < 100 || bpm > 180;
+}
+
+// The "non-reassuring" middle band from the same guidance — a caution,
+// not yet an alert. Used by the Dashboard's softer caution colouring (see
+// HospitalDashboard.tsx). Deliberately never used to decide
+// isPatientFlagged/AlertBanner/the "À surveiller" list — isBpmAlert alone
+// still owns that, so a caution never escalates into a popup or the
+// global banner, only ever shows as a colour in the plain Dashboard lists.
+export function getBpmBand(bpm: number): DilationBand {
+  if (isBpmAlert(bpm)) return "red";
+  if (bpm < 110 || bpm > 160) return "yellow";
+  return "green";
 }
 
 // Same red-flag rule the hospital dashboard uses to sort a patient into "À

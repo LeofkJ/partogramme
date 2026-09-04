@@ -21,7 +21,8 @@ import { notify } from "../../lib/notify";
 import { logger } from "../../lib/logger";
 import { getStringByEnum, partogrammeStates } from "../../../types/constants";
 import { AlertPatient } from "../../store/hospitalDashboard/hospitalDashboardStore";
-import { IconMaternity } from "../../components/Icons";
+import { DilationBand } from "../../lib/clinicalAlerts";
+import { IconAlertTriangle, IconMaternity } from "../../components/Icons";
 import { colors, spacing, radius, layout, monoFontFamily } from "../../theme";
 import { formatElapsed } from "../../lib/formatElapsed";
 import { SkeletonPulse, SkeletonBlock } from "../../components/Skeleton/Skeleton";
@@ -39,13 +40,48 @@ function statusDotColor(state: string): string {
   return colors.textMuted;
 }
 
+// Same green/yellow/red the dilation graph draws (getDilationBand) and the
+// same graded bpm banding (getBpmBand) — a patient's most recent dilation
+// or bpm reading dictates her styling here, so staff can see her trending
+// toward the alert line before she actually crosses it (red-banded
+// patients are already pulled into the "À surveiller" section above with
+// their own danger styling, so this only ever renders green/yellow/neutral
+// in practice). Deliberately confined to this Dashboard screen — never
+// feeds isPatientFlagged/AlertBanner/the "À surveiller" list, so a caution
+// never escalates into a popup.
+//
+// A caution is its own visual thing, not just a tinted line of text next
+// to a plain danger-red one — colors.warning ("#B45309", a dark amber) and
+// colors.danger ("#C62828", a dark red) read too close to each other as
+// plain text at 12px. Badged with its own soft background the same way
+// every other clinical-meaning value in this app is (statusPill,
+// alertTileSummaryBox), a caution is unmistakably "worth a look, not an
+// emergency" — green/no-band values stay plain text, same as before this
+// feature existed.
+function bandBadge(band: DilationBand | null): { bg: string; border: string; fg: string } | null {
+  if (band === "red") return { bg: colors.dangerSoft, border: colors.danger, fg: colors.danger };
+  if (band === "yellow") return { bg: colors.warningSoft, border: colors.warning, fg: colors.warning };
+  return null;
+}
+
+const VitalValue = ({ text, band }: { text: string; band: DilationBand | null }) => {
+  const badge = bandBadge(band);
+  if (!badge) return <Text style={styles.patientRowVitalText}>{text}</Text>;
+  return (
+    <View style={[styles.vitalBadge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+      <IconAlertTriangle size={11} color={badge.fg} />
+      <Text style={[styles.vitalBadgeText, { color: badge.fg }]}>{text}</Text>
+    </View>
+  );
+};
+
 function alertSummary(p: AlertPatient): string {
   if (p.reason === "manual") {
     const label = p.manualAlertCount > 1 ? `Alerte manuelle (${p.manualAlertCount})` : "Alerte manuelle";
     return p.raisedAt ? `${label} · depuis ${formatElapsed(p.raisedAt)}` : label;
   }
   if (p.reason === "bpm") {
-    return p.value < 110 ? `${p.value} bpm · bradycardie` : `${p.value} bpm · tachycardie`;
+    return p.value < 100 ? `${p.value} bpm · bradycardie` : `${p.value} bpm · tachycardie`;
   }
   return `${p.value} cm · dilatation bande rouge`;
 }
@@ -264,10 +300,10 @@ export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }
                   {(p.latestBpm != null || p.latestDilation != null) && (
                     <View style={styles.patientRowVitals}>
                       {p.latestBpm != null && (
-                        <Text style={styles.patientRowVitalText}>{p.latestBpm} bpm</Text>
+                        <VitalValue text={`${p.latestBpm} bpm`} band={p.latestBpmBand} />
                       )}
                       {p.latestDilation != null && (
-                        <Text style={styles.patientRowVitalText}>{p.latestDilation} cm</Text>
+                        <VitalValue text={`${p.latestDilation} cm`} band={p.latestDilationBand} />
                       )}
                     </View>
                   )}
@@ -317,10 +353,10 @@ export const ScreenHospitalDashboard: React.FC<Props> = observer(({ navigation }
                           {(p.latestBpm != null || p.latestDilation != null) && (
                             <View style={styles.patientRowVitals}>
                               {p.latestBpm != null && (
-                                <Text style={styles.patientRowVitalText}>{p.latestBpm} bpm</Text>
+                                <VitalValue text={`${p.latestBpm} bpm`} band={p.latestBpmBand} />
                               )}
                               {p.latestDilation != null && (
-                                <Text style={styles.patientRowVitalText}>{p.latestDilation} cm</Text>
+                                <VitalValue text={`${p.latestDilation} cm`} band={p.latestDilationBand} />
                               )}
                             </View>
                           )}
@@ -549,6 +585,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: colors.text,
+    fontFamily: monoFontFamily,
+  },
+  vitalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  vitalBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
     fontFamily: monoFontFamily,
   },
   maternityGroup: {

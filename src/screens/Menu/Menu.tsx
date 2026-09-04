@@ -1,7 +1,6 @@
 import { Platform, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { IconPlus } from "../../components/Icons";
 import { PartogrammeList } from "../../components/partogrammeList";
-import { MaternityTransferRequestsPanel } from "../../components/MaternityTransferRequestsPanel";
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DialogSetPassword } from "../../components/Dialogs/DialogSetPassword";
@@ -87,8 +86,6 @@ export const ScreenMenu: React.FC<Props> = observer(({ navigation }) => {
         </View>
         <View style={styles.headerHairline} />
       </View>
-
-      {isMaternityNurse && <MaternityTransferRequestsPanel />}
 
       {rootStore.partogrammeStore.state === "error" && (
         <View style={styles.loadError}>

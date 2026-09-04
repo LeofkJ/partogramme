@@ -1,5 +1,5 @@
 import { StyleSheet, View, TextInput, ScrollView, Text, Pressable } from "react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { observer } from "mobx-react";
 import { rootStore } from "../../store/rootStore";
 import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
@@ -18,27 +18,19 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
     const [commentary, onChangeCommentary] = useState("");
     const [patientFirstName, onChangePatientFirstName] = useState("");
     const [patientLastName, onChangePatientLastName] = useState("");
+    // Starts empty — left blank, a real collision-free number is claimed
+    // (atomic, global — see claim_next_dossier_number) at submit time
+    // instead of pre-filled here. Typed over, whatever she enters is used
+    // instead (parseDossierNumber + the 23505 handling in
+    // createButtonPressed catches a number that's already taken). This is
+    // the ONLY place a number gets claimed — once set it follows the
+    // patient everywhere (transfer, reclaim, reassign) unchanged, see
+    // partogrammeStore.ts's transfer methods.
     const [noFile, onChangeNoFile] = useState("");
     const [admissionDateTime, onChangeAdmissionDateTime] = useState(new Date());
     const [workStartDateTime, onChangeWorkStartDate] = useState(new Date());
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Prefills the next dossier number as a suggestion — she can still
-    // edit it. The database's Partogramme_maternityId_noFile_unique index
-    // is the actual uniqueness guarantee; a fetch failure here just leaves
-    // the field empty, falling back to today's fully-manual entry.
-    useEffect(() => {
-      const maternityId = userInfoStore.userInfo.maternityId;
-      if (userInfoStore.userInfo.nurseType !== "MATERNITY" || !maternityId) return;
-      rootStore.partogrammeStore.transportLayer
-        .fetchNextDossierNumber(maternityId)
-        .then((next) => onChangeNoFile(String(next)))
-        .catch((error: any) => {
-          logger.warn("AddPartogramme: fetchNextDossierNumber failed", { error: error?.message });
-        });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const handleTimeAdmissionChanged = (time: Date | undefined) => {
       if (time !== undefined) {
@@ -74,21 +66,36 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
       }
     };
 
-    const createButtonPressed = () => {
-      const parsedNoFile = parseDossierNumber(noFile);
-      if (parsedNoFile === null) {
-        setErrorMessage("Le numéro de dossier doit être un nombre entier positif.");
-        return;
+    const createButtonPressed = async () => {
+      let finalNoFile: number;
+      if (noFile.trim() === "") {
+        setErrorMessage(null);
+        setIsSubmitting(true);
+        try {
+          finalNoFile = await rootStore.partogrammeStore.transportLayer.claimNextDossierNumber();
+        } catch (error: any) {
+          logger.warn("AddPartogramme: claimNextDossierNumber failed", { error: error?.message });
+          setIsSubmitting(false);
+          setErrorMessage("Impossible d'attribuer un numéro de dossier automatiquement. Veuillez en saisir un manuellement.");
+          return;
+        }
+      } else {
+        const parsed = parseDossierNumber(noFile);
+        if (parsed === null) {
+          setErrorMessage("Le numéro de dossier doit être un nombre entier positif.");
+          return;
+        }
+        finalNoFile = parsed;
+        setErrorMessage(null);
+        setIsSubmitting(true);
       }
-      setErrorMessage(null);
-      setIsSubmitting(true);
       rootStore.partogrammeStore
         .createPartogramme(
           admissionDateTime.toISOString(),
           commentary,
           patientFirstName,
           patientLastName,
-          parsedNoFile,
+          finalNoFile,
           "ADMITTED",
           workStartDateTime.toISOString(),
         )
@@ -97,15 +104,13 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
           navigation.navigate("Screen_Menu");
         })
         .catch((error) => {
-          logger.warn("createPartogramme failed", { noFile, error: error?.message, code: error?.code });
+          logger.warn("createPartogramme failed", { noFile: finalNoFile, error: error?.message, code: error?.code });
           setIsSubmitting(false);
-          // 23505 = Postgres unique_violation — the (hospitalId, noFile)
-          // constraint (see 2026-08-07_unique_dossier_per_hospital.sql).
-          setErrorMessage(
-            error?.code === "23505"
-              ? "Ce numéro de dossier est déjà utilisé dans cet hôpital. Veuillez en choisir un autre."
-              : "Impossible de créer le partogramme. Veuillez réessayer.",
-          );
+          if (error?.code === "23505") {
+            setErrorMessage("Ce numéro de dossier est déjà utilisé. Veuillez en choisir un autre.");
+          } else {
+            setErrorMessage("Impossible de créer le partogramme. Veuillez réessayer.");
+          }
         });
     };
 
@@ -157,10 +162,11 @@ export const ScreenAddPartogramme: React.FC<Props> = observer(
             <Text style={styles.label}>Numéro de dossier</Text>
             <TextInput
               style={styles.input}
-              placeholder="Numéro de dossier"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
+              value={noFile}
               onChangeText={onChangeNoFile}
+              placeholder="Laisser vide pour attribution automatique"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
             />
           </View>
 

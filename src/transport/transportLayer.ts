@@ -216,21 +216,27 @@ export class TransportLayer {
     return data;
   }
 
-  // Suggests the next dossier number for a new maternity patient — a
-  // convenience prefill, not the actual uniqueness guarantee (that's
-  // Partogramme_maternityId_noFile_unique). Only considers not-yet-
-  // transferred patients (hospitalId is null), matching that index's scope.
-  async fetchNextDossierNumber(maternityId: string) {
-    const { data, error } = await supabase
-      .from("Partogramme")
-      .select("noFile")
-      .eq("maternityId", maternityId)
-      .is("hospitalId", null)
-      .eq("isDeleted", false)
-      .order("noFile", { ascending: false })
-      .limit(1);
+  // Atomically claims the next dossier number, globally — not scoped per
+  // hospital/maternity (see claim_next_dossier_number in
+  // 2026-09-04_global_dossier_numbers.sql). Numbers are assigned once at
+  // creation and never reclaimed afterward (transferToHospital,
+  // acceptTransferRequest, reassignToHospital, pullBackToMaternity all
+  // leave noFile untouched) — a stable identifier through the patient's
+  // whole journey requires uniqueness that holds everywhere she might go,
+  // which per-scope counters can't guarantee. The RPC's INSERT ... ON
+  // CONFLICT DO UPDATE serializes concurrent claims, so two people
+  // creating a patient at the same moment can never walk away with the
+  // same number.
+  async claimNextDossierNumber(): Promise<number> {
+    // Cast: claim_next_dossier_number doesn't exist in types/supabase.ts's
+    // generated RPC union yet — that file is generated from the live
+    // schema, which only knows about this function once the migration
+    // (2026-09-04_global_dossier_numbers.sql) has actually been applied
+    // and `supabase gen types` re-run. Safe to narrow here: the call
+    // itself is correct, this is purely a stale-types gap.
+    const { data, error } = await (supabase.rpc as any)("claim_next_dossier_number");
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return (data && data.length > 0 ? data[0].noFile : 0) + 1;
+    return data as number;
   }
 
   async fetchBabyHeartFrequencies(partogrammeId: string) {
@@ -398,7 +404,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherSystolicBloodPressure")
       .update(motherBloodPressure)
-      .eq("id", motherBloodPressure.id);
+      .eq("id", motherBloodPressure.id as string);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -437,7 +443,7 @@ export class TransportLayer {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
       .update(motherBloodPressure)
-      .eq("id", motherBloodPressure.id);
+      .eq("id", motherBloodPressure.id as string);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -636,7 +642,7 @@ export class TransportLayer {
     return data;
   }
 
-  async fetchUserInfo(profileId: String) {
+  async fetchUserInfo(profileId: string) {
     const { data, error } = await supabase
       .from("userInfo")
       .select("*")

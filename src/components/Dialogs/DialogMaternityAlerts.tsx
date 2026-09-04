@@ -31,7 +31,7 @@ interface Props {
 
 function alertTypeLabel(reason: "dilation" | "bpm" | "manual", value: number): string {
   if (reason === "manual") return "Alerte manuelle";
-  if (reason === "bpm") return `${value} bpm · ${value < 110 ? "bradycardie" : "tachycardie"}`;
+  if (reason === "bpm") return `${value} bpm · ${value < 100 ? "bradycardie" : "tachycardie"}`;
   return `${value} cm · dilatation bande rouge`;
 }
 

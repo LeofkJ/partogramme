@@ -826,6 +826,9 @@ export class Partogramme {
     reason: string,
   ) {
     const data = this.asJson;
+    // noFile stays exactly as-is — dossier numbers are global (see
+    // 2026-09-04_global_dossier_numbers.sql) and assigned once at
+    // creation, so there's no collision risk to avoid by reclaiming here.
     data.hospitalId = hospitalId;
     data.state = "TRANSFERRED";
     data.transferReason = reason;
@@ -857,12 +860,14 @@ export class Partogramme {
   // midwife's own pending list) — the requester's outcome notification
   // reads it via transferRequestStatus, and acknowledgeTransferRequestOutcome
   // is what finally clears it once they've actually seen the popup.
-  // noFileOverride: lets the midwife renumber the dossier in the same
-  // action when the target hospital already has a different patient with
-  // this number (23505 on Partogramme_hospitalId_noFile_unique — see
-  // MaternityTransferRequestsPanel's inline retry) — without this,
-  // accepting was a dead end since nothing else lets her edit noFile.
-  async acceptTransferRequest(noFileOverride?: number) {
+  // Used to take a noFileOverride so the midwife could renumber the
+  // dossier in the same action when the target hospital already had a
+  // different patient with this number (23505 on
+  // Partogramme_hospitalId_noFile_unique). No longer needed — dossier
+  // numbers are global now (see 2026-09-04_global_dossier_numbers.sql), so
+  // that collision can no longer happen at all, not just get a recovery
+  // path when it does.
+  async acceptTransferRequest() {
     const data = this.asJson;
     const hospitalId = data.transferRequestHospitalId;
     if (!hospitalId) return;
@@ -875,11 +880,11 @@ export class Partogramme {
       error.code = "LINK_REMOVED";
       throw error;
     }
+    // noFile stays as-is — see transferToHospital's comment above.
     data.hospitalId = hospitalId;
     data.state = "TRANSFERRED";
     data.transferRequestHospitalId = null;
     data.transferRequestStatus = "accepted";
-    if (noFileOverride !== undefined) data.noFile = noFileOverride;
     await this.store.transportLayer
       .resolveTransferRequest(data)
       .then(() => {
@@ -931,6 +936,7 @@ export class Partogramme {
   // doctor has to claim fresh via RÉCLAMER. State stays TRANSFERRED.
   async reassignToHospital(hospitalId: string, reason: string) {
     const data = this.asJson;
+    // noFile stays as-is — see transferToHospital's comment above.
     data.hospitalId = hospitalId;
     data.refDoctorId = null;
     data.transferReason = reason;
@@ -959,6 +965,7 @@ export class Partogramme {
   // IN_PROGRESS, same as any patient still being followed at the maternity.
   async pullBackToMaternity() {
     const data = this.asJson;
+    // noFile stays as-is — see transferToHospital's comment above.
     data.hospitalId = null;
     data.refDoctorId = null;
     data.state = "IN_PROGRESS";

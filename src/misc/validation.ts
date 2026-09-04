@@ -4,9 +4,10 @@
  * digits only — Number()'s own coercion accepts "1e5"/"0x1F" as valid
  * integers, which isn't what a human typing a dossier number means, so
  * this checks the raw string shape first. Returns the parsed integer, or
- * null if invalid. Shared by AddPartogramme.tsx (create) and
- * MaternityTransferRequestsPanel.tsx (renumber-on-accept) so both enforce
- * the same rule against the bigint noFile column. */
+ * null if invalid. Used by AddPartogramme.tsx to validate the editable
+ * dossier-number field — the field is pre-filled with a server-claimed
+ * suggestion (see claimNextDossierNumber) but stays editable, so whatever
+ * ends up there needs the same shape-check a fully free-typed value would. */
 export function parseDossierNumber(input: string): number | null {
   const trimmed = input.trim();
   if (!/^[0-9]+$/.test(trimmed)) return null;

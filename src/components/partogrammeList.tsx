@@ -85,32 +85,26 @@ const EnCoursSummary = observer(({ item }: { item: Partogramme }) => {
   if (!nurse) return null;
 
   const roleLabel = nurse.isMaternityNurse ? "Sage-femme" : "Infirmière";
-  const content = (
+
+  return (
     <View style={styles.nurseRow}>
       <Text style={[styles.nurseRole, nurse.isMaternityNurse ? styles.nurseRoleMidwife : styles.nurseRoleHospital]}>
         {roleLabel}
       </Text>
       {!!nurse.phone && (
-        <View style={styles.nursePhone}>
+        <TouchableOpacity
+          activeOpacity={0.6}
+          style={styles.nursePhone}
+          onPress={(e) => {
+            e.stopPropagation();
+            callPhone(nurse.phone as string);
+          }}
+        >
           <IconPhone size={13} color={colors.accent} />
           <Text style={styles.nursePhoneText}>{nurse.phone}</Text>
-        </View>
+        </TouchableOpacity>
       )}
     </View>
-  );
-
-  if (!nurse.phone) return content;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.6}
-      onPress={(e) => {
-        e.stopPropagation();
-        callPhone(nurse.phone as string);
-      }}
-    >
-      {content}
-    </TouchableOpacity>
   );
 });
 
@@ -118,10 +112,14 @@ const Item = observer(({ item, onPress, isFlagged }: ItemProps) => {
   const state = item.partogramme.state;
   const isEnCours = state === "IN_PROGRESS" || state === "TRANSFERRED";
   const role = rootStore.userInfoStore.userInfo.role;
+  const isMaternityNurse = role === "NURSE" && rootStore.userInfoStore.userInfo.nurseType === "MATERNITY";
   const isHospitalStaff =
     role === "DOCTOR" ||
     (role === "NURSE" && rootStore.userInfoStore.userInfo.nurseType !== "MATERNITY");
   const tone = isFlagged ? { bg: colors.dangerSoft, fg: colors.danger } : statusColors(state);
+  const patientName = [item.partogramme.patientFirstName, item.partogramme.patientLastName]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <TouchableOpacity
@@ -130,9 +128,16 @@ const Item = observer(({ item, onPress, isFlagged }: ItemProps) => {
       style={styles.card}
     >
       <View style={styles.cardMain}>
-        <Text style={styles.dossier} numberOfLines={1}>
-          Dossier #{Number(item.partogramme.noFile)}
-        </Text>
+        <View style={styles.cardTitles}>
+          <Text style={styles.dossier} numberOfLines={1}>
+            Dossier #{Number(item.partogramme.noFile)}
+          </Text>
+          {isMaternityNurse && !!patientName && (
+            <Text style={styles.patientName} numberOfLines={1}>
+              {patientName}
+            </Text>
+          )}
+        </View>
         <View style={styles.cardRight}>
           <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
             <Text style={[styles.statusPillText, { color: tone.fg }]}>
@@ -468,12 +473,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  dossier: {
+  cardTitles: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
+  },
+  dossier: {
     fontSize: 15,
     fontWeight: "600",
     color: colors.text,
+  },
+  patientName: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: colors.textSecondary,
   },
   cardRight: {
     flexShrink: 0,

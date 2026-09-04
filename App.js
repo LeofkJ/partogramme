@@ -6,6 +6,7 @@ import { NavBar, NAVBAR_ENABLED } from "./src/components/NavBar/NavBar";
 import { AlertBanner } from "./src/components/AlertBanner/AlertBanner";
 import { OfflineBanner } from "./src/components/OfflineBanner/OfflineBanner";
 import { DialogTransferOutcome } from "./src/components/Dialogs/DialogTransferOutcome";
+import { MaternityTransferRequestsPanel } from "./src/components/MaternityTransferRequestsPanel";
 import { navigationRef } from "./src/navigationRef";
 import { rootStore } from "./src/store/rootStore";
 import { colors, radius, spacing, type } from "./src/theme";
@@ -185,6 +186,7 @@ function App() {
             <AlertBanner />
             <OfflineBanner />
             <DialogTransferOutcome />
+            <MaternityTransferRequestsPanel />
             <Stack.Navigator>
               <Stack.Screen
                 name="Screen_Login"

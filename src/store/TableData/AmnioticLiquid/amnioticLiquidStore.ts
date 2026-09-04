@@ -310,7 +310,7 @@ export class AmnioticLiquid {
   async update(value: String) {
     if (!this.isEditable) {
       notify.error("Erreur", `Cette valeur ne peut plus être modifiée (délai de ${EDIT_WINDOW_MINUTES} minutes dépassé).`);
-      return Promise.reject("Edit window expired");
+      return Promise.reject(new Error("Edit window expired"));
     }
     let updatedData = this.asJson;
     updatedData.value = value;
