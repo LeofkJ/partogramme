@@ -1,5 +1,5 @@
 import { RealtimeChannel } from "@supabase/supabase-js";
-import { supabase } from "../initSupabase";
+import { supabase } from "../lib/initSupabase";
 
 /**
  * Subscribes to INSERT/UPDATE events on `table` for a single partogramme,

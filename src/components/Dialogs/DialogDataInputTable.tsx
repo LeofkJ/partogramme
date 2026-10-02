@@ -21,7 +21,7 @@ import { getEnumByString, getValueByRank, liquidStates } from "../../../types/co
 import { rootStore } from "../../store/rootStore";
 import { observer } from "mobx-react";
 import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
-import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
+import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/motherContractionDurationStore";
 
 export type DataInputTable_t =
   | AmnioticLiquidStore

@@ -9,7 +9,7 @@ import CustomButton from "../../components/CustomButton";
 import { IconUser, IconPlus, IconMaternity } from "../../components/Icons";
 import { notify } from "../../lib/notify";
 import { logger } from "../../lib/logger";
-import { reset } from "../../navigationRef";
+import { reset } from "../../navigation/navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
 
 export type Props = {

@@ -2,8 +2,6 @@
  * @description
  * This file contains all the constants used in the application
  */
-import { Database } from "../types/supabase";
-import { isLiquidState } from '../src/misc/CheckTypes';
 
 // Constants for the Tables of the graph page
 export const tableTitles = [

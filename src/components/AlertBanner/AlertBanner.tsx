@@ -3,7 +3,7 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions
 import { observer } from "mobx-react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { rootStore } from "../../store/rootStore";
-import { navigate, navigationRef, reset } from "../../navigationRef";
+import { navigate, navigationRef, reset } from "../../navigation/navigationRef";
 import { IconAlertTriangle, IconX } from "../Icons";
 import { colors, spacing, radius } from "../../theme";
 import { AlertBannerStore } from "../../store/alertBanner/alertBannerStore";

@@ -6,7 +6,7 @@ import { AmnioticLiquid } from '../store/TableData/AmnioticLiquid/amnioticLiquid
 import { MotherSystolicBloodPressure } from '../store/TableData/MotherSystolicBloodPressure/motherSystolicBloodPressureStore';
 import { MotherDiastolicBloodPressure } from '../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore';
 import { MotherContractionsFrequency } from '../store/TableData/MotherContractionsFrequency/motherContractionsFrequencyStore';
-import { MotherContractionDuration } from '../store/TableData/MotherContractionDuration/MotherContractionDurationStore';
+import { MotherContractionDuration } from '../store/TableData/MotherContractionDuration/motherContractionDurationStore';
 import { MotherHeartFrequency } from '../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore';
 import { MotherTemperature } from '../store/TableData/MotherTemperature/motherTemperatureStore';
 import { data_t } from '../store/partogramme/partogrammeStore';

@@ -13,7 +13,7 @@ import { Partogramme } from "../../partogramme/partogrammeStore";
 import { DataStore } from "../../DataStore";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
-import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
+import { isPhysiologicallyPlausible, isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../lib/validation";
 
 export type MotherContractionDuration_t =
   Database["public"]["Tables"]["MotherContractionDuration"];

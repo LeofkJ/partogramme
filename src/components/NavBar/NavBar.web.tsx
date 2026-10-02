@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { observer } from "mobx-react";
-import { navigate, reset } from "../../navigationRef";
+import { navigate, reset } from "../../navigation/navigationRef";
 import { rootStore } from "../../store/rootStore";
 import { logger } from "../../lib/logger";
 import { colors, spacing } from "../../theme";

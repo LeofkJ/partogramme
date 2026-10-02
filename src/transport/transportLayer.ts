@@ -1,6 +1,6 @@
 import * as Sentry from "../lib/sentry";
 import { logger } from "../lib/logger";
-import { supabase } from "../initSupabase";
+import { supabase } from "../lib/initSupabase";
 import { AmnioticLiquid_t as AmnioticLiquid_t } from "../store/TableData/AmnioticLiquid/amnioticLiquidStore";
 import { BabyDescent_t } from "../store/GraphData/BabyDescent/babyDescentStore";
 import { BabyHeartFrequency_t } from "../store/GraphData/BabyHeartFrequency/babyHeartFrequencyStore";
@@ -11,7 +11,7 @@ import { MotherContractionsFrequency_t } from "../store/TableData/MotherContract
 import { MotherHeartFrequency_t } from "../store/TableData/MotherHeartFrequency/motherHeartFrequencyStore";
 import { MotherTemperature_t } from "../store/TableData/MotherTemperature/motherTemperatureStore";
 import { Partogramme_t } from "../store/partogramme/partogrammeStore";
-import { MotherContractionDuration_t } from "../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
+import { MotherContractionDuration_t } from "../store/TableData/MotherContractionDuration/motherContractionDurationStore";
 import { Comment_t } from "../store/Comment/CommentStore";
 import { UserInfo } from "../store/user/userInfoStore";
 import { Profile } from "../store/user/profileStore";
@@ -248,28 +248,11 @@ export class TransportLayer {
     return data;
   }
 
-  async deleteBabyHeartFrequency(id: string) {
-    const { data, error } = await supabase
-      .from("BabyHeartFrequency")
-      .update({ isDeleted: true })
-      .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async updateBabyHeartFrequency(frequency: BabyHeartFrequency_t["Row"]) {
     const { data, error } = await supabase
       .from("BabyHeartFrequency")
       .upsert({ ...frequency })
       .eq("id", frequency.id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async insertBabyHeartFrequency(frequency: BabyHeartFrequency_t["Insert"]) {
-    const { data, error } = await supabase
-      .from("BabyHeartFrequency")
-      .insert({ ...frequency });
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -292,23 +275,6 @@ export class TransportLayer {
     return data;
   }
 
-  async insertDilation(dilation: Dilation_t["Insert"]) {
-    const { data, error } = await supabase
-      .from("Dilation")
-      .insert({ ...dilation });
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async deleteDilation(id: string) {
-    const { data, error } = await supabase
-      .from("Dilation")
-      .update({ isDeleted: true })
-      .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchBabyDescents(partogrammeId: string) {
     const { data, error } = await supabase
       .from("BabyDescent")
@@ -327,23 +293,6 @@ export class TransportLayer {
     return data;
   }
 
-  async insertBabyDescent(babyDescent: BabyDescent_t["Insert"]) {
-    const { data, error } = await supabase
-      .from("BabyDescent")
-      .insert({ ...babyDescent });
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async deleteBabyDescent(id: string) {
-    const { data, error } = await supabase
-      .from("BabyDescent")
-      .update({ isDeleted: true })
-      .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchAmnioticLiquids(partogrammeId: string) {
     const { data, error } = await supabase
       .from("amnioticLiquid")
@@ -358,23 +307,6 @@ export class TransportLayer {
       .from("amnioticLiquid")
       .upsert({ ...amnioticLiquid })
       .eq("id", amnioticLiquid.id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async insertAmnioticLiquid(amnioticLiquid: AmnioticLiquid_t["Insert"]) {
-    const { data, error } = await supabase
-      .from("amnioticLiquid")
-      .insert({ ...amnioticLiquid });
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async deleteAmnioticLiquid(amnioticLiquidId: string) {
-    const { data, error } = await supabase
-      .from("amnioticLiquid")
-      .update({ isDeleted: true })
-      .eq("id", amnioticLiquidId);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -409,15 +341,6 @@ export class TransportLayer {
     return data;
   }
 
-  async deleteSystolicMotherBloodPressure(motherBloodPressureId: string) {
-    const { data, error } = await supabase
-      .from("MotherSystolicBloodPressure")
-      .update({ isDeleted: true })
-      .eq("id", motherBloodPressureId);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchDiastolicMotherBloodPressures(partogrammeId: string) {
     const { data, error } = await supabase
       .from("MotherDiastolicBloodPressure")
@@ -448,29 +371,11 @@ export class TransportLayer {
     return data;
   }
 
-  async deleteDiastolicMotherBloodPressure(motherBloodPressureId: string) {
-    const { data, error } = await supabase
-      .from("MotherDiastolicBloodPressure")
-      .update({ isDeleted: true })
-      .eq("id", motherBloodPressureId);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchMotherContractionsFrequencies(partogrammeId: string) {
     const { data, error } = await supabase
       .from("MotherContractionsFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async deleteMotherContractionsFrequency(id: string) {
-    const { data, error } = await supabase
-      .from("MotherContractionsFrequency")
-      .update({ isDeleted: true })
-      .eq("id", id);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -486,30 +391,11 @@ export class TransportLayer {
     return data;
   }
 
-  async insertMotherContractionsFrequency(
-    frequency: MotherContractionsFrequency_t["Row"],
-  ) {
-    const { data, error } = await supabase
-      .from("MotherContractionsFrequency")
-      .insert({ ...frequency });
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchMotherHeartFrequencies(partogrammeId: string) {
     const { data, error } = await supabase
       .from("MotherHeartFrequency")
       .select("*")
       .eq("partogrammeId", partogrammeId);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async deleteMotherHeartFrequency(id: string) {
-    const { data, error } = await supabase
-      .from("MotherHeartFrequency")
-      .update({ isDeleted: true })
-      .eq("id", id);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -523,14 +409,6 @@ export class TransportLayer {
     return data;
   }
 
-  async insertMotherHeartFrequency(frequency: MotherHeartFrequency_t["Row"]) {
-    const { data, error } = await supabase
-      .from("MotherHeartFrequency")
-      .insert({ ...frequency });
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async fetchMotherTemperatures(partogrammeId: string) {
     const { data, error } = await supabase
       .from("MotherTemperature")
@@ -540,28 +418,11 @@ export class TransportLayer {
     return data;
   }
 
-  async deleteMotherTemperature(id: string) {
-    const { data, error } = await supabase
-      .from("MotherTemperature")
-      .update({ isDeleted: true })
-      .eq("id", id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   async updateMotherTemperature(temperature: MotherTemperature_t["Row"]) {
     const { data, error } = await supabase
       .from("MotherTemperature")
       .upsert({ ...temperature })
       .eq("id", temperature.id);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
-  async insertMotherTemperature(temperature: MotherTemperature_t["Row"]) {
-    const { data, error } = await supabase
-      .from("MotherTemperature")
-      .insert({ ...temperature });
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
@@ -685,7 +546,7 @@ export class TransportLayer {
   }
 
   // Admin-only, gated by the "Admins can create hospitals" RLS policy
-  // (supabase/policies/2026-07-27_admin_hospital_insert.sql).
+  // (supabase/history/2026-07-27_admin_hospital_insert.sql).
   async createHospital(hospital: { id: string; name: string; city: string; region?: string | null }) {
     const { data, error } = await supabase
       .from("hospital")
@@ -696,7 +557,7 @@ export class TransportLayer {
 
   // Soft-delete, same pattern as Partogramme/userInfo. Admin-only, gated by
   // the "Admins can update hospitals" RLS policy
-  // (supabase/policies/2026-07-27_admin_hospital_update.sql).
+  // (supabase/history/2026-07-27_admin_hospital_update.sql).
   async removeHospital(hospitalId: string) {
     const { data, error } = await supabase
       .from("hospital")
@@ -731,7 +592,7 @@ export class TransportLayer {
   }
 
   // Admin-only, gated by the "Admins can create maternities" RLS policy
-  // (supabase/policies/2026-08-09_maternity_nurses_and_transfer.sql).
+  // (supabase/history/2026-08-09_maternity_nurses_and_transfer.sql).
   async createMaternity(maternity: { id: string; name: string; region: string; address?: string | null }) {
     const { data, error } = await supabase
       .from("maternity")
@@ -754,7 +615,7 @@ export class TransportLayer {
 
   // Soft-delete, same pattern as removeHospital. Admin-only, gated by the
   // "Admins can update maternities" RLS policy
-  // (supabase/policies/2026-08-09_maternity_nurses_and_transfer.sql).
+  // (supabase/history/2026-08-09_maternity_nurses_and_transfer.sql).
   async removeMaternity(maternityId: string) {
     const { data, error } = await supabase
       .from("maternity")
@@ -848,7 +709,7 @@ export class TransportLayer {
   }
 
   // Admin-only, gated by the "Admins can create hospital-maternity links"
-  // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
+  // RLS policy (supabase/history/2026-08-12_hospital_maternity_link.sql).
   async linkHospitalMaternity(link: { id: string; hospitalId: string; maternityId: string }) {
     const { data, error } = await supabase.from("hospitalMaternityLink").insert(link);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
@@ -856,25 +717,15 @@ export class TransportLayer {
   }
 
   // Admin-only, gated by the "Admins can delete hospital-maternity links"
-  // RLS policy (supabase/policies/2026-08-12_hospital_maternity_link.sql).
+  // RLS policy (supabase/history/2026-08-12_hospital_maternity_link.sql).
   async unlinkHospitalMaternity(linkId: string) {
     const { data, error } = await supabase.from("hospitalMaternityLink").delete().eq("id", linkId);
     if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
     return data;
   }
 
-  async fetchAllDoctors() {
-    const { data, error } = await supabase
-      .from("userInfo")
-      .select("*")
-      .eq("role", "DOCTOR")
-      .neq("isDeleted", true);
-    if (error) { logger.error(error.message, { code: error.code }); Sentry.captureException(error); throw error; }
-    return data;
-  }
-
   // Admin-only. Backed by the "Admins can view all userInfo rows" RLS
-  // policy (supabase/policies/2026-07-27_admin_userinfo_select.sql). A
+  // policy (supabase/history/2026-07-27_admin_userinfo_select.sql). A
   // non-admin caller just gets back the same hospital-scoped rows they'd
   // see anyway, not an error.
   async fetchAllUserInfo() {

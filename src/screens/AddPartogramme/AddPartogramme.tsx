@@ -6,7 +6,7 @@ import DateTimePickerUIBloc from "../../components/DateTimePickerUIBloc";
 import { logger } from "../../lib/logger";
 import { IconMaternity } from "../../components/Icons";
 import { colors, spacing, radius, type, layout } from "../../theme";
-import { parseDossierNumber } from "../../misc/validation";
+import { parseDossierNumber } from "../../lib/validation";
 
 export type Props = {
   navigation: any;

@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { makePersistable } from 'mobx-persist-store';
 import { Database } from '../../../types/supabase';
-import { supabase } from '../../initSupabase';
+import { supabase } from '../../lib/initSupabase';
 import { RootStore } from '../rootStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notify } from '../../lib/notify';
@@ -94,14 +94,6 @@ export class ProfileStore {
       notify.success("Connecté avec " + data.user.email + " !");
     }
     return isLoggedIn;
-  }
-
-  /**
-   * This function is used get name of the user.
-   * @returns the user's profile information
-   */
-  getProfileName() {
-    return this.profile.firstName + " " + this.profile.lastName;
   }
 
   /**

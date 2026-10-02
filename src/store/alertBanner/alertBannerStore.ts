@@ -2,7 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import { RootStore } from "../rootStore";
 import { TransportLayer } from "../../transport/transportLayer";
 import { logger } from "../../lib/logger";
-import { supabase } from "../../initSupabase";
+import { supabase } from "../../lib/initSupabase";
 
 /** Backs the floating "X patientes ont une alerte" banner shown app-wide
  * after login (see AlertBanner.tsx) — hospital staff only (doctor/hospital

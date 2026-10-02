@@ -11,7 +11,7 @@
 import { observer } from "mobx-react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { rootStore } from "../../store/rootStore";
-import { navigate } from "../../navigationRef";
+import { navigate } from "../../navigation/navigationRef";
 import { colors, radius, spacing } from "../../theme";
 import { IconCheck } from "../Icons";
 

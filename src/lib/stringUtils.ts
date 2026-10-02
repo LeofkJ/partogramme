@@ -11,13 +11,6 @@
 // happens to default to (some environments fall back to an ISO-looking
 // "2026-07-27" instead of a real French date, which reads as a bug).
 
-export const formatDateString = (date: string | null): string => {
-  if (!date) return "Aucune date";
-  return new Date(date as string)
-                .toLocaleString("fr-FR")
-                .replace(",", "");
-}
-
 export const formatDateOnly = (date: string | null): string => {
   if (!date) return "Aucune date";
   return new Date(date).toLocaleDateString("fr-FR");

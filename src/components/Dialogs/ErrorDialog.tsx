@@ -17,27 +17,7 @@ export interface AppProps {
   toggleDialog: () => void;
 }
 
-export interface AppState {}
-
-export default class AppComponent extends React.Component<AppProps, AppState> {
-  constructor(props: AppProps) {
-    super(props);
-    this.state = {};
-  }
-
-  public render() {
-    return (
-      <ErrorDialogInner
-        isVisible={this.props.isVisible}
-        errorCode={this.props.errorCode}
-        errorMsg={this.props.errorMsg}
-        toggleDialog={this.props.toggleDialog}
-      />
-    );
-  }
-}
-
-const ErrorDialogInner: React.FC<AppProps> = ({
+const ErrorDialog: React.FC<AppProps> = ({
   isVisible,
   errorCode,
   errorMsg,
@@ -131,3 +111,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 });
+
+export default ErrorDialog;

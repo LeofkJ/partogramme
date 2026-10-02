@@ -209,15 +209,6 @@ export class AdminStore {
     return this.hospitals.filter((h) => linkedIds.has(h.id));
   }
 
-  /** Maternities currently linked to a hospital — the other direction of
-   * hospitalsForMaternity. */
-  maternitiesForHospital(hospitalId: string): Maternity["Row"][] {
-    const linkedIds = new Set(
-      this.hospitalMaternityLinks.filter((l) => l.hospitalId === hospitalId).map((l) => l.maternityId),
-    );
-    return this.maternities.filter((m) => linkedIds.has(m.id));
-  }
-
   async linkMaternityToHospital(maternityId: string, hospitalId: string) {
     try {
       const link = { id: uuid.v4().toString(), maternityId, hospitalId };

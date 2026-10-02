@@ -1,5 +1,4 @@
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -8,7 +7,6 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { observer } from "mobx-react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DialogDataInputGraph from "../../components/Dialogs/DialogDataInputGraph";
 import { useEffect, useRef, useState } from "react";
 import BabyGraph from "../../components/Graphs/BabyGraph";
@@ -34,11 +32,11 @@ import CustomButton from "../../components/CustomButton";
 import DataModifierDialog from "../../components/DataModifierDialog";
 import EditDataDialog from "../../components/Dialogs/EditDataDialog";
 import { MotherDiastolicBloodPressureStore } from "../../store/TableData/MotherDiastolicBloodPressure/motherDiastolicBloodPressureStore";
-import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/MotherContractionDurationStore";
+import { MotherContractionDurationStore } from "../../store/TableData/MotherContractionDuration/motherContractionDurationStore";
 import { dataStore_t } from "../../store/partogramme/partogrammeStore";
 import { CommentsSlider } from "../../components/CommentsSlider";
 import { DialogEditText } from "../../components/Dialogs/DialogEditText";
-import { formatDateOnly, formatTimeOnly } from "../../tools/StringUtilitary";
+import { formatDateOnly, formatTimeOnly } from "../../lib/stringUtils";
 import { getStringByEnum, partogrammeStates } from "../../../types/constants";
 import { DialogConfirm } from "../../components/Dialogs/DialogConfirm";
 import { DialogTransferPatient } from "../../components/Dialogs/DialogTransferPatient";
@@ -55,7 +53,6 @@ export type Props = {
 };
 
 export const ScreenGraph: React.FC<Props> = observer(({ navigation }) => {
-  const insets = useSafeAreaInsets();
   const [isReady, setIsReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isFcDialogVisible, setFcDialogVisible] = useState(false);
@@ -1603,22 +1600,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 30,
   },
-  overlayPenButton: {
-    position: "absolute",
-  },
-  fabButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
   patientTitleLabel: {
     width: "95%",
     color: colors.textSecondary,
@@ -1661,12 +1642,5 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     marginTop: 2,
     lineHeight: 16,
-  },
-  sectionTitleText: {
-    textAlign: "left",
-    color: colors.textSecondary,
-    fontSize: 15,
-    margin: 2,
-    fontWeight: "600",
   },
 });

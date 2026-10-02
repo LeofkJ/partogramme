@@ -3,19 +3,14 @@ import { colors } from "../../theme";
 import {
   ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import {
   Table,
   TableWrapper,
   Row,
-  Rows,
-  Col,
   Cell,
 } from "react-native-reanimated-table";
-import { tableTitles } from "../../../types/constants";
 import { Button, Icon } from "@rneui/themed";
 import { data_t } from "../../store/partogramme/partogrammeStore";
 
@@ -35,8 +30,8 @@ const DataListTable: React.FC<Props> = ({
   onPress,
 }) => {
   const element = (data, index) => (
-    <Button 
-      radius={"sm"} 
+    <Button
+      radius={"sm"}
       type="solid"
       buttonStyle = {styles.btn}
       onPress={
@@ -99,16 +94,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignSelf: "center",
   },
-  head: { height: 40, backgroundColor: colors.accent, width: "100%" , borderLeftWidth: 2, borderRightWidth: 2, borderTopWidth: 2},
-  wrapper: { flex: 1, flexDirection: "row", width: "100%" },
-  wrapper_rows: { flex: 1, flexDirection: "column", width: "100%" },
-  dataWrapper: {},
-  title: { backgroundColor: "#f6f8fa" },
+  head: { height: 40, backgroundColor: colors.accent, width: "100%" , borderLeftWidth: 2, borderRightWidth: 2, borderTopWidth: 2},   
   row: { flexDirection: "row", backgroundColor: "#7162b5" , borderLeftWidth: 2, borderRightWidth: 2},
-  rowWrapper: { flexDirection: "row" },
   text: { textAlign: "center", color: "#fff", margin: 2 },
   btn: { width: 40, height: 40, backgroundColor: colors.accent, borderRadius: 20, margin: 5 },
-  btnText: { textAlign: "center", color: "#fff" },
 });
 
 export default DataListTable;

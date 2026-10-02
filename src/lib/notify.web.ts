@@ -1,4 +1,4 @@
-import { colors, radius } from "../theme";
+import { colors } from "../theme";
 import type { Notify } from "./notifyTypes";
 
 // Web implementation: lightweight DOM toasts, no dependencies.

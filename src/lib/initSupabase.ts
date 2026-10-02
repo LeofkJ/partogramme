@@ -1,9 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import { Platform } from "react-native";
-import { Database } from "../types/supabase";
+import { Database } from "../../types/supabase";
 import {SUPABASEURL, SUPABASEKEY} from "@env"
-import { logger } from "./lib/logger";
+import { logger } from "./logger";
 
 const supabaseUrl = SUPABASEURL
 const supabaseKey = SUPABASEKEY

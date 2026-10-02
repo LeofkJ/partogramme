@@ -5,13 +5,11 @@ import { TransportLayer } from "../../../transport/transportLayer";
 import { RootStore } from "../../rootStore";
 import uuid from "react-native-uuid";
 import { Partogramme } from "../../partogramme/partogrammeStore";
-import { throws } from "assert";
 import { liquidStates, getStringByEnum } from '../../../../types/constants';
-import { isLiquidState } from "../../../misc/CheckTypes";
 import { logger } from "../../../lib/logger";
 import { notify } from "../../../lib/notify";
 import { subscribeToPartogrammeTable, unsubscribeChannel } from "../../realtimeSync";
-import { isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../misc/validation";
+import { isWithinEditWindow, EDIT_WINDOW_MINUTES } from "../../../lib/validation";
 
 export type AmnioticLiquid_t =
   Database["public"]["Tables"]["amnioticLiquid"];

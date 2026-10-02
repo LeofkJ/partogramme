@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { rootStore } from "../../store/rootStore";
-import { supabase } from "../../initSupabase";
+import { supabase } from "../../lib/initSupabase";
 import { logger } from "../../lib/logger";
 import { notify } from "../../lib/notify";
-import { navigationRef, reset } from "../../navigationRef";
+import { navigationRef, reset } from "../../navigation/navigationRef";
 
 /**
  * Login screen logic, shared by every platform variant of the screen

@@ -1,5 +1,5 @@
 import React from "react";
-import Svg, { Path, Circle, G, Rect } from "react-native-svg";
+import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { colors } from "../theme";
 
 interface IconProps {
@@ -75,18 +75,6 @@ export const IconClock: React.FC<IconProps> = ({ size = 24, color = "#000" }) =>
   </Svg>
 );
 
-export const IconMessage: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H9l-4.5 4V17H4a1 1 0 01-1-1V6a1 1 0 011-1z"
-      stroke={color}
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
 export const IconChevronDown: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
@@ -149,18 +137,6 @@ export const IconUser: React.FC<IconProps> = ({ size = 24, color = "#000" }) => 
       stroke={color}
       strokeWidth={1.8}
       strokeLinecap="round"
-    />
-  </Svg>
-);
-
-export const IconHeart: React.FC<IconProps> = ({ size = 24, color = "#000" }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M12 20s-7-4.35-9.5-9C.86 7.6 2.4 4.5 5.5 4.5c1.86 0 3.41 1.14 4 2.5.59-1.36 2.14-2.5 4-2.5 3.1 0 4.64 3.1 3 6.5-2.5 4.65-9.5 9-9.5 9z"
-      stroke={color}
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
     />
   </Svg>
 );

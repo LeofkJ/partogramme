@@ -6,7 +6,7 @@ import { logger } from "../../lib/logger";
 import { Database } from "../../../types/supabase";
 import { TransportLayer } from "../../transport/transportLayer";
 import { RootStore } from "../rootStore";
-import { supabase } from "../../initSupabase";
+import { supabase } from "../../lib/initSupabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import {
   BabyHeartFrequency,
@@ -48,7 +48,7 @@ import { DataInputTable_t } from "../../components/Dialogs/DialogDataInputTable"
 import {
   MotherContractionDuration,
   MotherContractionDurationStore,
-} from "../TableData/MotherContractionDuration/MotherContractionDurationStore";
+} from "../TableData/MotherContractionDuration/motherContractionDurationStore";
 import { Comment, CommentStore } from "../Comment/CommentStore";
 
 export type Partogramme_t = Database["public"]["Tables"]["Partogramme"];
@@ -80,23 +80,6 @@ export type data_t =
   | BabyHeartFrequency
   | Dilation
   | Comment;
-
-export const getStatusBackgroundColor = (
-  status: Database["public"]["Enums"]["PartogrammeState"]
-) => {
-  if (status === "ADMITTED") {
-    return "#8c8c8c";
-  }
-  if (status === "IN_PROGRESS") {
-    return "#fcdd7e";
-  }
-  if (status === "TRANSFERRED") {
-    return "#168039";
-  }
-  if (status === "WORK_FINISHED") {
-    return "#168039";
-  }
-};
 
 export class PartogrammeStore {
   rootStore: RootStore;
@@ -442,15 +425,6 @@ export class PartogrammeStore {
     this.selectedPartogrammeId = null;
     this.partogrammeList.splice(0, this.partogrammeList.length);
   }
-
-  // Status flag for the loading state of the partogrammeStore
-  // TODO: this is not used yet and it should be reworked correctly
-  // get isLoading() {
-  //   return (
-  //     this.state === "pending" ||
-  //     this.partogrammeList.some((partogramme) => partogramme.state === "pending")
-  //   );
-  // }
 }
 
 export class Partogramme {
@@ -688,23 +662,6 @@ export class Partogramme {
       }
     }
     return last10MinutesData;
-  }
-
-  /**
-   * @brief this function return a list of every data added in the last 10 minutes in the partogramme.
-   * @param ids the ids of the data to return
-   * @returns the last 10 minutes data
-   */
-  getDataByIds(ids: String[]) {
-    const Data = [];
-    for (const store of this.dataStores) {
-      for (const data of store.dataList) {
-        if (ids.includes(data.data.id)) {
-          Data.push(data);
-        }
-      }
-    }
-    return Data;
   }
 
   getDataById(id: String) {

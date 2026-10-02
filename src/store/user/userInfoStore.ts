@@ -1,11 +1,11 @@
-import { makeAutoObservable, reaction, runInAction } from "mobx";
+import { makeAutoObservable, runInAction } from "mobx";
 import { makePersistable } from "mobx-persist-store";
 import { Database } from "../../../types/supabase";
-import { supabase } from "../../initSupabase";
+import { supabase } from "../../lib/initSupabase";
 import { RootStore } from "../rootStore";
 import { notify } from "../../lib/notify";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Profile, ProfileStore } from "./profileStore";
+import { ProfileStore } from "./profileStore";
 import { TransportLayer } from "../../transport/transportLayer";
 import { PostgrestError } from "@supabase/supabase-js";
 import uuid from "react-native-uuid";
@@ -114,10 +114,6 @@ export class UserInfoStore {
     this.userInfo.refDoctorId = userInfoRefDoctor;
   }
 
-  setUserInfoHospitalId(userInfoHospitalId: string) {
-    this.userInfo.hospitalId = userInfoHospitalId;
-  }
-
   set userInfoRole(userInfoRole: Role) {
     this.userInfo.role = userInfoRole;
   }
@@ -132,10 +128,6 @@ export class UserInfoStore {
 
   set userInfoAddress(userInfoAddress: string) {
     this.userInfo.address = userInfoAddress;
-  }
-
-  setDoctorIds(doctorIds: string[]) {
-    this.doctorIds = doctorIds;
   }
 
   setHospitals(hospitals: Hospital["Row"][]) {

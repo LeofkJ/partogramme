@@ -21,9 +21,9 @@ import { MaternityHospitalLinksPanel } from "../../components/MaternityHospitalL
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { IconTrash, IconPlus, IconUser, IconHospital, IconMaternity, IconUserCog, IconCopy, IconCheck } from "../../components/Icons";
 import { notify } from "../../lib/notify";
-import { reset } from "../../navigationRef";
+import { reset } from "../../navigation/navigationRef";
 import { colors, spacing, radius, layout } from "../../theme";
-import { formatDateOnly } from "../../tools/StringUtilitary";
+import { formatDateOnly } from "../../lib/stringUtils";
 import { SkeletonPulse, SkeletonBlock } from "../../components/Skeleton/Skeleton";
 
 type RoleChoice = "NURSE" | "DOCTOR";

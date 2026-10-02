@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
-import { colors, layout, radius, spacing } from "../../theme";
+import { colors, layout, spacing } from "../../theme";
 import { SkeletonPulse, SkeletonBlock } from "../Skeleton/Skeleton";
 import { IconClock } from "../Icons";
 

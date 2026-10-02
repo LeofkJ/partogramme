@@ -7,7 +7,7 @@ import { AlertBanner } from "./src/components/AlertBanner/AlertBanner";
 import { OfflineBanner } from "./src/components/OfflineBanner/OfflineBanner";
 import { DialogTransferOutcome } from "./src/components/Dialogs/DialogTransferOutcome";
 import { MaternityTransferRequestsPanel } from "./src/components/MaternityTransferRequestsPanel";
-import { navigationRef } from "./src/navigationRef";
+import { navigationRef } from "./src/navigation/navigationRef";
 import { rootStore } from "./src/store/rootStore";
 import { colors, radius, spacing, type } from "./src/theme";
 import * as Sentry from "./src/lib/sentry";

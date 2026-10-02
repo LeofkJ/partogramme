@@ -1,88 +1,153 @@
-# Partogramme Application
-This repository contains the source code for the Partogramme application on mobile and web.
+# Partogramme
 
-this project use the framework reactnative and expo to build both mobile and web application.
+A mobile and web app for tracking labour digitally with a partogram, the chart midwives use to follow a birth and spot problems early. Midwives at a maternity centre record the mother's and baby's vitals as labour progresses. The app flags patients who need attention and lets them be handed over to a hospital. The interface is in French.
 
-The application is build using the supabase database and authentification service.
-To learn more about supabase, visit https://supabase.io/
+Built with React Native and Expo (iOS, Android, web) on a Supabase backend.
 
-<img src="assets\global_functional_schema.png" alt= “” width="1000">
+<img src="assets/global_functional_schema.png" alt="Global functional schema" width="1000">
 
-# Getting Started
-To get started clone the repository.
+## What it does
 
-Then setup your reactNative/expo environement by following the tutorial on https://reactnative.dev/docs/environment-setup
+For each patient, identified by a dossier (file) number rather than a name, the app records:
 
-Once you've done the quick start guide, go into the project folder and run the following command to install all the dependencies:
+- **Baby:** heart rate, cervical dilation, descent
+- **Mother:** blood pressure (systolic and diastolic), heart rate, temperature, contraction frequency and duration
+- **Amniotic liquid:** none, intact, clear, meconial, bloody, or pea-soup
+- **Comments:** free-text notes on the chart
+
+Readings are plotted on graphs. The dilation graph uses the WHO green, yellow and red banding, and the same thresholds drive the alerts shown on patient cards and the hospital dashboard.
+
+A patient moves through four states: admitted, in progress, transferred, and work finished.
+
+### Who uses it
+
+| Role | What they can do |
+| --- | --- |
+| Maternity nurse (midwife) | Registers patients, records vitals, raises manual alerts, transfers a patient to a linked hospital, and accepts transfer requests from hospital staff. |
+| Doctor | Sees the hospital dashboard: alerts, the hospital's own patients, and the patients of every linked maternity. Can edit data and request a transfer. |
+| Hospital nurse | Same dashboard and visibility as a doctor. |
+| Admin | Creates and manages accounts, hospitals, maternities, and the links between them. Has no access to patient charts or the dashboard. |
+
+Accounts are created by an admin with a temporary password, and the user must set their own password on first login.
+
+### Other behaviour
+
+- **Live updates:** edits show up on every device viewing the same patient, through Supabase realtime.
+- **Offline awareness:** a banner appears when the connection drops.
+- **Alerts:** automatic ones from clinical thresholds, plus manual ones raised by the midwife with a reason.
+- **Transfers:** a maternity patient can be transferred to a hospital, either initiated by the midwife or requested by hospital staff and accepted by the midwife. The outcome notifies the other side.
+- **Dossier numbers:** unique and claimed atomically on the server so two devices never get the same number.
+- **Crash reporting:** Sentry, on native and web.
+
+## Tech stack
+
+- React Native 0.81 and Expo 54, TypeScript, one codebase for iOS, Android and web
+- MobX for state (`mobx`, `mobx-react`, `mobx-persist-store`)
+- React Navigation (native stack plus bottom tabs on mobile, a top navbar on web)
+- Supabase: Postgres with row-level security, auth, realtime, and edge functions
+- UI libraries: React Native Paper, React Native Elements, react-native-svg for graphs
+
+## Getting started
+
+You need Node (see `.nvmrc`), npm, and an Expo environment. Follow the React Native environment guide at https://reactnative.dev/docs/environment-setup if you want to run on a simulator.
+
 ```bash
 npm install
 ```
-# Running the application
-To run the application on your device, run the following command:
-```bash
-npm start
+
+### Environment variables
+
+The app reads its Supabase connection from an env file chosen by the `MY_ENV` variable (via `react-native-dotenv`). Create one file per environment at the project root, for example `.env.staging`, `.env.production` or `.env.local-dev`:
+
 ```
-This will start the expo server and open a new tab in your browser. From there you can choose to run the application on your device or on a simulator.
-## Running on personal devices
-To run the application on your personal device, you will need to install the expo application on your device. You can find it on the app store or the play store.
-More info on https://docs.expo.dev/.
-
-Once you have the application installed, you can scan the QR code on the expo server page to run the application on your device.
-
-## Running on simulator
-To run the application on a simulator, you will need to install the simulator on your computer.
-Just follow this tutorial to install the simulator : https://docs.expo.dev/workflow/android-studio-emulator/.
-
-Then to launch the application on the simulator, launch the expo server and press the key that say "Run on Android device/emulator" or "Run on iOS simulator" depending on the simulator you installed.
-
-# Project Structure
-there is 3 main folder in the project:
-- src: contains all the source code of the application.
-  - components: contains all the components
-  - screens: contains all the screens
-  - store: contains all mobx store
-  - transport: contains all the api calls
-- prisma: contains the prisma schema that define the database structure.
-- types: contains the typescript types generated by supabase and other needed constants.
-
-# Update Database types
-The typescript types are generated by supabase. To update them, run the following command:
-```bash
-npx supabase login
-npx supabase gen types typescript --project-id yqgeaxbjjjvxgmbtpqqp  > types/supabase.ts
-```
-# prisma cmd
-Here some cmds to use with prisma cli.
-To learn more about prisma, visit https://www.prisma.io/.
-To format  your prisma schema, run the following command:
-```bash
-npx prisma format
+SUPABASEURL=https://<project-ref>.supabase.co
+SUPABASEKEY=<the project's anon (public) key>
 ```
 
-To open the prisma studio, it allowed to see the content of the database.
-Run the following command:
+Never put a service role key in the app or in these files.
+
+### Run
+
 ```bash
-npx prisma studio
+npx expo start            # dev server, then pick a platform
+npm run ios               # build and run on the iOS simulator
+npm run android           # build and run on an Android emulator or device
+npm run web               # run in the browser
 ```
 
-To update the database, run the following command:
+The Android shortcuts set `MY_ENV` for you: `npm run android-local`, `android-dev` (staging) and `android-prod`. The `start` script in `package.json` pins a packager IP address, so change it to yours or use `npx expo start`.
+
+To run on a physical phone, install the Expo Go or dev client app and scan the QR code from the dev server.
+
+### Build
+
 ```bash
-npx prisma migrate dev --name <name>
+npm run build-android          # EAS build
+npm run build-android-apk      # development APK
+npm run build-android-store    # production build for the store
+npm run build-ios
 ```
 
-# Envirronement variables
-In order to setup the application, you will need to create a .env file at the root of the project.
-This file will contain all the envirronement variables needed to run the application.
-Here is the list of the variables needed:
-DATABASE_URL
-SHADOW_DATABASE_URL
-SUPABASEURL
-SUPABASEKEY
-EMAIL_ADMIN
-EMAIL_ADMIN_PASSWORD
+Builds use EAS, configured in `eas.json`. A static web build comes from `npx expo export --platform web`.
 
-# To connect to local supabase 
-http://<your_local_ip_adress>:54323/
+## Project structure
 
+```
+App.js                 Entry component: providers, navigation, global banners and dialogs
+index.js               Registers the app
+src/
+  components/          Reusable UI (dialogs, graphs, tables, banners, icons)
+  screens/             Login, Menu, AddPartogramme, Graph, Profile, Admin, HospitalDashboard
+  navigation/          Bottom tab navigator and the navigation ref
+  store/               MobX stores: partogramme, each vital sign, user, admin, alerts, network
+  transport/           All Supabase calls (transportLayer.ts)
+  lib/                 Helpers: supabase client, logger, notifications, Sentry, clinical alert
+                       thresholds, validation, type guards, string utils
+  theme.ts             Colours, spacing, typography
+supabase/
+  functions/           Edge functions for admin account management
+  history/             Dated SQL files (RLS policies, functions, fixes), see below
+types/
+  supabase.ts          Generated database types
+  constants.ts         Shared constants and enum helpers
+prisma/                Early schema copy, may be out of date (see below)
+assets/                Icons, splash screen, schema diagram
+android/, ios/         Native projects
+```
 
-Tcheck awesome react !!!
+State flows from screens to MobX stores to the transport layer to Supabase. Screens do not call Supabase directly.
+
+## Backend (Supabase)
+
+The database, auth and edge functions live in Supabase. Row-level security enforces who can see and change what, so the access rules are in the database, not only in the app.
+
+### Edge functions
+
+`supabase/functions/` contains admin-only functions: `create-account`, `update-account`, `remove-account`, and `admin-list-logins`. They share a check in `_shared/adminAuth.ts` that the caller is an admin. Deploy with the Supabase CLI.
+
+### Database changes
+
+Schema and policy changes are plain SQL files in `supabase/history/`, named with a date prefix. They are applied by hand in the Supabase SQL editor, in date order. Later files often fix or replace earlier ones, so read them in order. Add new changes with the next date prefix and a comment at the top saying what to apply them after.
+
+Keep this in mind when writing policies: an `.upsert()` needs a SELECT policy as well as INSERT and UPDATE, otherwise it fails with a misleading `42501` permission error.
+
+### Regenerate the TypeScript types
+
+After a schema change:
+
+```bash
+npm run update-types
+```
+
+This runs `supabase gen types` against the project and rewrites `types/supabase.ts`. You need to be logged in with `npx supabase login`.
+
+### Prisma
+
+`prisma/schema.prisma` was the original schema definition and does not include newer tables such as maternities and hospital links. Treat `types/supabase.ts` and the SQL in `supabase/history/` as the source of truth. The `update-database` and `open-prisma-studio` scripts still exist but only make sense against the old schema.
+
+## Working on the code
+
+- There is no automated test suite yet.
+- Check types with `npx tsc --noEmit`. There are some pre-existing type errors, mostly in the stores, so compare against the baseline rather than expecting zero.
+- Edits to patient data go through MobX stores and the transport layer so that realtime sync and offline handling keep working.
+- Patient names are hidden throughout the UI. Use the dossier number to identify a patient.
